@@ -17,10 +17,16 @@ import {
   preventJoinIntoBlockquote,
   exitToParagraph,
   smartSelectAll,
+  deleteEmptyCell,
+  convertEmptyHeadingToParagraph,
 } from './commands';
 import { ensureCellPlugin } from './plugins/ensureCellPlugin';
 import { slashMenuPlugin } from './plugins/slashMenuPlugin';
+import { autosavePlugin, NOTEBOOK_IDB_KEY } from './plugins/autosavePlugin';
+import { placeholderPlugin } from './plugins/placeholderPlugin';
 import { SlashMenu } from './components/SlashMenu';
+import { useUIStore } from './stores/uiStore';
+import { get } from 'idb-keyval';
 import './App.css';
 
 function createPlugins() {
@@ -52,6 +58,8 @@ function createPlugins() {
       //   2. preventJoinIntoBlockquote — block joining a paragraph INTO a previous quote
       //   3. (fall through to baseKeymap for default delete/join)
       'Backspace': chainCommands(
+        convertEmptyHeadingToParagraph,
+        deleteEmptyCell,
         exitBlockquoteOnBackspace,
         preventJoinIntoBlockquote,
       ),
@@ -72,33 +80,49 @@ function createPlugins() {
     }),
     keymap(baseKeymap),
     ensureCellPlugin,
+    autosavePlugin,
+    placeholderPlugin,
   ];
 }
 
 function App() {
   const editorRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<EditorView | null>(null);
+  const saveStatus = useUIStore((s) => s.saveStatus);
 
   useEffect(() => {
     if (!editorRef.current) return;
 
-    const state = EditorState.create({
-      schema: notebookSchema,
-      doc: createInitialDoc(),
-      plugins: createPlugins(),
-    });
+    let v: EditorView;
 
-    const v = new EditorView(editorRef.current, {
-      state,
-      dispatchTransaction(transaction) {
-        const newState = v.state.apply(transaction);
-        v.updateState(newState);
-      },
-    });
+    (async () => {
+      const saved = await get(NOTEBOOK_IDB_KEY);
+      let doc;
+      try {
+        doc = saved ? notebookSchema.nodeFromJSON(saved) : createInitialDoc();
+      } catch {
+        doc = createInitialDoc();
+      }
 
-    setView(v);
+      const state = EditorState.create({
+        schema: notebookSchema,
+        doc,
+        plugins: createPlugins(),
+      });
+
+      v = new EditorView(editorRef.current!, {
+        state,
+        dispatchTransaction(transaction) {
+          const newState = v.state.apply(transaction);
+          v.updateState(newState);
+        },
+      });
+
+      setView(v);
+    })();
+
     return () => {
-      v.destroy();
+      v?.destroy();
       setView(null);
     };
   }, []);
@@ -107,6 +131,11 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>Second Brain</h1>
+        {saveStatus !== 'idle' && (
+          <span className={`save-status save-status--${saveStatus}`}>
+            {saveStatus === 'pending' ? 'Saving...' : 'Saved'}
+          </span>
+        )}
       </header>
       <main className="app-main">
         <div ref={editorRef} className="notebook-editor" />

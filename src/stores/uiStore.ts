@@ -23,10 +23,15 @@ export interface SlashState {
   anchor: { top: number; left: number } | null;
 }
 
+export type SaveStatus = 'idle' | 'pending' | 'saved';
+
 interface UIState {
   slash: SlashState;
   setSlash: (partial: Partial<SlashState>) => void;
   resetSlash: () => void;
+
+  saveStatus: SaveStatus;
+  setSaveStatus: (status: SaveStatus) => void;
 }
 
 const initialSlash: SlashState = {
@@ -42,4 +47,7 @@ export const useUIStore = create<UIState>((set) => ({
   setSlash: (partial) =>
     set((state) => ({ slash: { ...state.slash, ...partial } })),
   resetSlash: () => set({ slash: initialSlash }),
+
+  saveStatus: 'idle',
+  setSaveStatus: (status) => set({ saveStatus: status }),
 }));

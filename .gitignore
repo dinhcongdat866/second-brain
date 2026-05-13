@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Local-only docs (project notes, business plan, scratchpad)
+localDoc/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

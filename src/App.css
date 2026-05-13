@@ -23,12 +23,28 @@ body {
   padding: 16px 32px;
   border-bottom: 1px solid #e5e5e5;
   background: white;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .app-header h1 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+}
+
+.save-status {
+  font-size: 12px;
+  transition: opacity 0.2s;
+}
+
+.save-status--pending {
+  color: #999;
+}
+
+.save-status--saved {
+  color: #4caf50;
 }
 
 .app-main {
@@ -88,6 +104,17 @@ body {
   border-top: 1px solid #ddd;
   margin: 16px 0;
   height: 0;
+}
+
+/* Placeholder for empty cells */
+.pm-placeholder {
+  position: relative;
+}
+.pm-placeholder::before {
+  content: 'Start writing...';
+  position: absolute;
+  color: #bbb;
+  pointer-events: none;
 }
 
 /* Inline code mark (Mod-E) — GitHub/Stack Overflow style */

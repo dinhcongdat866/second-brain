@@ -1,4 +1,4 @@
-import { type Command, TextSelection, AllSelection } from 'prosemirror-state';
+import { type Command, TextSelection, AllSelection, Selection } from 'prosemirror-state';
 import type { Node as PMNode, NodeType } from 'prosemirror-model';
 import {
   chainCommands,
@@ -331,4 +331,74 @@ export const smartSelectAll: Command = (state, dispatch) => {
 
 export const toggleCodeMark: Command = (state, dispatch) => {
   return toggleMark(notebookSchema.marks.code)(state, dispatch);
+};
+
+// ---------------------------------------------------------------------------
+// Convert empty heading → paragraph on Backspace
+// ---------------------------------------------------------------------------
+// When cursor is at the start of an empty heading, Backspace converts it to
+// a plain paragraph instead of deleting — consistent with Notion behavior.
+// deleteEmptyCell then handles the next Backspace if the paragraph is the
+// only child in the cell.
+// ---------------------------------------------------------------------------
+
+export const convertEmptyHeadingToParagraph: Command = (state, dispatch) => {
+  const { $from, empty } = state.selection;
+  if (!empty) return false;
+  if ($from.parentOffset !== 0) return false;
+  if ($from.parent.content.size !== 0) return false;
+  if ($from.parent.type !== notebookSchema.nodes.heading) return false;
+
+  return setParagraph(state, dispatch);
+};
+
+// ---------------------------------------------------------------------------
+// Delete empty cell on Backspace
+// ---------------------------------------------------------------------------
+// If the cursor is in a markdown_cell that has exactly one empty paragraph,
+// delete the whole cell and move cursor to the previous cell (or next if first).
+// ensureCellPlugin will backfill a fresh cell if the doc ends up empty.
+// ---------------------------------------------------------------------------
+
+export const deleteEmptyCell: Command = (state, dispatch) => {
+  const { selection, doc } = state;
+  if (!selection.empty) return false;
+
+  const { $from } = selection;
+
+  // Find markdown_cell depth
+  let cellDepth = -1;
+  for (let d = $from.depth; d >= 0; d--) {
+    if ($from.node(d).type.name === 'markdown_cell') {
+      cellDepth = d;
+      break;
+    }
+  }
+  if (cellDepth === -1) return false;
+
+  const cell = $from.node(cellDepth);
+
+  // Cell must be empty: one paragraph, no text
+  if (cell.childCount !== 1) return false;
+  const block = cell.firstChild!;
+  if (block.type.name !== 'paragraph' || block.content.size !== 0) return false;
+
+  // Don't delete the last remaining cell
+  if (doc.childCount === 1) return false;
+
+  if (dispatch) {
+    const cellStart = $from.before(cellDepth);
+    const cellEnd = cellStart + cell.nodeSize;
+    const isFirstCell = cellStart === 0;
+
+    const tr = state.tr.delete(cellStart, cellEnd);
+
+    // Move cursor to end of previous cell, or start of next if deleting first
+    const targetPos = isFirstCell ? cellStart : cellStart - 1;
+    const resolved = tr.doc.resolve(Math.max(0, targetPos));
+    tr.setSelection(Selection.near(resolved, isFirstCell ? 1 : -1));
+    dispatch(tr.scrollIntoView());
+  }
+
+  return true;
 };
