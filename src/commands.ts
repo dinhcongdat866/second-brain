@@ -1,13 +1,13 @@
 import { type Command, TextSelection } from 'prosemirror-state';
 import type { Node as PMNode } from 'prosemirror-model';
 import { chainCommands, exitCode } from 'prosemirror-commands';
-import { notebookSchema, createCodeCell, createMarkdownCell } from './schema';
+import { notebookSchema, createMarkdownCell } from './schema';
 
 // ---------------------------------------------------------------------------
 // Insert hard break (Enter, Shift-Enter)
 // ---------------------------------------------------------------------------
-// In code_cell (which doesn't allow inline nodes), this would fail — caller
-// should chain with newlineInCode for code cells.
+// Inserts <br> inline. exitCode is chained first as a safe no-op for future
+// code-like nodes; today it just falls through.
 // ---------------------------------------------------------------------------
 
 export const insertHardBreak: Command = chainCommands(
@@ -65,10 +65,6 @@ function insertCellAfterCurrent(cell: PMNode): Command {
     return true;
   };
 }
-
-export const insertCodeCell: Command = (state, dispatch) => {
-  return insertCellAfterCurrent(createCodeCell())(state, dispatch);
-};
 
 export const insertMarkdownCell: Command = (state, dispatch) => {
   return insertCellAfterCurrent(createMarkdownCell())(state, dispatch);

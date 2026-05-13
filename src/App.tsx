@@ -2,20 +2,11 @@ import { useEffect, useRef } from 'react';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { history, redo, undo } from 'prosemirror-history';
-import {
-  baseKeymap,
-  chainCommands,
-  newlineInCode,
-  toggleMark,
-} from 'prosemirror-commands';
+import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { keymap } from 'prosemirror-keymap';
 
 import { notebookSchema, createInitialDoc } from './schema';
-import {
-  insertHardBreak,
-  insertCodeCell,
-  insertMarkdownCell,
-} from './commands';
+import { insertHardBreak, insertMarkdownCell } from './commands';
 import { ensureCellPlugin } from './plugins/ensureCellPlugin';
 import './App.css';
 
@@ -31,16 +22,14 @@ function createPlugins() {
       // Marks
       'Mod-b': toggleMark(notebookSchema.marks.strong),
       'Mod-i': toggleMark(notebookSchema.marks.em),
+      'Mod-e': toggleMark(notebookSchema.marks.code),
 
-      // Enter behavior:
-      // - In code_cell: insert newline char (newlineInCode handles `code: true`)
-      // - Elsewhere: insert hard_break (line break within current block)
-      // We deliberately do NOT split blocks on Enter — new cells via slash/cmd.
-      'Enter': chainCommands(newlineInCode, insertHardBreak),
-      'Shift-Enter': chainCommands(newlineInCode, insertHardBreak),
+      // Enter behavior: hard_break, never split blocks.
+      // New cells created via slash command / keymap, not Enter.
+      'Enter': insertHardBreak,
+      'Shift-Enter': insertHardBreak,
 
       // Insert cells
-      'Mod-Alt-c': insertCodeCell,
       'Mod-Alt-m': insertMarkdownCell,
     }),
     keymap(baseKeymap),

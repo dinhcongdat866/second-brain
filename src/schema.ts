@@ -20,11 +20,11 @@ const baseCellAttrs = {
 };
 
 // Group taxonomy:
-//   'cell'  = top-level containers (markdown_cell, code_cell)
-//   'block' = block-level content INSIDE markdown_cell
+//   'cell'  = top-level containers (currently only markdown_cell;
+//             future: code_cell, ai_cell, chart_cell, etc.)
+//   'block' = block-level content INSIDE a cell
 //             (paragraph, heading, blockquote, horizontal_rule)
 // doc only accepts 'cell' — cells cannot nest into each other.
-// markdown_cell only accepts 'block' — no nested cells.
 
 export const notebookSchema = new Schema({
   nodes: {
@@ -53,36 +53,7 @@ export const notebookSchema = new Schema({
       },
     },
 
-    code_cell: {
-      content: 'text*',
-      group: 'cell',
-      marks: '',
-      code: true,
-      isolating: true,
-      attrs: {
-        ...baseCellAttrs,
-        language: { default: 'plain' },
-      },
-      parseDOM: [
-        {
-          tag: 'div[data-type="code-cell"]',
-          preserveWhitespace: 'full',
-        },
-      ],
-      toDOM(node) {
-        return [
-          'div',
-          {
-            'data-type': 'code-cell',
-            'data-id': node.attrs.id,
-            'data-language': node.attrs.language,
-          },
-          ['pre', 0],
-        ];
-      },
-    },
-
-    // ---- Inline-level (block content inside markdown_cell) ----
+    // ---- Block-level content inside markdown_cell ----
     // Override group from schema-basic to ensure they belong to 'block', not 'cell'.
 
     paragraph: { ...basicSchema.spec.nodes.get('paragraph')!, group: 'block' },
@@ -122,25 +93,6 @@ export function createMarkdownCell(text = ''): PMNode {
   return notebookSchema.nodes.markdown_cell.create(makeCellAttrs(), paragraph);
 }
 
-export function createCodeCell(language = 'plain', code = ''): PMNode {
-  const content = code ? notebookSchema.text(code) : undefined;
-  return notebookSchema.nodes.code_cell.create(
-    makeCellAttrs({ language }),
-    content,
-  );
-}
-
 export function createInitialDoc(): PMNode {
   return notebookSchema.nodes.doc.create(null, [createMarkdownCell()]);
-}
-
-// DEV ONLY: sample doc with both cell types for visual testing
-// before slash command lands. Swap back to createInitialDoc once
-// users can insert cells via UI.
-export function createDevSampleDoc(): PMNode {
-  return notebookSchema.nodes.doc.create(null, [
-    createMarkdownCell('Welcome to your second brain.'),
-    createCodeCell('javascript', 'console.log("hello world")'),
-    createMarkdownCell('Type below. Press Mod-Z to undo.'),
-  ]);
 }
