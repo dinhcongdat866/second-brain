@@ -214,7 +214,7 @@ export const slashMenuPlugin = new Plugin<SlashPluginState>({
             : Math.min(next.selectedIndex, options.length - 1);
 
         // Compute anchor coords from the "/" position
-        let anchor: { top: number; left: number } | null = null;
+        let anchor: { top: number; left: number } | null;
         try {
           const coords = view.coordsAtPos(next.triggerPos);
           anchor = { top: coords.bottom, left: coords.left };

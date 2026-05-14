@@ -94,9 +94,14 @@ function App() {
     if (!editorRef.current) return;
 
     let v: EditorView;
+    let cancelled = false;
 
     (async () => {
       const saved = await get(NOTEBOOK_IDB_KEY);
+
+      // StrictMode runs cleanup before async resolves — bail out if so
+      if (cancelled) return;
+
       let doc;
       try {
         doc = saved ? notebookSchema.nodeFromJSON(saved) : createInitialDoc();
@@ -122,6 +127,7 @@ function App() {
     })();
 
     return () => {
+      cancelled = true;
       v?.destroy();
       setView(null);
     };
