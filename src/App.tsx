@@ -1,11 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
-import { history, redo, undo } from 'prosemirror-history';
 import { baseKeymap, chainCommands, toggleMark } from 'prosemirror-commands';
 import { keymap } from 'prosemirror-keymap';
+import {
+  ySyncPlugin,
+  yCursorPlugin,
+  yUndoPlugin,
+  undo,
+  redo,
+  initProseMirrorDoc,
+} from 'y-prosemirror';
+import type * as Y from 'yjs';
+import type { WebsocketProvider } from 'y-websocket';
 
-import { notebookSchema, createInitialDoc } from './schema';
+type ProseMirrorMapping = ReturnType<typeof initProseMirrorDoc>['mapping'];
+type Awareness = WebsocketProvider['awareness'];
+
+import { notebookSchema } from './schema';
 import {
   insertHardBreak,
   insertMarkdownCell,
@@ -22,20 +34,32 @@ import {
 } from './commands';
 import { ensureCellPlugin } from './plugins/ensureCellPlugin';
 import { slashMenuPlugin } from './plugins/slashMenuPlugin';
-import { autosavePlugin, NOTEBOOK_IDB_KEY } from './plugins/autosavePlugin';
 import { placeholderPlugin } from './plugins/placeholderPlugin';
 import { SlashMenu } from './components/SlashMenu';
 import { useUIStore } from './stores/uiStore';
-import { get } from 'idb-keyval';
+import {
+  createCollabSetup,
+  seedIfEmpty,
+  wireSaveStatus,
+} from './collab/ydoc';
 import './App.css';
 
-function createPlugins() {
+function createPlugins(
+  yXmlFragment: Y.XmlFragment,
+  mapping: ProseMirrorMapping,
+  awareness: Awareness,
+) {
   return [
-    history({ depth: 100, newGroupDelay: 300 }),
+    // ySyncPlugin binds the doc to the CRDT; yUndoPlugin replaces
+    // prosemirror-history (undo only spans local CRDT changes).
+    ySyncPlugin(yXmlFragment, { mapping }),
+    // yCursorPlugin renders remote carets/selections from awareness.
+    yCursorPlugin(awareness),
+    yUndoPlugin(),
     // Slash menu BEFORE other keymaps — it needs first shot at arrow/enter
     slashMenuPlugin,
     keymap({
-      // Undo/redo
+      // Undo/redo — y-prosemirror's, backed by yUndoPlugin
       'Mod-z': undo,
       'Mod-y': redo,
       'Shift-Mod-z': redo,
@@ -80,7 +104,6 @@ function createPlugins() {
     }),
     keymap(baseKeymap),
     ensureCellPlugin,
-    autosavePlugin,
     placeholderPlugin,
   ];
 }
@@ -93,42 +116,45 @@ function App() {
   useEffect(() => {
     if (!editorRef.current) return;
 
-    let v: EditorView;
+    const { ydoc, persistence, provider, yXmlFragment } = createCollabSetup();
+    let v: EditorView | undefined;
+    let unwireSaveStatus: (() => void) | undefined;
     let cancelled = false;
 
-    (async () => {
-      const saved = await get(NOTEBOOK_IDB_KEY);
-
-      // StrictMode runs cleanup before async resolves — bail out if so
+    // Bind after the LOCAL store loads — don't wait for the network, so the
+    // editor works offline. Remote updates merge in once the socket connects.
+    persistence.whenSynced.then(() => {
+      // StrictMode runs cleanup before the promise resolves — bail out if so
       if (cancelled) return;
 
-      let doc;
-      try {
-        doc = saved ? notebookSchema.nodeFromJSON(saved) : createInitialDoc();
-      } catch {
-        doc = createInitialDoc();
-      }
+      seedIfEmpty(ydoc, yXmlFragment);
+      unwireSaveStatus = wireSaveStatus(ydoc);
 
+      const { doc, mapping } = initProseMirrorDoc(yXmlFragment, notebookSchema);
       const state = EditorState.create({
         schema: notebookSchema,
         doc,
-        plugins: createPlugins(),
+        plugins: createPlugins(yXmlFragment, mapping, provider.awareness),
       });
 
       v = new EditorView(editorRef.current!, {
         state,
         dispatchTransaction(transaction) {
-          const newState = v.state.apply(transaction);
-          v.updateState(newState);
+          const newState = v!.state.apply(transaction);
+          v!.updateState(newState);
         },
       });
 
       setView(v);
-    })();
+    });
 
     return () => {
       cancelled = true;
+      unwireSaveStatus?.();
       v?.destroy();
+      provider.destroy();
+      persistence.destroy();
+      ydoc.destroy();
       setView(null);
     };
   }, []);
