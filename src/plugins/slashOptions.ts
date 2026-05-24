@@ -1,13 +1,30 @@
+import type * as Y from 'yjs';
 import type { EditorView } from 'prosemirror-view';
 import {
   insertMarkdownCell,
-  insertAiCell,
+  makeInsertAiCell,
   smartInsertTextblock,
   smartInsertBlockquote,
   smartInsertDivider,
   toggleCodeMark,
 } from '../commands';
 import { notebookSchema } from '../schema';
+
+// ---------------------------------------------------------------------------
+// ydoc late-bind
+// ---------------------------------------------------------------------------
+// slashOptions is a static module, but insertAiCell needs ydoc to seed the
+// thread atomically with the cell creation. Call bindYDoc() once after the
+// collab setup is ready (App.tsx / persistence.whenSynced).
+// The app has exactly one Y.Doc per session — a module-level ref is safe.
+// ---------------------------------------------------------------------------
+
+let _ydoc: Y.Doc | null = null;
+
+/** Wire the active Y.Doc so AI cell creation can seed its thread atomically. */
+export function bindYDoc(ydoc: Y.Doc): void {
+  _ydoc = ydoc;
+}
 
 // ---------------------------------------------------------------------------
 // Slash menu options
@@ -145,7 +162,15 @@ export const SLASH_OPTIONS: SlashOption[] = [
     icon: '✨',
     group: 'cell',
     keywords: ['ai', 'cell', 'chat', 'assistant', 'hoi', 'prompt'],
-    run: (view) => dispatch(view, insertAiCell),
+    run: (view) => {
+      if (!_ydoc) {
+        // ydoc not bound yet — should never happen after app init,
+        // but fail gracefully rather than crash.
+        console.warn('[slashOptions] insertAiCell called before ydoc was bound');
+        return;
+      }
+      dispatch(view, makeInsertAiCell(_ydoc));
+    },
   },
 ];
 

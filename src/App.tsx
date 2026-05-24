@@ -35,6 +35,7 @@ import {
 import { ensureCellPlugin } from './plugins/ensureCellPlugin';
 import { slashMenuPlugin } from './plugins/slashMenuPlugin';
 import { placeholderPlugin } from './plugins/placeholderPlugin';
+import { bindYDoc } from './plugins/slashOptions';
 import { SlashMenu } from './components/SlashMenu';
 import { AiCellView } from './nodeViews/aiCellView';
 import { useUIStore } from './stores/uiStore';
@@ -129,6 +130,7 @@ function App() {
       if (cancelled) return;
 
       seedIfEmpty(ydoc, yXmlFragment);
+      bindYDoc(ydoc);
       unwireSaveStatus = wireSaveStatus(ydoc);
 
       const { doc, mapping } = initProseMirrorDoc(yXmlFragment, notebookSchema);

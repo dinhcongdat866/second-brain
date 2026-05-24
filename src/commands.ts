@@ -14,7 +14,9 @@ import {
   lift,
   toggleMark,
 } from 'prosemirror-commands';
+import type * as Y from 'yjs';
 import { notebookSchema, createMarkdownCell, createAiCell } from './schema';
+import { getThread } from './collab/aiThreads';
 
 // ---------------------------------------------------------------------------
 // Insert hard break (Enter, Shift-Enter)
@@ -84,9 +86,31 @@ export const insertMarkdownCell: Command = (state, dispatch) => {
   return insertCellAfterCurrent(createMarkdownCell())(state, dispatch);
 };
 
-export const insertAiCell: Command = (state, dispatch) => {
-  return insertCellAfterCurrent(createAiCell())(state, dispatch);
-};
+/**
+ * Factory that returns a Command for inserting an ai_cell.
+ *
+ * Critically, the ai_cell's Y.Array thread entry is created inside the SAME
+ * ydoc.transact() as the PM dispatch. This produces ONE Yjs update message
+ * that carries both the XmlFragment change and the aiThreads entry atomically.
+ *
+ * Without this, a peer can receive the XmlFragment update (ai_cell appears),
+ * mount the NodeView, call getThread() and create its own Y.Array — before
+ * the creator's aiThreads update arrives. Two peers then hold different Y.Array
+ * instances under the same Y.Map key; Y.Map last-write-wins discards one,
+ * silently losing every message written to it.
+ */
+export function makeInsertAiCell(ydoc: Y.Doc): Command {
+  return (state, dispatch) => {
+    const cell = createAiCell();
+    ydoc.transact(() => {
+      // PM dispatch runs synchronously; ySyncPlugin's inner ydoc.transact()
+      // is absorbed into this outer one — both changes land in one update.
+      insertCellAfterCurrent(cell)(state, dispatch);
+      getThread(ydoc, cell.attrs.id as string);
+    });
+    return true;
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Block-level commands (used by both keymaps and slash menu)
