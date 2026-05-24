@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -8,5 +9,9 @@ export default defineConfig({
   // dedupe forces every `import 'yjs'` to resolve to one file.
   resolve: {
     dedupe: ['yjs'],
+  },
+  test: {
+    // Pure Yjs — no browser APIs needed.
+    environment: 'node',
   },
 })
