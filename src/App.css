@@ -491,3 +491,243 @@ body {
   cursor: not-allowed;
 }
 
+/* ---------- Snapshot modal ---------- */
+
+.snap-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.snap-modal {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+  width: min(860px, 92vw);
+  height: min(580px, 90vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.snap-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid #ececec;
+  flex-shrink: 0;
+}
+
+.snap-modal__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+}
+
+.snap-modal__close {
+  border: none;
+  background: transparent;
+  color: #aaa;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.snap-modal__close:hover {
+  background: #f4f4f4;
+  color: #555;
+}
+
+/* Body: two-column */
+.snap-modal__body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Left: list */
+.snap-list {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1px solid #ececec;
+  overflow-y: auto;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.snap-take-btn {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px dashed #ccc;
+  border-radius: 6px;
+  background: transparent;
+  color: #555;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  margin-bottom: 6px;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.snap-take-btn:hover {
+  border-color: #999;
+  background: #f8f8f8;
+  color: #222;
+}
+
+.snap-empty {
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.55;
+  margin: 4px 4px;
+}
+
+.snap-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.snap-item:hover {
+  background: #f4f4f4;
+}
+.snap-item--selected {
+  background: #f0ebff;
+}
+.snap-item--selected:hover {
+  background: #ebe4ff;
+}
+
+.snap-item__label {
+  flex: 1;
+  font-size: 12.5px;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.snap-item--selected .snap-item__label {
+  color: #5b21b6;
+  font-weight: 500;
+}
+
+.snap-item__del {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #ccc;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.snap-item:hover .snap-item__del {
+  opacity: 1;
+}
+.snap-item__del:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Right: preview */
+.snap-preview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  background: #fafafa;
+}
+
+.snap-preview__editor {
+  /* Inherit notebook-editor appearance but without interactive styling */
+  min-height: 100%;
+  cursor: default;
+}
+
+/* Suppress focus ring on read-only preview */
+.snap-preview__editor.notebook-editor:focus-within {
+  border-color: #e5e5e5;
+}
+
+.snap-preview__empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #bbb;
+}
+
+/* Footer */
+.snap-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid #ececec;
+  flex-shrink: 0;
+}
+
+.snap-btn {
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.snap-btn--ghost {
+  border: 1px solid #ddd;
+  background: transparent;
+  color: #555;
+}
+.snap-btn--ghost:hover {
+  background: #f4f4f4;
+}
+.snap-btn--primary {
+  border: none;
+  background: #7c3aed;
+  color: #fff;
+}
+.snap-btn--primary:hover:not(:disabled) {
+  background: #6d28d9;
+}
+.snap-btn--primary:disabled {
+  background: #c9bce8;
+  cursor: not-allowed;
+}
+
+/* Header button — "History" trigger */
+.header-history-btn {
+  border: 1px solid #e5e5e5;
+  background: transparent;
+  color: #555;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: auto;
+  transition: background 0.15s, border-color 0.15s;
+}
+.header-history-btn:hover {
+  background: #f4f4f4;
+  border-color: #ccc;
+}
+

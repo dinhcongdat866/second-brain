@@ -54,7 +54,9 @@ export interface CollabSetup {
 }
 
 export function createCollabSetup(): CollabSetup {
-  const ydoc = new Y.Doc();
+  // gc: false — keep all tombstoned operations so Y.snapshot / time-travel works.
+  // The IndexedDB store grows slowly over time; acceptable for a personal notebook.
+  const ydoc = new Y.Doc({ gc: false });
   const persistence = new IndexeddbPersistence(COLLAB_DB_NAME, ydoc);
   const provider = new WebsocketProvider(WS_URL, WS_ROOM, ydoc);
   provider.awareness.setLocalStateField('user', randomUser());

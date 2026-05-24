@@ -37,6 +37,8 @@ import { slashMenuPlugin } from './plugins/slashMenuPlugin';
 import { placeholderPlugin } from './plugins/placeholderPlugin';
 import { bindYDoc } from './plugins/slashOptions';
 import { SlashMenu } from './components/SlashMenu';
+import { SnapshotModal } from './components/SnapshotModal';
+import { startAutoSnapshot } from './collab/snapshots';
 import { AiCellView } from './nodeViews/aiCellView';
 import { useUIStore } from './stores/uiStore';
 import {
@@ -113,6 +115,8 @@ function createPlugins(
 function App() {
   const editorRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<EditorView | null>(null);
+  const ydocRef = useRef<Y.Doc | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const saveStatus = useUIStore((s) => s.saveStatus);
 
   useEffect(() => {
@@ -121,6 +125,7 @@ function App() {
     const { ydoc, persistence, provider, yXmlFragment } = createCollabSetup();
     let v: EditorView | undefined;
     let unwireSaveStatus: (() => void) | undefined;
+    let stopAutoSnapshot: (() => void) | undefined;
     let cancelled = false;
 
     // Bind after the LOCAL store loads — don't wait for the network, so the
@@ -131,7 +136,9 @@ function App() {
 
       seedIfEmpty(ydoc, yXmlFragment);
       bindYDoc(ydoc);
+      ydocRef.current = ydoc;
       unwireSaveStatus = wireSaveStatus(ydoc);
+      stopAutoSnapshot = startAutoSnapshot(ydoc);
 
       const { doc, mapping } = initProseMirrorDoc(yXmlFragment, notebookSchema);
       const state = EditorState.create({
@@ -158,6 +165,7 @@ function App() {
     return () => {
       cancelled = true;
       unwireSaveStatus?.();
+      stopAutoSnapshot?.();
       v?.destroy();
       provider.destroy();
       persistence.destroy();
@@ -175,11 +183,25 @@ function App() {
             {saveStatus === 'pending' ? 'Saving...' : 'Saved'}
           </span>
         )}
+        <button
+          className="header-history-btn"
+          onClick={() => setShowHistory(true)}
+          title="View history"
+        >
+          History
+        </button>
       </header>
       <main className="app-main">
         <div ref={editorRef} className="notebook-editor" />
         <SlashMenu view={view} />
       </main>
+      {showHistory && ydocRef.current && view && (
+        <SnapshotModal
+          ydoc={ydocRef.current}
+          mainView={view}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
     </div>
   );
 }

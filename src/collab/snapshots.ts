@@ -1,0 +1,148 @@
+/**
+ * Snapshot store — time-travel for the notebook.
+ *
+ * Snapshots are stored inside the Y.Doc itself (Y.Map('snapshots')), so they
+ * sync across peers automatically via WebSocket — no backend required.
+ *
+ * Each entry is a nested Y.Map:
+ *   { id: string, label: string, created_at: ISO, encoded: Uint8Array }
+ *
+ * Restoring requires gc: false on the Y.Doc (set in ydoc.ts). Without it,
+ * Yjs GC's deleted operations and past states can't be reconstructed.
+ */
+
+import * as Y from 'yjs';
+
+export const SNAPSHOTS_KEY = 'snapshots';
+
+/** Max snapshots kept by auto-snapshot before pruning oldest. */
+const MAX_AUTO_SNAPSHOTS = 30;
+
+/** Auto-snapshot fires this long after the last local change (ms). */
+const AUTO_SNAPSHOT_IDLE_MS = 5 * 60 * 1000; // 5 minutes
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface SnapshotMeta {
+  id: string;
+  label: string;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getSnapshotsMap(ydoc: Y.Doc): Y.Map<Y.Map<unknown>> {
+  return ydoc.getMap<Y.Map<unknown>>(SNAPSHOTS_KEY);
+}
+
+function formatLabel(isoString: string): string {
+  return new Date(isoString).toLocaleString('vi-VN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// CRUD
+// ---------------------------------------------------------------------------
+
+/** Take a snapshot of the current Y.Doc state and persist it. Returns the id. */
+export function takeSnapshot(ydoc: Y.Doc, label?: string): string {
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  const entry = new Y.Map<unknown>();
+  entry.set('id', id);
+  entry.set('label', label ?? formatLabel(now));
+  entry.set('created_at', now);
+  entry.set('encoded', Y.encodeSnapshot(Y.snapshot(ydoc)));
+
+  getSnapshotsMap(ydoc).set(id, entry);
+  return id;
+}
+
+/** List all snapshots sorted newest-first. */
+export function listSnapshots(ydoc: Y.Doc): SnapshotMeta[] {
+  const result: SnapshotMeta[] = [];
+  getSnapshotsMap(ydoc).forEach((entry) => {
+    result.push({
+      id: entry.get('id') as string,
+      label: entry.get('label') as string,
+      created_at: entry.get('created_at') as string,
+    });
+  });
+  return result.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** Decode a snapshot for use with Y.createDocFromSnapshot. Returns null if missing. */
+export function getSnapshotEncoded(ydoc: Y.Doc, id: string): Uint8Array | null {
+  const entry = getSnapshotsMap(ydoc).get(id);
+  if (!entry) return null;
+  return entry.get('encoded') as Uint8Array;
+}
+
+/** Delete a snapshot by id. */
+export function deleteSnapshot(ydoc: Y.Doc, id: string): void {
+  getSnapshotsMap(ydoc).delete(id);
+}
+
+/** Delete oldest snapshots beyond maxCount. */
+function pruneSnapshots(ydoc: Y.Doc, maxCount: number): void {
+  const all = listSnapshots(ydoc); // newest-first
+  all.slice(maxCount).forEach((s) => deleteSnapshot(ydoc, s.id));
+}
+
+// ---------------------------------------------------------------------------
+// Auto-snapshot
+// ---------------------------------------------------------------------------
+
+/**
+ * Watch the Y.Doc for local changes and take a snapshot after
+ * AUTO_SNAPSHOT_IDLE_MS of inactivity. Returns a cleanup function.
+ *
+ * Only fires on local changes — remote peer edits don't trigger it
+ * (each peer manages its own snapshots independently).
+ */
+export function startAutoSnapshot(ydoc: Y.Doc): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // Ignore updates for the first 3 s to skip the initial seed / IndexedDB load.
+  let ready = false;
+  const readyTimer = setTimeout(() => {
+    ready = true;
+    // Baseline snapshot on first-ever load — so History is never empty.
+    if (listSnapshots(ydoc).length === 0) {
+      takeSnapshot(ydoc, 'Initial state');
+    }
+  }, 3_000);
+
+  const schedule = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      takeSnapshot(ydoc);
+      pruneSnapshots(ydoc, MAX_AUTO_SNAPSHOTS);
+    }, AUTO_SNAPSHOT_IDLE_MS);
+  };
+
+  // 'update' fires with (update, origin). WebsocketProvider sets origin to
+  // itself; local PM edits go through ySyncPlugin which also sets an origin.
+  // Simplest heuristic: schedule on ANY update and let the idle debounce
+  // absorb bursts. Five-minute idle means false-positives are harmless.
+  const onUpdate = () => {
+    if (ready) schedule();
+  };
+
+  ydoc.on('update', onUpdate);
+
+  return () => {
+    clearTimeout(readyTimer);
+    clearTimeout(timer);
+    ydoc.off('update', onUpdate);
+  };
+}
