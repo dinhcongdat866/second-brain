@@ -1,4 +1,10 @@
-import { type Command, TextSelection, AllSelection, Selection } from 'prosemirror-state';
+import {
+  type Command,
+  TextSelection,
+  NodeSelection,
+  AllSelection,
+  Selection,
+} from 'prosemirror-state';
 import type { Node as PMNode, NodeType } from 'prosemirror-model';
 import {
   chainCommands,
@@ -8,7 +14,7 @@ import {
   lift,
   toggleMark,
 } from 'prosemirror-commands';
-import { notebookSchema, createMarkdownCell } from './schema';
+import { notebookSchema, createMarkdownCell, createAiCell } from './schema';
 
 // ---------------------------------------------------------------------------
 // Insert hard break (Enter, Shift-Enter)
@@ -60,12 +66,13 @@ function insertCellAfterCurrent(cell: PMNode): Command {
     const insertPos = $from.after(cellDepth);
     const tr = state.tr.insert(insertPos, cell);
 
-    // Explicit cursor placement inside the new cell's text content.
-    // markdown_cell: open token (1) + paragraph open token (1) = +2
-    // code_cell:     open token (1) = +1
-    const isMarkdown = cell.type.name === 'markdown_cell';
-    const cursorPos = insertPos + (isMarkdown ? 2 : 1);
-    tr.setSelection(TextSelection.create(tr.doc, cursorPos));
+    if (cell.type.name === 'ai_cell') {
+      // ai_cell is an atom — no text position inside; select the node itself.
+      tr.setSelection(NodeSelection.create(tr.doc, insertPos));
+    } else {
+      // markdown_cell: open token (1) + paragraph open token (1) = +2
+      tr.setSelection(TextSelection.create(tr.doc, insertPos + 2));
+    }
     tr.scrollIntoView();
 
     dispatch(tr);
@@ -75,6 +82,10 @@ function insertCellAfterCurrent(cell: PMNode): Command {
 
 export const insertMarkdownCell: Command = (state, dispatch) => {
   return insertCellAfterCurrent(createMarkdownCell())(state, dispatch);
+};
+
+export const insertAiCell: Command = (state, dispatch) => {
+  return insertCellAfterCurrent(createAiCell())(state, dispatch);
 };
 
 // ---------------------------------------------------------------------------

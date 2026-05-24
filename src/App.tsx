@@ -36,6 +36,7 @@ import { ensureCellPlugin } from './plugins/ensureCellPlugin';
 import { slashMenuPlugin } from './plugins/slashMenuPlugin';
 import { placeholderPlugin } from './plugins/placeholderPlugin';
 import { SlashMenu } from './components/SlashMenu';
+import { AiCellView } from './nodeViews/aiCellView';
 import { useUIStore } from './stores/uiStore';
 import {
   createCollabSetup,
@@ -139,6 +140,10 @@ function App() {
 
       v = new EditorView(editorRef.current!, {
         state,
+        nodeViews: {
+          ai_cell: (node, view, getPos) =>
+            new AiCellView(node, view, getPos, ydoc),
+        },
         dispatchTransaction(transaction) {
           const newState = v!.state.apply(transaction);
           v!.updateState(newState);

@@ -1,6 +1,7 @@
 import type { EditorView } from 'prosemirror-view';
 import {
   insertMarkdownCell,
+  insertAiCell,
   smartInsertTextblock,
   smartInsertBlockquote,
   smartInsertDivider,
@@ -136,6 +137,15 @@ export const SLASH_OPTIONS: SlashOption[] = [
     keywords: ['cell', 'new', 'markdown', 'block'],
     shortcut: 'Mod+Alt+M',
     run: (view) => dispatch(view, insertMarkdownCell),
+  },
+  {
+    id: 'ai-cell',
+    label: 'AI cell',
+    description: 'Hội thoại với AI về nội dung',
+    icon: '✨',
+    group: 'cell',
+    keywords: ['ai', 'cell', 'chat', 'assistant', 'hoi', 'prompt'],
+    run: (view) => dispatch(view, insertAiCell),
   },
 ];
 

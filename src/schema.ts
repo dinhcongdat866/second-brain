@@ -5,9 +5,9 @@ import { schema as basicSchema } from 'prosemirror-schema-basic';
 // Notebook Schema
 // ---------------------------------------------------------------------------
 // Structure:
-//   doc → block+ (mix paragraph, markdown_cell, code_cell — Notion-like)
+//   doc → cell+ (markdown_cell | ai_cell)
 //   markdown_cell → block+ (paragraph, heading, blockquote, hr)
-//   code_cell → text* (plain text, no marks, monospace)
+//   ai_cell → atom (no PM content; conversation lives in Yjs — collab/aiThreads)
 // ---------------------------------------------------------------------------
 
 const generateId = () => crypto.randomUUID();
@@ -20,8 +20,8 @@ const baseCellAttrs = {
 };
 
 // Group taxonomy:
-//   'cell'  = top-level containers (currently only markdown_cell;
-//             future: code_cell, ai_cell, chart_cell, etc.)
+//   'cell'  = top-level containers (markdown_cell, ai_cell;
+//             future: code_cell, chart_cell, etc.)
 //   'block' = block-level content INSIDE a cell
 //             (paragraph, heading, blockquote, horizontal_rule)
 // doc only accepts 'cell' — cells cannot nest into each other.
@@ -50,6 +50,18 @@ export const notebookSchema = new Schema({
           },
           0,
         ];
+      },
+    },
+
+    // ai_cell: atom — PM owns nothing inside; a NodeView (React) renders the
+    // whole chat UI, and the conversation data lives in Yjs (collab/aiThreads).
+    ai_cell: {
+      group: 'cell',
+      atom: true,
+      attrs: baseCellAttrs,
+      parseDOM: [{ tag: 'div[data-type="ai-cell"]' }],
+      toDOM(node) {
+        return ['div', { 'data-type': 'ai-cell', 'data-id': node.attrs.id }];
       },
     },
 
@@ -91,6 +103,10 @@ export function createMarkdownCell(text = ''): PMNode {
     ? notebookSchema.nodes.paragraph.create(null, notebookSchema.text(text))
     : notebookSchema.nodes.paragraph.create();
   return notebookSchema.nodes.markdown_cell.create(makeCellAttrs(), paragraph);
+}
+
+export function createAiCell(): PMNode {
+  return notebookSchema.nodes.ai_cell.create(makeCellAttrs());
 }
 
 export function createInitialDoc(): PMNode {

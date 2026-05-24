@@ -282,3 +282,212 @@ body {
   user-select: none;
 }
 
+/* ---------- AI cell (NodeView) ---------- */
+
+.ai-cell {
+  margin: 8px 0;
+}
+
+.ai-cell__inner {
+  border: 1px solid #e4ddf5;
+  border-radius: 6px;
+  background: #faf8ff;
+  overflow: hidden;
+}
+
+.ai-cell.ProseMirror-selectednode .ai-cell__inner {
+  border-color: #a98fe0;
+  box-shadow: 0 0 0 2px #ece6f9;
+}
+
+/* Wind sweep while AI is streaming — Gemini-style.
+   Four oversized soft pastel radials sweep LEFT → RIGHT; each blob extends
+   past the cell so only the soft edge bleeds in — looks like fog being blown
+   across. One @property <percentage> drives all positions via `calc` with
+   staggered velocities so blobs don't move in lockstep. When streaming ends,
+   the same animation re-runs once in 0.9s (`.is-finishing`) — a final gust
+   before the cell settles back to plain white. */
+@property --aurora {
+  syntax: '<percentage>';
+  initial-value: 0%;
+  inherits: false;
+}
+
+/* Selector includes the parent `.ai-cell` so specificity (0,3,0) ties with
+   the .ProseMirror-selectednode rule above — placed AFTER → source-order
+   wins → aurora stays visible right after insert when ai_cell still has
+   NodeSelection. */
+.ai-cell .ai-cell__inner.is-streaming,
+.ai-cell .ai-cell__inner.is-finishing {
+  background:
+    radial-gradient(
+      ellipse 130% 100%
+      at calc(-30% + var(--aurora) * 1.6) 25%,
+      rgba(140, 200, 230, 0.20),
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 110% 100%
+      at calc(-50% + var(--aurora) * 1.7) 65%,
+      rgba(170, 220, 200, 0.18),
+      transparent 78%
+    ),
+    radial-gradient(
+      ellipse 120% 95%
+      at calc(-25% + var(--aurora) * 1.5) 75%,
+      rgba(190, 170, 230, 0.16),
+      transparent 78%
+    ),
+    radial-gradient(
+      ellipse 100% 90%
+      at calc(-40% + var(--aurora) * 1.65) 35%,
+      rgba(240, 225, 185, 0.14),
+      transparent 80%
+    ),
+    #ffffff;
+  box-shadow: 0 0 18px -6px rgba(140, 180, 220, 0.18);
+}
+
+.ai-cell .ai-cell__inner.is-streaming {
+  /* Slow left-to-right wind during generation. */
+  animation: ai-aurora 8s linear infinite;
+}
+
+.ai-cell .ai-cell__inner.is-finishing {
+  /* Final fast gust when streaming completes, then settles. */
+  animation: ai-aurora 0.9s cubic-bezier(0.15, 0.55, 0.2, 1);
+}
+
+@keyframes ai-aurora {
+  to {
+    --aurora: 100%;
+  }
+}
+
+.ai-cell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid #ece6f9;
+}
+
+.ai-cell__badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7c3aed;
+  letter-spacing: 0.02em;
+}
+
+.ai-cell__delete {
+  border: none;
+  background: transparent;
+  color: #b9a8db;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+.ai-cell__delete:hover {
+  background: #efe9fb;
+  color: #7c3aed;
+}
+
+.ai-cell__turns {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+}
+
+.ai-cell__empty {
+  font-size: 13px;
+  color: #a99fc4;
+  font-style: italic;
+}
+
+.ai-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-turn__role {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ai-turn--user .ai-turn__role {
+  color: #777;
+}
+.ai-turn--assistant .ai-turn__role {
+  color: #7c3aed;
+}
+
+.ai-turn__content {
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ai-turn--user .ai-turn__content {
+  color: #333;
+}
+.ai-turn--assistant .ai-turn__content {
+  color: #2a2240;
+}
+
+.ai-turn__cursor {
+  color: #7c3aed;
+  animation: ai-blink 1s steps(2) infinite;
+}
+@keyframes ai-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.ai-cell__input {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid #ece6f9;
+}
+
+.ai-cell__input input {
+  flex: 1;
+  border: 1px solid #ddd3f0;
+  border-radius: 5px;
+  padding: 6px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+.ai-cell__input input:focus {
+  border-color: #a98fe0;
+}
+.ai-cell__input input:disabled {
+  background: #f4f1fb;
+  color: #999;
+}
+
+.ai-cell__input button {
+  border: none;
+  background: #7c3aed;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.ai-cell__input button:hover:not(:disabled) {
+  background: #6d28d9;
+}
+.ai-cell__input button:disabled {
+  background: #c9bce8;
+  cursor: not-allowed;
+}
+
