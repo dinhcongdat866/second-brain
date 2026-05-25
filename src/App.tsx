@@ -36,6 +36,7 @@ import { ensureCellPlugin } from './plugins/ensureCellPlugin';
 import { slashMenuPlugin } from './plugins/slashMenuPlugin';
 import { placeholderPlugin } from './plugins/placeholderPlugin';
 import { bindYDoc } from './plugins/slashOptions';
+import { transformPastedHTML, pasteNormPlugin } from './clipboard';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
 import { startAutoSnapshot } from './collab/snapshots';
@@ -109,6 +110,7 @@ function createPlugins(
     keymap(baseKeymap),
     ensureCellPlugin,
     placeholderPlugin,
+    pasteNormPlugin,
   ];
 }
 
@@ -153,6 +155,7 @@ function App() {
           ai_cell: (node, view, getPos) =>
             new AiCellView(node, view, getPos, ydoc),
         },
+        transformPastedHTML,
         dispatchTransaction(transaction) {
           const newState = v!.state.apply(transaction);
           v!.updateState(newState);
