@@ -2,6 +2,7 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { addTurn, type TurnRole, type YThread } from '../collab/aiThreads';
 import { streamClaudeReply } from '../collab/claudeStream';
+import { formatSmartDate, formatFullDate } from '../lib/formatDate';
 
 // ---------------------------------------------------------------------------
 // Icons (inline SVG — no external dependency)
@@ -30,29 +31,6 @@ function IconPencil() {
       <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
     </svg>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Timestamp helpers
-// ---------------------------------------------------------------------------
-
-function formatTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '';
-  }
-}
-
-function formatFullDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString([], {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    });
-  } catch {
-    return iso;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +266,7 @@ export function AiCell({
                         className="ai-turn__time"
                         title={formatFullDate(turn.createdAt)}
                       >
-                        {formatTime(turn.createdAt)}
+                        {formatSmartDate(turn.createdAt)}
                       </span>
                     )}
                     {isPendingReplace && (

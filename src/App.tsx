@@ -43,6 +43,7 @@ import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
 import { startAutoSnapshot } from './collab/snapshots';
 import { AiCellView } from './nodeViews/aiCellView';
+import { MarkdownCellView } from './nodeViews/markdownCellView';
 import { useUIStore } from './stores/uiStore';
 import {
   createCollabSetup,
@@ -194,6 +195,8 @@ function App() {
       v = new EditorView(editorRef.current!, {
         state,
         nodeViews: {
+          markdown_cell: (node, view, getPos) =>
+            new MarkdownCellView(node, view, getPos),
           ai_cell: (node, view, getPos) =>
             new AiCellView(node, view, getPos, doc_ydoc),
         },

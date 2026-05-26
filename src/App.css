@@ -197,6 +197,7 @@ body {
   transition: border-color 0.15s, background 0.12s, box-shadow 0.15s;
   background: var(--nb-bg-surface);
   box-shadow: 0 1px 3px rgba(60, 40, 10, 0.05);
+  position: relative; /* required for absolutely-positioned controls */
 }
 
 .ProseMirror div[data-type='markdown-cell']:hover {
@@ -206,6 +207,58 @@ body {
 .ProseMirror div[data-type='markdown-cell']:focus-within {
   border-color: var(--nb-border-focus);
   background: #fffefa;
+}
+
+/* Controls that appear on cell hover (copy button + timestamp) */
+.markdown-cell__controls {
+  position: absolute;
+  bottom: 7px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  background: var(--nb-bg-surface);
+  border-radius: var(--nb-r-xs);
+  padding: 1px 4px;
+}
+
+[data-type='markdown-cell']:hover .markdown-cell__controls,
+[data-type='markdown-cell']:focus-within .markdown-cell__controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.md-cell-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.md-cell-controls__time {
+  font-size: 10px;
+  color: var(--nb-text-3);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.md-cell-controls__btn {
+  border: none;
+  background: transparent;
+  color: var(--nb-text-3);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--nb-r-xs);
+  display: flex;
+  align-items: center;
+  transition: color 0.1s, background 0.1s;
+}
+
+.md-cell-controls__btn:hover {
+  color: var(--nb-text-2);
+  background: var(--nb-bg-hover);
 }
 
 /* ---------- Cell adder bar ---------- */
