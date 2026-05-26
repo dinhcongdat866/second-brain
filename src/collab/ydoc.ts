@@ -2,6 +2,7 @@ import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
 import { prosemirrorToYDoc } from 'y-prosemirror';
+import type { Node as PMNode } from 'prosemirror-model';
 import { createInitialDoc } from '../schema';
 import { useUIStore } from '../stores/uiStore';
 
@@ -77,6 +78,22 @@ export function createCollabSetup(docId: string): CollabSetup {
 export function seedIfEmpty(ydoc: Y.Doc, yXmlFragment: Y.XmlFragment): void {
   if (yXmlFragment.length > 0) return;
   const seed = prosemirrorToYDoc(createInitialDoc(), XML_FRAGMENT_NAME);
+  Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(seed));
+  seed.destroy();
+}
+
+/**
+ * Seed a Y.Doc from an existing PM doc node (used when importing a file into
+ * a brand-new document). Skips if the fragment already has content so it is
+ * safe to call unconditionally after `whenSynced`.
+ */
+export function seedFromContent(
+  ydoc: Y.Doc,
+  yXmlFragment: Y.XmlFragment,
+  pmDoc: PMNode,
+): void {
+  if (yXmlFragment.length > 0) return;
+  const seed = prosemirrorToYDoc(pmDoc, XML_FRAGMENT_NAME);
   Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(seed));
   seed.destroy();
 }

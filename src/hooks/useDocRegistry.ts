@@ -33,6 +33,15 @@ export function useDocRegistry() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Create a named doc and navigate to it. Used by import flow. */
+  const importDoc = useCallback((name: string) => {
+    const doc = createDoc(name);
+    refresh();
+    setActiveDocId(doc.id);
+    setActiveDocIdState(doc.id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleRename = useCallback((id: string, name: string) => {
     renameDoc(id, name);
     refresh();
@@ -67,6 +76,7 @@ export function useDocRegistry() {
     activeDocId,
     selectDoc,
     createNewDoc,
+    importDoc,
     renameDoc: handleRename,
     deleteDoc: handleDelete,
     restoreDoc: handleRestore,

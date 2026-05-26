@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { baseKeymap, chainCommands, toggleMark } from 'prosemirror-commands';
@@ -37,8 +37,9 @@ import { transformPastedHTML, pasteNormPlugin } from '../clipboard';
 import { AiCellView } from '../nodeViews/aiCellView';
 import { MarkdownCellView } from '../nodeViews/markdownCellView';
 import { startAutoSnapshot } from '../collab/snapshots';
-import { createCollabSetup, seedIfEmpty, wireSaveStatus } from '../collab/ydoc';
-import { sweepOrphanThreads } from '../collab/aiThreads';
+import { createCollabSetup, seedFromContent, seedIfEmpty, wireSaveStatus } from '../collab/ydoc';
+import { addTurn, getThread, sweepOrphanThreads } from '../collab/aiThreads';
+import { consumePendingImport } from '../lib/importState';
 
 type ProseMirrorMapping = ReturnType<typeof initProseMirrorDoc>['mapping'];
 type Awareness = WebsocketProvider['awareness'];
@@ -86,7 +87,7 @@ function createPlugins(
 }
 
 export function useNotebookEditor(
-  editorRef: React.RefObject<HTMLDivElement>,
+  editorRef: React.RefObject<HTMLDivElement | null>,
   activeDocId: string,
 ) {
   const [view, setView] = useState<EditorView | null>(null);
@@ -105,7 +106,22 @@ export function useNotebookEditor(
     persistence.whenSynced.then(() => {
       if (cancelled) return;
 
-      seedIfEmpty(doc, yXmlFragment);
+      const pendingImport = consumePendingImport();
+      if (pendingImport) {
+        seedFromContent(doc, yXmlFragment, pendingImport.pmDoc);
+        if (pendingImport.threads.length > 0) {
+          doc.transact(() => {
+            for (const { cellId, turns } of pendingImport.threads) {
+              const thread = getThread(doc, cellId);
+              for (const { role, content } of turns) {
+                addTurn(thread, role, content);
+              }
+            }
+          });
+        }
+      } else {
+        seedIfEmpty(doc, yXmlFragment);
+      }
       sweepOrphanThreads(doc, yXmlFragment);
       bindYDoc(doc);
       setYdoc(doc);

@@ -1265,3 +1265,24 @@ body {
   background: var(--nb-bg-hover);
   border-color: var(--nb-border-focus);
 }
+
+.header-export-btn {
+  border: 1px solid var(--nb-border);
+  background: transparent;
+  color: var(--nb-text-2);
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.header-export-btn:hover:not(:disabled) {
+  background: var(--nb-bg-hover);
+  border-color: var(--nb-border-focus);
+}
+
+.header-export-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

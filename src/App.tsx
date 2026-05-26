@@ -8,6 +8,8 @@ import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
 import { useDocRegistry } from './hooks/useDocRegistry';
 import { useNotebookEditor } from './hooks/useNotebookEditor';
+import { exportDocToMarkdown, saveMarkdownFile } from './lib/exportMarkdown';
+import { importMarkdownAsNewDoc } from './lib/importMarkdown';
 import { useUIStore } from './stores/uiStore';
 import './App.css';
 
@@ -78,6 +80,29 @@ function App() {
           title="View history"
         >
           History
+        </button>
+        <button
+          className="header-export-btn"
+          onClick={() => importMarkdownAsNewDoc(registry.importDoc)}
+          title="Import a Markdown file as a new document"
+        >
+          Import .md
+        </button>
+        <button
+          className="header-export-btn"
+          disabled={!view || !ydoc}
+          onClick={async () => {
+            if (!view || !ydoc) return;
+            const content = exportDocToMarkdown(
+              view.state.doc,
+              ydoc,
+              activeDocName,
+            );
+            await saveMarkdownFile(content, activeDocName);
+          }}
+          title="Export as Markdown"
+        >
+          Export .md
         </button>
       </header>
 
