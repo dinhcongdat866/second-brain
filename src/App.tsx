@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { baseKeymap, chainCommands, toggleMark } from 'prosemirror-commands';
@@ -39,6 +39,7 @@ import { slashMenuPlugin } from './plugins/slashMenuPlugin';
 import { placeholderPlugin } from './plugins/placeholderPlugin';
 import { bindYDoc } from './plugins/slashOptions';
 import { transformPastedHTML, pasteNormPlugin } from './clipboard';
+import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
 import { startAutoSnapshot } from './collab/snapshots';
@@ -49,8 +50,19 @@ import {
   createCollabSetup,
   seedIfEmpty,
   wireSaveStatus,
+  deleteDocStorage,
 } from './collab/ydoc';
 import { sweepOrphanThreads } from './collab/aiThreads';
+import {
+  listDocs,
+  createDoc,
+  renameDoc,
+  deleteDoc,
+  restoreDoc,
+  getActiveDocId,
+  setActiveDocId,
+  type DocMeta,
+} from './lib/docRegistry';
 import './App.css';
 
 function createPlugins(
@@ -157,7 +169,54 @@ function App() {
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const storageCleanupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [docs, setDocs] = useState<DocMeta[]>(() => listDocs());
+  const [activeDocId, setActiveDocIdState] = useState<string>(
+    () => getActiveDocId(),
+  );
   const saveStatus = useUIStore((s) => s.saveStatus);
+
+  const handleSelectDoc = useCallback((id: string) => {
+    setActiveDocId(id);
+    setActiveDocIdState(id);
+  }, []);
+
+  const handleCreateDoc = useCallback(() => {
+    const doc = createDoc('Untitled');
+    setDocs(listDocs());
+    setActiveDocId(doc.id);
+    setActiveDocIdState(doc.id);
+  }, []);
+
+  const handleRenameDoc = useCallback((id: string, name: string) => {
+    renameDoc(id, name);
+    setDocs(listDocs());
+  }, []);
+
+  const handleDeleteDoc = useCallback(
+    (id: string) => {
+      deleteDoc(id);
+      const remaining = listDocs();
+      setDocs(remaining);
+      if (id === activeDocId) {
+        const next = remaining[0].id;
+        setActiveDocId(next);
+        setActiveDocIdState(next);
+      }
+      // Delete IndexedDB data after the undo window (5s) expires
+      if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
+      storageCleanupRef.current = setTimeout(() => deleteDocStorage(id), 5500);
+    },
+    [activeDocId],
+  );
+
+  const handleRestoreDoc = useCallback((meta: DocMeta) => {
+    restoreDoc(meta);
+    setDocs(listDocs());
+    // Cancel pending IndexedDB deletion so restored content stays intact
+    if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
+  }, []);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -167,7 +226,7 @@ function App() {
       persistence,
       provider,
       yXmlFragment,
-    } = createCollabSetup();
+    } = createCollabSetup(activeDocId);
     let v: EditorView | undefined;
     let unwireSaveStatus: (() => void) | undefined;
     let stopAutoSnapshot: (() => void) | undefined;
@@ -223,12 +282,21 @@ function App() {
       setView(null);
       setYdoc(null);
     };
-  }, []);
+  }, [activeDocId]);
+
+  const activeDocName = docs.find((d) => d.id === activeDocId)?.name ?? '';
 
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Second Brain</h1>
+        <button
+          className="header-sidebar-toggle"
+          onClick={() => setSidebarOpen((v) => !v)}
+          title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+        >
+          ☰
+        </button>
+        <h1>{activeDocName}</h1>
         {saveStatus !== 'idle' && (
           <span className={`save-status save-status--${saveStatus}`}>
             {saveStatus === 'pending' ? 'Saving...' : 'Saved'}
@@ -242,13 +310,26 @@ function App() {
           History
         </button>
       </header>
-      <main className="app-main">
-        <div className="notebook-wrap">
-          <div ref={editorRef} className="notebook-editor" />
-          <CellAdder view={view} ydoc={ydoc} />
-        </div>
-        <SlashMenu view={view} />
-      </main>
+      <div className="app-body">
+        {sidebarOpen && (
+          <Sidebar
+            docs={docs}
+            activeId={activeDocId}
+            onSelect={handleSelectDoc}
+            onCreate={handleCreateDoc}
+            onRename={handleRenameDoc}
+            onDelete={handleDeleteDoc}
+            onRestore={handleRestoreDoc}
+          />
+        )}
+        <main className="app-main">
+          <div className="notebook-wrap">
+            <div ref={editorRef} className="notebook-editor" />
+            <CellAdder view={view} ydoc={ydoc} />
+          </div>
+          <SlashMenu view={view} />
+        </main>
+      </div>
       {showHistory && ydoc && view && (
         <SnapshotModal
           ydoc={ydoc}

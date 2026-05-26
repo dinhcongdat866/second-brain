@@ -6,12 +6,6 @@ import { createInitialDoc } from '../schema';
 import { useUIStore } from '../stores/uiStore';
 
 /**
- * IndexedDB database name for the local CRDT store.
- * Distinct from the old idb-keyval store — no migration, fresh start.
- */
-export const COLLAB_DB_NAME = 'notebook:default';
-
-/**
  * XML fragment key inside the Y.Doc that ProseMirror binds to.
  * Must match the name passed to prosemirrorToYDoc when seeding.
  */
@@ -20,8 +14,19 @@ export const XML_FRAGMENT_NAME = 'prosemirror';
 /** URL of the self-hosted y-websocket sync server (dev: `pnpm dev:ws`). */
 export const WS_URL = 'ws://localhost:1234';
 
-/** WebSocket room name — all clients in the same room sync the same doc. */
-export const WS_ROOM = 'notebook-default';
+/** IndexedDB key for a given doc. 'default' maps to the original store. */
+export const collabDbName = (docId: string) => `notebook:${docId}`;
+
+/**
+ * Permanently remove the Yjs IndexedDB store for a document.
+ * Call this only after the undo window has expired so a restore is still possible.
+ */
+export function deleteDocStorage(docId: string): void {
+  indexedDB.deleteDatabase(collabDbName(docId));
+}
+
+/** WebSocket room for a given doc — each doc gets its own collab room. */
+export const collabRoom = (docId: string) => `notebook-${docId}`;
 
 /** Cursor/selection colors handed out to peers via awareness. */
 const CURSOR_COLORS = [
@@ -53,12 +58,12 @@ export interface CollabSetup {
   yXmlFragment: Y.XmlFragment;
 }
 
-export function createCollabSetup(): CollabSetup {
+export function createCollabSetup(docId: string): CollabSetup {
   // gc: false — keep all tombstoned operations so Y.snapshot / time-travel works.
   // The IndexedDB store grows slowly over time; acceptable for a personal notebook.
   const ydoc = new Y.Doc({ gc: false });
-  const persistence = new IndexeddbPersistence(COLLAB_DB_NAME, ydoc);
-  const provider = new WebsocketProvider(WS_URL, WS_ROOM, ydoc);
+  const persistence = new IndexeddbPersistence(collabDbName(docId), ydoc);
+  const provider = new WebsocketProvider(WS_URL, collabRoom(docId), ydoc);
   provider.awareness.setLocalStateField('user', randomUser());
   const yXmlFragment = ydoc.getXmlFragment(XML_FRAGMENT_NAME);
   return { ydoc, persistence, provider, yXmlFragment };
