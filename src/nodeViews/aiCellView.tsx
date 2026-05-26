@@ -3,6 +3,7 @@ import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import type * as Y from 'yjs';
 import { getThread } from '../collab/aiThreads';
+import { extractDocContext } from '../lib/docContext';
 import { AiCell } from './AiCell';
 
 // ---------------------------------------------------------------------------
@@ -36,8 +37,12 @@ export class AiCellView implements NodeView {
       view.dispatch(view.state.tr.delete(pos, pos + node.nodeSize));
     };
 
+    const getDocContext = () => extractDocContext(view.state.doc);
+
     this.root = createRoot(this.dom);
-    this.root.render(<AiCell thread={thread} onDelete={onDelete} />);
+    this.root.render(
+      <AiCell thread={thread} getDocContext={getDocContext} onDelete={onDelete} />,
+    );
   }
 
   // atom node with stable attrs — keep this NodeView, never recreate.

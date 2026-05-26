@@ -1,29 +1,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { addTurn, type TurnRole, type YThread } from '../collab/aiThreads';
-
-// Stage 1: no real LLM yet. Stage 2 swaps this for a streamed Claude response.
-const MOCK_REPLY =
-  'Đây là phản hồi mẫu (mock). Stage 2 sẽ thay bằng Claude API thật — ' +
-  'AI đọc context các cell phía trên rồi stream câu trả lời thật về đây.';
-
-/**
- * Append `text` into `target` one character at a time — fakes token streaming.
- * Each insert is a Yjs op, so collaborators see the reply grow in real time.
- */
-function mockStream(target: Y.Text, text: string, onDone: () => void): void {
-  let i = 0;
-  const tick = () => {
-    if (i >= text.length) {
-      onDone();
-      return;
-    }
-    target.insert(target.length, text[i]);
-    i += 1;
-    setTimeout(tick, 18);
-  };
-  tick();
-}
+import { streamClaudeReply } from '../collab/claudeStream';
 
 /** Re-render whenever the thread (or any nested turn / Y.Text) changes. */
 function useTurns(thread: YThread) {
@@ -41,14 +19,17 @@ function useTurns(thread: YThread) {
 
 export function AiCell({
   thread,
+  getDocContext,
   onDelete,
 }: {
   thread: YThread;
+  getDocContext: () => string;
   onDelete: () => void;
 }) {
   const turns = useTurns(thread);
   const [prompt, setPrompt] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   // On the streaming→done transition, briefly flag `finishing` so the wind
   // animation re-runs once at a faster duration — a final "gust" before
   // the cell settles back to plain white.
@@ -67,12 +48,30 @@ export function AiCell({
   const submit = () => {
     const text = prompt.trim();
     if (!text || streaming) return;
+    setError(null);
     addTurn(thread, 'user', text);
     const assistant = addTurn(thread, 'assistant');
+    const yText = assistant.get('content') as Y.Text;
     setPrompt('');
     setStreaming(true);
-    mockStream(assistant.get('content') as Y.Text, MOCK_REPLY, () =>
-      setStreaming(false),
+
+    const history = thread
+      .toArray()
+      .slice(0, -1) // exclude the empty assistant turn we just added
+      .map((t) => ({
+        role: t.get('role') as TurnRole,
+        content: (t.get('content') as Y.Text).toString(),
+      }));
+
+    streamClaudeReply(
+      getDocContext(),
+      history,
+      yText,
+      () => setStreaming(false),
+      (err) => {
+        setStreaming(false);
+        setError(err.message);
+      },
     );
   };
 
@@ -113,6 +112,7 @@ export function AiCell({
             </div>
           </div>
         ))}
+        {error && <div className="ai-cell__error">{error}</div>}
       </div>
 
       <div className="ai-cell__input">
