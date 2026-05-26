@@ -49,3 +49,31 @@ export function addTurn(thread: YThread, role: TurnRole, text = ''): YTurn {
   if (text) (turn.get('content') as Y.Text).insert(0, text);
   return turn;
 }
+
+/**
+ * Remove thread entries whose ai_cell no longer exists in the document.
+ * Called once at load time — a deleted ai_cell leaves its thread entry behind
+ * because the PM delete transaction has no knowledge of the Yjs side-store.
+ */
+export function sweepOrphanThreads(
+  ydoc: Y.Doc,
+  yXmlFragment: Y.XmlFragment,
+): void {
+  const threads = getAiThreads(ydoc);
+  if (threads.size === 0) return;
+
+  const liveCellIds = new Set<string>();
+  for (const child of yXmlFragment.toArray()) {
+    if (child instanceof Y.XmlElement && child.nodeName === 'ai_cell') {
+      const id = child.getAttribute('id');
+      if (id) liveCellIds.add(id);
+    }
+  }
+
+  const orphans = [...threads.keys()].filter((id) => !liveCellIds.has(id));
+  if (orphans.length === 0) return;
+
+  ydoc.transact(() => {
+    for (const id of orphans) threads.delete(id);
+  });
+}

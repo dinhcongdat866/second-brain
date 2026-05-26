@@ -50,6 +50,7 @@ import {
   seedIfEmpty,
   wireSaveStatus,
 } from './collab/ydoc';
+import { sweepOrphanThreads } from './collab/aiThreads';
 import './App.css';
 
 function createPlugins(
@@ -179,6 +180,7 @@ function App() {
       if (cancelled) return;
 
       seedIfEmpty(doc_ydoc, yXmlFragment);
+      sweepOrphanThreads(doc_ydoc, yXmlFragment);
       bindYDoc(doc_ydoc);
       ydocRef.current = doc_ydoc;
       setYdoc(doc_ydoc);
