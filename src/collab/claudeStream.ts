@@ -22,6 +22,7 @@ export async function streamClaudeReply(
   onDone: () => void,
   onError: (err: Error) => void,
   ragContext = '',
+  signal?: AbortSignal,
 ): Promise<void> {
   const messages: Anthropic.MessageParam[] = turns.map((t) => ({
     role: t.role,
@@ -55,12 +56,10 @@ export async function streamClaudeReply(
   }
 
   try {
-    const stream = client.messages.stream({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
-      system,
-      messages,
-    });
+    const stream = client.messages.stream(
+      { model: 'claude-sonnet-4-6', max_tokens: 2048, system, messages },
+      { signal },
+    );
 
     for await (const event of stream) {
       if (
@@ -73,6 +72,10 @@ export async function streamClaudeReply(
 
     onDone();
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      onDone();
+      return;
+    }
     onError(err instanceof Error ? err : new Error(String(err)));
   }
 }

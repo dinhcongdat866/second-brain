@@ -91,6 +91,7 @@ export function AiCell({
   }, [pendingDelete]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Streaming → done: briefly flag `finishing` for the final aurora gust.
   const [finishing, setFinishing] = useState(false);
@@ -135,25 +136,33 @@ export function AiCell({
     // Fetch semantically related notes, then stream. Fire in parallel with
     // no await on search so UI feels instant — search result arrives fast
     // enough before the first token anyway.
-    searchCells(text, 3).then((results) => {
-      const ragContext = results
-        .filter((r) => r.score > 0.3)
-        .map((r) => r.content)
-        .join('\n\n');
+    const ac = new AbortController();
+    abortRef.current = ac;
 
-      streamClaudeReply(
-        getLocalContext(),
-        getDocContext(),
-        history,
-        yText,
-        () => setStreaming(false),
-        (err) => {
-          setStreaming(false);
-          setError(err.message);
-        },
-        ragContext,
-      );
-    });
+    searchCells(text, 3)
+      .then((results) => {
+        if (ac.signal.aborted) return;
+        const ragContext = results
+          .filter((r) => r.score > 0.3)
+          .map((r) => r.content)
+          .join('\n\n');
+
+        return streamClaudeReply(
+          getLocalContext(),
+          getDocContext(),
+          history,
+          yText,
+          () => { abortRef.current = null; setStreaming(false); },
+          (err) => { abortRef.current = null; setStreaming(false); setError(err.message); },
+          ragContext,
+          ac.signal,
+        );
+      })
+      .catch((err: unknown) => {
+        abortRef.current = null;
+        setStreaming(false);
+        setError(err instanceof Error ? err.message : String(err));
+      });
   };
 
   // Start editing the last user turn without immediately modifying the thread.
@@ -360,13 +369,24 @@ export function AiCell({
                 Huỷ
               </button>
             )}
-            <button
-              type="button"
-              onClick={submit}
-              disabled={streaming || prompt.trim() === ''}
-            >
-              {editFromIdx !== null ? 'Gửi lại' : 'Gửi'}
-            </button>
+            {streaming ? (
+              <button
+                type="button"
+                className="ai-cell__stop-btn"
+                onClick={() => abortRef.current?.abort()}
+                title="Dừng stream"
+              >
+                ■ Dừng
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={submit}
+                disabled={prompt.trim() === ''}
+              >
+                {editFromIdx !== null ? 'Gửi lại' : 'Gửi'}
+              </button>
+            )}
           </div>
         </>
       )}

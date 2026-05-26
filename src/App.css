@@ -618,6 +618,21 @@ body {
   background: var(--nb-bg-hover);
 }
 
+.ai-cell__stop-btn {
+  border: 1px solid #f87171;
+  background: transparent;
+  color: #f87171;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ai-cell__stop-btn:hover {
+  background: rgba(248, 113, 113, 0.1);
+}
+
 /* Scrollable conversation area */
 .ai-cell__turns {
   display: flex;
