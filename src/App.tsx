@@ -1,134 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { EditorState } from 'prosemirror-state';
-import { EditorView } from 'prosemirror-view';
-import { baseKeymap, chainCommands, toggleMark } from 'prosemirror-commands';
-import { keymap } from 'prosemirror-keymap';
-import {
-  ySyncPlugin,
-  yCursorPlugin,
-  yUndoPlugin,
-  undo,
-  redo,
-  initProseMirrorDoc,
-} from 'y-prosemirror';
+import { useRef, useState } from 'react';
 import type * as Y from 'yjs';
-import type { WebsocketProvider } from 'y-websocket';
+import type { EditorView } from 'prosemirror-view';
 
-type ProseMirrorMapping = ReturnType<typeof initProseMirrorDoc>['mapping'];
-type Awareness = WebsocketProvider['awareness'];
-
-import { notebookSchema } from './schema';
-import {
-  insertHardBreak,
-  insertMarkdownCell,
-  setHeading,
-  setParagraph,
-  toggleBlockquote,
-  insertHorizontalRule,
-  exitBlockquoteOnBackspace,
-  preventJoinIntoBlockquote,
-  exitToParagraph,
-  smartSelectAll,
-  deleteEmptyCell,
-  convertEmptyHeadingToParagraph,
-  appendMarkdownCell,
-  makeAppendAiCell,
-} from './commands';
-import { ensureCellPlugin } from './plugins/ensureCellPlugin';
-import { slashMenuPlugin } from './plugins/slashMenuPlugin';
-import { placeholderPlugin } from './plugins/placeholderPlugin';
-import { bindYDoc } from './plugins/slashOptions';
-import { transformPastedHTML, pasteNormPlugin } from './clipboard';
+import { appendMarkdownCell, makeAppendAiCell } from './commands';
 import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
-import { startAutoSnapshot } from './collab/snapshots';
-import { AiCellView } from './nodeViews/aiCellView';
-import { MarkdownCellView } from './nodeViews/markdownCellView';
+import { useDocRegistry } from './hooks/useDocRegistry';
+import { useNotebookEditor } from './hooks/useNotebookEditor';
 import { useUIStore } from './stores/uiStore';
-import {
-  createCollabSetup,
-  seedIfEmpty,
-  wireSaveStatus,
-  deleteDocStorage,
-} from './collab/ydoc';
-import { sweepOrphanThreads } from './collab/aiThreads';
-import {
-  listDocs,
-  createDoc,
-  renameDoc,
-  deleteDoc,
-  restoreDoc,
-  getActiveDocId,
-  setActiveDocId,
-  type DocMeta,
-} from './lib/docRegistry';
 import './App.css';
-
-function createPlugins(
-  yXmlFragment: Y.XmlFragment,
-  mapping: ProseMirrorMapping,
-  awareness: Awareness,
-) {
-  return [
-    // ySyncPlugin binds the doc to the CRDT; yUndoPlugin replaces
-    // prosemirror-history (undo only spans local CRDT changes).
-    ySyncPlugin(yXmlFragment, { mapping }),
-    // yCursorPlugin renders remote carets/selections from awareness.
-    yCursorPlugin(awareness),
-    yUndoPlugin(),
-    // Slash menu BEFORE other keymaps — it needs first shot at arrow/enter
-    slashMenuPlugin,
-    keymap({
-      // Undo/redo — y-prosemirror's, backed by yUndoPlugin
-      'Mod-z': undo,
-      'Mod-y': redo,
-      'Shift-Mod-z': redo,
-
-      // Marks
-      'Mod-b': toggleMark(notebookSchema.marks.strong),
-      'Mod-i': toggleMark(notebookSchema.marks.em),
-      'Mod-e': toggleMark(notebookSchema.marks.code),
-
-      // Enter behavior: hard_break, never split blocks.
-      // New cells created via slash command / keymap, not Enter.
-      'Enter': insertHardBreak,
-      'Shift-Enter': insertHardBreak,
-
-      // Mod-Enter: exit blockquote/heading → new paragraph below
-      'Mod-Enter': exitToParagraph,
-
-      // Backspace chain:
-      //   1. exitBlockquoteOnBackspace — lift out if at start of empty quote paragraph
-      //   2. preventJoinIntoBlockquote — block joining a paragraph INTO a previous quote
-      //   3. (fall through to baseKeymap for default delete/join)
-      'Backspace': chainCommands(
-        convertEmptyHeadingToParagraph,
-        deleteEmptyCell,
-        exitBlockquoteOnBackspace,
-        preventJoinIntoBlockquote,
-      ),
-
-      // Smart select-all: cell content first, then full doc on second press
-      'Mod-a': smartSelectAll,
-
-      // Insert cells
-      'Mod-Alt-m': insertMarkdownCell,
-
-      // Block transforms (inside markdown_cell)
-      'Mod-Alt-1': setHeading(1),
-      'Mod-Alt-2': setHeading(2),
-      'Mod-Alt-3': setHeading(3),
-      'Mod-Alt-0': setParagraph,
-      'Mod-Alt-q': toggleBlockquote,
-      'Mod-Alt-d': insertHorizontalRule,
-    }),
-    keymap(baseKeymap),
-    ensureCellPlugin,
-    placeholderPlugin,
-    pasteNormPlugin,
-  ];
-}
 
 function CellAdder({
   view,
@@ -138,23 +19,26 @@ function CellAdder({
   ydoc: Y.Doc | null;
 }) {
   if (!view || !ydoc) return null;
-
-  const addMarkdown = () => {
-    appendMarkdownCell(view.state, view.dispatch.bind(view));
-    view.focus();
-  };
-
-  const addAi = () => {
-    makeAppendAiCell(ydoc)(view.state, view.dispatch.bind(view));
-    view.focus();
-  };
-
   return (
     <div className="cell-adder">
-      <button type="button" className="cell-adder__btn" onClick={addMarkdown}>
+      <button
+        type="button"
+        className="cell-adder__btn"
+        onClick={() => {
+          appendMarkdownCell(view.state, view.dispatch.bind(view));
+          view.focus();
+        }}
+      >
         + Markdown
       </button>
-      <button type="button" className="cell-adder__btn" onClick={addAi}>
+      <button
+        type="button"
+        className="cell-adder__btn"
+        onClick={() => {
+          makeAppendAiCell(ydoc)(view.state, view.dispatch.bind(view));
+          view.focus();
+        }}
+      >
         + AI Cell
       </button>
     </div>
@@ -163,128 +47,14 @@ function CellAdder({
 
 function App() {
   const editorRef = useRef<HTMLDivElement>(null);
-  const [view, setView] = useState<EditorView | null>(null);
-  // ydoc stored in state so JSX can read it without touching a ref during render.
-  // ydocRef is kept only for the snapshot modal (imperative API, not render).
-  const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
-  const ydocRef = useRef<Y.Doc | null>(null);
+  const registry = useDocRegistry();
+  const { view, ydoc } = useNotebookEditor(editorRef, registry.activeDocId);
   const [showHistory, setShowHistory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const storageCleanupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [docs, setDocs] = useState<DocMeta[]>(() => listDocs());
-  const [activeDocId, setActiveDocIdState] = useState<string>(
-    () => getActiveDocId(),
-  );
   const saveStatus = useUIStore((s) => s.saveStatus);
 
-  const handleSelectDoc = useCallback((id: string) => {
-    setActiveDocId(id);
-    setActiveDocIdState(id);
-  }, []);
-
-  const handleCreateDoc = useCallback(() => {
-    const doc = createDoc('Untitled');
-    setDocs(listDocs());
-    setActiveDocId(doc.id);
-    setActiveDocIdState(doc.id);
-  }, []);
-
-  const handleRenameDoc = useCallback((id: string, name: string) => {
-    renameDoc(id, name);
-    setDocs(listDocs());
-  }, []);
-
-  const handleDeleteDoc = useCallback(
-    (id: string) => {
-      deleteDoc(id);
-      const remaining = listDocs();
-      setDocs(remaining);
-      if (id === activeDocId) {
-        const next = remaining[0].id;
-        setActiveDocId(next);
-        setActiveDocIdState(next);
-      }
-      // Delete IndexedDB data after the undo window (5s) expires
-      if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
-      storageCleanupRef.current = setTimeout(() => deleteDocStorage(id), 5500);
-    },
-    [activeDocId],
-  );
-
-  const handleRestoreDoc = useCallback((meta: DocMeta) => {
-    restoreDoc(meta);
-    setDocs(listDocs());
-    // Cancel pending IndexedDB deletion so restored content stays intact
-    if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
-  }, []);
-
-  useEffect(() => {
-    if (!editorRef.current) return;
-
-    const {
-      ydoc: doc_ydoc,
-      persistence,
-      provider,
-      yXmlFragment,
-    } = createCollabSetup(activeDocId);
-    let v: EditorView | undefined;
-    let unwireSaveStatus: (() => void) | undefined;
-    let stopAutoSnapshot: (() => void) | undefined;
-    let cancelled = false;
-
-    // Bind after the LOCAL store loads — don't wait for the network, so the
-    // editor works offline. Remote updates merge in once the socket connects.
-    persistence.whenSynced.then(() => {
-      // StrictMode runs cleanup before the promise resolves — bail out if so
-      if (cancelled) return;
-
-      seedIfEmpty(doc_ydoc, yXmlFragment);
-      sweepOrphanThreads(doc_ydoc, yXmlFragment);
-      bindYDoc(doc_ydoc);
-      ydocRef.current = doc_ydoc;
-      setYdoc(doc_ydoc);
-      unwireSaveStatus = wireSaveStatus(doc_ydoc);
-      stopAutoSnapshot = startAutoSnapshot(doc_ydoc);
-
-      const { doc, mapping } = initProseMirrorDoc(yXmlFragment, notebookSchema);
-      const state = EditorState.create({
-        schema: notebookSchema,
-        doc,
-        plugins: createPlugins(yXmlFragment, mapping, provider.awareness),
-      });
-
-      v = new EditorView(editorRef.current!, {
-        state,
-        nodeViews: {
-          markdown_cell: (node, view, getPos) =>
-            new MarkdownCellView(node, view, getPos),
-          ai_cell: (node, view, getPos) =>
-            new AiCellView(node, view, getPos, doc_ydoc),
-        },
-        transformPastedHTML,
-        dispatchTransaction(transaction) {
-          const newState = v!.state.apply(transaction);
-          v!.updateState(newState);
-        },
-      });
-
-      setView(v);
-    });
-
-    return () => {
-      cancelled = true;
-      unwireSaveStatus?.();
-      stopAutoSnapshot?.();
-      v?.destroy();
-      provider.destroy();
-      persistence.destroy();
-      doc_ydoc.destroy();
-      setView(null);
-      setYdoc(null);
-    };
-  }, [activeDocId]);
-
-  const activeDocName = docs.find((d) => d.id === activeDocId)?.name ?? '';
+  const activeDocName =
+    registry.docs.find((d) => d.id === registry.activeDocId)?.name ?? '';
 
   return (
     <div className="app">
@@ -310,16 +80,17 @@ function App() {
           History
         </button>
       </header>
+
       <div className="app-body">
         {sidebarOpen && (
           <Sidebar
-            docs={docs}
-            activeId={activeDocId}
-            onSelect={handleSelectDoc}
-            onCreate={handleCreateDoc}
-            onRename={handleRenameDoc}
-            onDelete={handleDeleteDoc}
-            onRestore={handleRestoreDoc}
+            docs={registry.docs}
+            activeId={registry.activeDocId}
+            onSelect={registry.selectDoc}
+            onCreate={registry.createNewDoc}
+            onRename={registry.renameDoc}
+            onDelete={registry.deleteDoc}
+            onRestore={registry.restoreDoc}
           />
         )}
         <main className="app-main">
@@ -330,6 +101,7 @@ function App() {
           <SlashMenu view={view} />
         </main>
       </div>
+
       {showHistory && ydoc && view && (
         <SnapshotModal
           ydoc={ydoc}
