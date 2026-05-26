@@ -3,6 +3,7 @@ import type * as Y from 'yjs';
 import { addTurn, type TurnRole, type YThread } from '../collab/aiThreads';
 import { streamClaudeReply } from '../collab/claudeStream';
 import { formatSmartDate, formatFullDate } from '../lib/formatDate';
+import { upsertUserTurn } from '../lib/backendSync';
 
 // ---------------------------------------------------------------------------
 // Icons (inline SVG — no external dependency)
@@ -59,10 +60,14 @@ export function AiCell({
   thread,
   getDocContext,
   onDelete,
+  cellId,
+  docId,
 }: {
   thread: YThread;
   getDocContext: () => string;
   onDelete: () => void;
+  cellId: string;
+  docId: string;
 }) {
   const turns = useTurns(thread);
   const [prompt, setPrompt] = useState('');
@@ -111,6 +116,7 @@ export function AiCell({
     }
 
     addTurn(thread, 'user', text);
+    upsertUserTurn(cellId, docId, text);
     const assistant = addTurn(thread, 'assistant');
     const yText = assistant.get('content') as Y.Text;
     setPrompt('');

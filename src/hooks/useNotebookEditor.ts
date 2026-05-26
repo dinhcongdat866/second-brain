@@ -40,6 +40,7 @@ import { startAutoSnapshot } from '../collab/snapshots';
 import { createCollabSetup, seedFromContent, seedIfEmpty, wireSaveStatus } from '../collab/ydoc';
 import { addTurn, getThread, sweepOrphanThreads } from '../collab/aiThreads';
 import { consumePendingImport } from '../lib/importState';
+import { createDocSyncer } from '../lib/backendSync';
 
 type ProseMirrorMapping = ReturnType<typeof initProseMirrorDoc>['mapping'];
 type Awareness = WebsocketProvider['awareness'];
@@ -138,18 +139,21 @@ export function useNotebookEditor(
         plugins: createPlugins(yXmlFragment, mapping, provider.awareness),
       });
 
+      const syncDoc = createDocSyncer(activeDocId);
+
       v = new EditorView(editorRef.current!, {
         state,
         nodeViews: {
           markdown_cell: (node, view, getPos) =>
             new MarkdownCellView(node, view, getPos),
           ai_cell: (node, view, getPos) =>
-            new AiCellView(node, view, getPos, doc),
+            new AiCellView(node, view, getPos, doc, activeDocId),
         },
         transformPastedHTML,
         dispatchTransaction(tr) {
           const next = v!.state.apply(tr);
           v!.updateState(next);
+          if (tr.docChanged) syncDoc(next.doc);
         },
       });
 

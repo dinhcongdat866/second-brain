@@ -15,6 +15,12 @@ dist-ssr
 # Local-only docs (project notes, business plan, scratchpad)
 localDoc/
 
+# Python backend
+backend/.env
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.venv/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

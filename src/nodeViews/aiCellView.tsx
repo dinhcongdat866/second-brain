@@ -21,6 +21,7 @@ export class AiCellView implements NodeView {
     view: EditorView,
     getPos: () => number | undefined,
     ydoc: Y.Doc,
+    docId: string,
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'ai-cell';
@@ -43,7 +44,7 @@ export class AiCellView implements NodeView {
 
     this.root = createRoot(this.dom);
     this.root.render(
-      <AiCell thread={thread} getDocContext={getDocContext} onDelete={onDelete} />,
+      <AiCell thread={thread} getDocContext={getDocContext} onDelete={onDelete} cellId={cellId} docId={docId} />,
     );
 
     // After React renders, move browser focus into the ai_cell's input field.
