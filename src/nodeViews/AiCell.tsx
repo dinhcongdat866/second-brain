@@ -3,7 +3,7 @@ import type * as Y from 'yjs';
 import { addTurn, type TurnRole, type YThread } from '../collab/aiThreads';
 import { streamClaudeReply } from '../collab/claudeStream';
 import { formatSmartDate, formatFullDate } from '../lib/formatDate';
-import { upsertUserTurn } from '../lib/backendSync';
+import { upsertUserTurn, searchCells } from '../lib/backendSync';
 
 // ---------------------------------------------------------------------------
 // Icons (inline SVG — no external dependency)
@@ -58,12 +58,14 @@ function useTurns(thread: YThread) {
 
 export function AiCell({
   thread,
+  getLocalContext,
   getDocContext,
   onDelete,
   cellId,
   docId,
 }: {
   thread: YThread;
+  getLocalContext: () => string;
   getDocContext: () => string;
   onDelete: () => void;
   cellId: string;
@@ -130,16 +132,28 @@ export function AiCell({
         content: (t.get('content') as Y.Text).toString(),
       }));
 
-    streamClaudeReply(
-      getDocContext(),
-      history,
-      yText,
-      () => setStreaming(false),
-      (err) => {
-        setStreaming(false);
-        setError(err.message);
-      },
-    );
+    // Fetch semantically related notes, then stream. Fire in parallel with
+    // no await on search so UI feels instant — search result arrives fast
+    // enough before the first token anyway.
+    searchCells(text, 3).then((results) => {
+      const ragContext = results
+        .filter((r) => r.score > 0.3)
+        .map((r) => r.content)
+        .join('\n\n');
+
+      streamClaudeReply(
+        getLocalContext(),
+        getDocContext(),
+        history,
+        yText,
+        () => setStreaming(false),
+        (err) => {
+          setStreaming(false);
+          setError(err.message);
+        },
+        ragContext,
+      );
+    });
   };
 
   // Start editing the last user turn without immediately modifying the thread.

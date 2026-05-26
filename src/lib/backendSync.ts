@@ -34,6 +34,26 @@ export function upsertUserTurn(cellId: string, docId: string, text: string): voi
   upsertCell({ cell_id: `${cellId}:u:${Date.now()}`, doc_id: docId, content }).catch(() => {});
 }
 
+export interface SearchResult {
+  cell_id: string;
+  doc_id: string;
+  content: string;
+  score: number;
+}
+
+/** Semantic search across all indexed cells. Returns empty array if backend unreachable. */
+export async function searchCells(query: string, limit = 5): Promise<SearchResult[]> {
+  try {
+    const res = await fetch(
+      `${BACKEND_URL}/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as SearchResult[];
+  } catch {
+    return [];
+  }
+}
+
 /** Returns a debounced sync function. Call on every docChanged transaction. */
 export function createDocSyncer(docId: string, debounceMs = 2000) {
   let timer: ReturnType<typeof setTimeout> | null = null;

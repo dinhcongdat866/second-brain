@@ -3,7 +3,7 @@ import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import type * as Y from 'yjs';
 import { getThread } from '../collab/aiThreads';
-import { extractDocContext } from '../lib/docContext';
+import { extractDocContext, extractLocalContext } from '../lib/docContext';
 import { AiCell } from './AiCell';
 
 // ---------------------------------------------------------------------------
@@ -40,11 +40,19 @@ export class AiCellView implements NodeView {
       requestAnimationFrame(() => view.focus());
     };
 
+    const getLocalContext = () => extractLocalContext(view.state.doc, cellId);
     const getDocContext = () => extractDocContext(view.state.doc);
 
     this.root = createRoot(this.dom);
     this.root.render(
-      <AiCell thread={thread} getDocContext={getDocContext} onDelete={onDelete} cellId={cellId} docId={docId} />,
+      <AiCell
+        thread={thread}
+        getLocalContext={getLocalContext}
+        getDocContext={getDocContext}
+        onDelete={onDelete}
+        cellId={cellId}
+        docId={docId}
+      />,
     );
 
     // After React renders, move browser focus into the ai_cell's input field.
