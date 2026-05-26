@@ -35,6 +35,8 @@ export class AiCellView implements NodeView {
       // Never delete the last remaining cell — keeps the doc schema-valid.
       if (view.state.doc.childCount === 1) return;
       view.dispatch(view.state.tr.delete(pos, pos + node.nodeSize));
+      // Return focus to PM editor so Ctrl+Z immediately undoes the deletion.
+      requestAnimationFrame(() => view.focus());
     };
 
     const getDocContext = () => extractDocContext(view.state.doc);
@@ -43,6 +45,14 @@ export class AiCellView implements NodeView {
     this.root.render(
       <AiCell thread={thread} getDocContext={getDocContext} onDelete={onDelete} />,
     );
+
+    // After React renders, move browser focus into the ai_cell's input field.
+    // Without this, the PM contenteditable still holds focus with a NodeSelection
+    // on the newly inserted atom — any keypress would replace the node.
+    setTimeout(() => {
+      const input = this.dom.querySelector<HTMLInputElement>('input');
+      input?.focus();
+    }, 0);
   }
 
   // atom node with stable attrs — keep this NodeView, never recreate.

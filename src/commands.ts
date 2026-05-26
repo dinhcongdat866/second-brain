@@ -64,8 +64,20 @@ function insertCellAfterCurrent(cell: PMNode): Command {
     }
     if (cellDepth === -1) return false;
 
-    // Position right after the current top-level cell
-    const insertPos = $from.after(cellDepth);
+    // Position right after the current top-level cell.
+    // When inserting a markdown_cell, skip past any immediately-following ai_cells.
+    // An ai_cell "belongs" to its preceding context; a new markdown_cell should
+    // open a fresh section AFTER the whole AI exchange.
+    let insertPos = $from.after(cellDepth);
+    if (cell.type.name === 'markdown_cell') {
+      const { doc } = state;
+      while (insertPos < doc.content.size) {
+        const next = doc.nodeAt(insertPos);
+        if (!next || next.type.name !== 'ai_cell') break;
+        insertPos += next.nodeSize;
+      }
+    }
+
     const tr = state.tr.insert(insertPos, cell);
 
     if (cell.type.name === 'ai_cell') {
@@ -367,6 +379,40 @@ export const smartSelectAll: Command = (state, dispatch) => {
 export const toggleCodeMark: Command = (state, dispatch) => {
   return toggleMark(notebookSchema.marks.code)(state, dispatch);
 };
+
+// ---------------------------------------------------------------------------
+// Append cell at end of doc (used by the "Add cell" button bar below editor)
+// These do NOT depend on cursor position — always insert after the last cell.
+// ---------------------------------------------------------------------------
+
+export const appendMarkdownCell: Command = (state, dispatch) => {
+  const cell = createMarkdownCell();
+  const insertPos = state.doc.content.size;
+  if (dispatch) {
+    const tr = state.tr.insert(insertPos, cell);
+    tr.setSelection(TextSelection.create(tr.doc, insertPos + 2));
+    tr.scrollIntoView();
+    dispatch(tr);
+  }
+  return true;
+};
+
+export function makeAppendAiCell(ydoc: Y.Doc): Command {
+  return (state, dispatch) => {
+    const cell = createAiCell();
+    const insertPos = state.doc.content.size;
+    ydoc.transact(() => {
+      if (dispatch) {
+        const tr = state.tr.insert(insertPos, cell);
+        tr.setSelection(NodeSelection.create(tr.doc, insertPos));
+        tr.scrollIntoView();
+        dispatch(tr);
+      }
+      getThread(ydoc, cell.attrs.id as string);
+    });
+    return true;
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Convert empty heading → paragraph on Backspace

@@ -182,14 +182,34 @@ export const GROUP_LABELS: Record<SlashGroup, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// Filter logic — simple substring match against label + keywords
+// Filter + sort logic
+// ---------------------------------------------------------------------------
+// Scoring (higher = first):
+//   3 — label starts with query  (e.g. "/ai" → "AI cell")
+//   2 — a keyword starts with query (prefix match — avoids mid-word noise like
+//        "plain" matching "/ai" because "pl*ai*n" ⊃ "ai")
+//   1 — label contains query somewhere
+// Keywords use startsWith, not includes, to prevent false positives.
 // ---------------------------------------------------------------------------
 
 export function filterSlashOptions(query: string): SlashOption[] {
   if (!query) return SLASH_OPTIONS;
   const q = query.toLowerCase();
-  return SLASH_OPTIONS.filter((opt) => {
-    if (opt.label.toLowerCase().includes(q)) return true;
-    return opt.keywords.some((k) => k.toLowerCase().includes(q));
-  });
+
+  const scored: Array<{ opt: SlashOption; score: number }> = [];
+
+  for (const opt of SLASH_OPTIONS) {
+    const label = opt.label.toLowerCase();
+    const labelStarts   = label.startsWith(q);
+    const labelContains = label.includes(q);
+    const kwStarts      = opt.keywords.some((k) => k.toLowerCase().startsWith(q));
+
+    if (!labelContains && !kwStarts) continue;
+
+    const score = labelStarts ? 3 : kwStarts ? 2 : 1;
+    scored.push({ opt, score });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((s) => s.opt);
 }

@@ -31,6 +31,8 @@ import {
   smartSelectAll,
   deleteEmptyCell,
   convertEmptyHeadingToParagraph,
+  appendMarkdownCell,
+  makeAppendAiCell,
 } from './commands';
 import { ensureCellPlugin } from './plugins/ensureCellPlugin';
 import { slashMenuPlugin } from './plugins/slashMenuPlugin';
@@ -114,9 +116,43 @@ function createPlugins(
   ];
 }
 
+function CellAdder({
+  view,
+  ydoc,
+}: {
+  view: EditorView | null;
+  ydoc: Y.Doc | null;
+}) {
+  if (!view || !ydoc) return null;
+
+  const addMarkdown = () => {
+    appendMarkdownCell(view.state, view.dispatch.bind(view));
+    view.focus();
+  };
+
+  const addAi = () => {
+    makeAppendAiCell(ydoc)(view.state, view.dispatch.bind(view));
+    view.focus();
+  };
+
+  return (
+    <div className="cell-adder">
+      <button type="button" className="cell-adder__btn" onClick={addMarkdown}>
+        + Markdown
+      </button>
+      <button type="button" className="cell-adder__btn" onClick={addAi}>
+        + AI Cell
+      </button>
+    </div>
+  );
+}
+
 function App() {
   const editorRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<EditorView | null>(null);
+  // ydoc stored in state so JSX can read it without touching a ref during render.
+  // ydocRef is kept only for the snapshot modal (imperative API, not render).
+  const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const saveStatus = useUIStore((s) => s.saveStatus);
@@ -124,7 +160,12 @@ function App() {
   useEffect(() => {
     if (!editorRef.current) return;
 
-    const { ydoc, persistence, provider, yXmlFragment } = createCollabSetup();
+    const {
+      ydoc: doc_ydoc,
+      persistence,
+      provider,
+      yXmlFragment,
+    } = createCollabSetup();
     let v: EditorView | undefined;
     let unwireSaveStatus: (() => void) | undefined;
     let stopAutoSnapshot: (() => void) | undefined;
@@ -136,11 +177,12 @@ function App() {
       // StrictMode runs cleanup before the promise resolves — bail out if so
       if (cancelled) return;
 
-      seedIfEmpty(ydoc, yXmlFragment);
-      bindYDoc(ydoc);
-      ydocRef.current = ydoc;
-      unwireSaveStatus = wireSaveStatus(ydoc);
-      stopAutoSnapshot = startAutoSnapshot(ydoc);
+      seedIfEmpty(doc_ydoc, yXmlFragment);
+      bindYDoc(doc_ydoc);
+      ydocRef.current = doc_ydoc;
+      setYdoc(doc_ydoc);
+      unwireSaveStatus = wireSaveStatus(doc_ydoc);
+      stopAutoSnapshot = startAutoSnapshot(doc_ydoc);
 
       const { doc, mapping } = initProseMirrorDoc(yXmlFragment, notebookSchema);
       const state = EditorState.create({
@@ -153,7 +195,7 @@ function App() {
         state,
         nodeViews: {
           ai_cell: (node, view, getPos) =>
-            new AiCellView(node, view, getPos, ydoc),
+            new AiCellView(node, view, getPos, doc_ydoc),
         },
         transformPastedHTML,
         dispatchTransaction(transaction) {
@@ -172,8 +214,9 @@ function App() {
       v?.destroy();
       provider.destroy();
       persistence.destroy();
-      ydoc.destroy();
+      doc_ydoc.destroy();
       setView(null);
+      setYdoc(null);
     };
   }, []);
 
@@ -195,12 +238,15 @@ function App() {
         </button>
       </header>
       <main className="app-main">
-        <div ref={editorRef} className="notebook-editor" />
+        <div className="notebook-wrap">
+          <div ref={editorRef} className="notebook-editor" />
+          <CellAdder view={view} ydoc={ydoc} />
+        </div>
         <SlashMenu view={view} />
       </main>
-      {showHistory && ydocRef.current && view && (
+      {showHistory && ydoc && view && (
         <SnapshotModal
-          ydoc={ydocRef.current}
+          ydoc={ydoc}
           mainView={view}
           onClose={() => setShowHistory(false)}
         />
