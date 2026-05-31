@@ -8,8 +8,12 @@ import {
   streamClaudeReply,
   type UsageStats,
   type ModelConfig,
+  type OllamaModel,
   DEFAULT_MODEL_CONFIG,
   MODELS,
+  fetchOllamaModels,
+  isOllamaModel,
+  ollamaModelName,
 } from '../collab/claudeStream';
 import { compressHistory } from '../collab/historyCompressor';
 import { formatSmartDate, formatFullDate } from '../lib/formatDate';
@@ -161,22 +165,10 @@ export function AiCell({
 
   const [editFromIdx, setEditFromIdx] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState(false);
-  useEffect(() => {
-    if (!pendingDelete) return;
-    const t = setTimeout(() => setPendingDelete(false), 3000);
-    return () => clearTimeout(t);
-  }, [pendingDelete]);
-
-  // Close maximize with Escape
-  useEffect(() => {
-    if (!maximized) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setMaximized(false); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [maximized]);
 
   const [sessionCost, setSessionCost] = useState(0);
   const [modelConfig, setModelConfig] = useState<ModelConfig>(DEFAULT_MODEL_CONFIG);
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [configOpen, setConfigOpen] = useState(false);
   const [panelAnchor, setPanelAnchor] = useState<{ top: number; left: number } | null>(null);
   const [searchingActive, setSearchingActive] = useState(false);
@@ -197,6 +189,25 @@ export function AiCell({
     if (rect) setPanelAnchor({ top: rect.bottom + 4, left: rect.left });
     setConfigOpen(true);
   };
+
+  useEffect(() => {
+    if (!pendingDelete) return;
+    const t = setTimeout(() => setPendingDelete(false), 3000);
+    return () => clearTimeout(t);
+  }, [pendingDelete]);
+
+  // Close maximize with Escape
+  useEffect(() => {
+    if (!maximized) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setMaximized(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [maximized]);
+
+  // Discover locally installed Ollama models once on mount.
+  useEffect(() => {
+    fetchOllamaModels().then(setOllamaModels).catch(() => {});
+  }, []);
 
   // Close config panel on outside click
   useEffect(() => {
@@ -297,7 +308,7 @@ export function AiCell({
           .map((r) => r.content)
           .join('\n\n');
 
-        const compressed = await compressHistory(history, ac.signal);
+        const compressed = await compressHistory(history, ac.signal, modelConfig);
         if (ac.signal.aborted) return;
 
         return streamClaudeReply(
@@ -634,7 +645,9 @@ export function AiCell({
                 else openConfigFrom(configBtnRef);
               }}
             >
-              {MODELS.find((m) => m.id === modelConfig.model)?.label ?? 'Sonnet'}
+              {isOllamaModel(modelConfig.model)
+                ? ollamaModelName(modelConfig.model)
+                : (MODELS.find((m) => m.id === modelConfig.model)?.label ?? 'Sonnet')}
               {modelConfig.thinking ? ' · Think' : ''}
               {modelConfig.webSearch ? ' · 🌐' : ''}
               {' ▾'}
@@ -710,8 +723,8 @@ export function AiCell({
           style={{ top: panelAnchor.top, left: panelAnchor.left }}
         >
           <div className="ai-cell__config-section">
-            <span className="ai-cell__config-heading">Model</span>
-            {MODELS.map((m) => (
+            <span className="ai-cell__config-heading">☁️ Anthropic</span>
+            {MODELS.filter((m) => m.provider === 'anthropic').map((m) => (
               <button
                 key={m.id}
                 type="button"
@@ -721,6 +734,7 @@ export function AiCell({
                     ...c,
                     model: m.id,
                     thinking: m.supportsThinking ? c.thinking : false,
+                    webSearch: m.supportsWebSearch ? c.webSearch : false,
                   }));
                   setConfigOpen(false);
                   setPanelAnchor(null);
@@ -735,28 +749,69 @@ export function AiCell({
           <div className="ai-cell__config-divider" />
 
           <div className="ai-cell__config-section">
-            <span className="ai-cell__config-heading">Tính năng</span>
-            <label className={
-              'ai-cell__config-toggle' +
-              (MODELS.find((m) => m.id === modelConfig.model)?.supportsThinking ? '' : ' is-disabled')
-            }>
-              <input
-                type="checkbox"
-                checked={modelConfig.thinking}
-                disabled={!MODELS.find((m) => m.id === modelConfig.model)?.supportsThinking}
-                onChange={(e) => setModelConfig((c) => ({ ...c, thinking: e.target.checked }))}
-              />
-              💭 Extended Thinking
-            </label>
-            <label className="ai-cell__config-toggle">
-              <input
-                type="checkbox"
-                checked={modelConfig.webSearch}
-                onChange={(e) => setModelConfig((c) => ({ ...c, webSearch: e.target.checked }))}
-              />
-              🌐 Web Search
-            </label>
+            <span className="ai-cell__config-heading">🏠 Ollama local</span>
+            {ollamaModels.length === 0 ? (
+              <span className="ai-cell__config-desc" style={{ padding: '4px 8px', display: 'block' }}>
+                Không tìm thấy model — hãy chạy Ollama
+              </span>
+            ) : ollamaModels.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={'ai-cell__config-option' + (modelConfig.model === m.id ? ' is-active' : '')}
+                onClick={() => {
+                  setModelConfig((c) => ({
+                    ...c,
+                    model: m.id,
+                    thinking: false,
+                    webSearch: false,
+                  }));
+                  setConfigOpen(false);
+                  setPanelAnchor(null);
+                }}
+              >
+                <span>{m.name}</span>
+                <span className="ai-cell__config-desc">{m.sizeGb} GB</span>
+              </button>
+            ))}
           </div>
+
+          <div className="ai-cell__config-divider" />
+
+          {(() => {
+            const activeModel = isOllamaModel(modelConfig.model)
+              ? { supportsThinking: false, supportsWebSearch: false }
+              : MODELS.find((m) => m.id === modelConfig.model);
+            return (
+              <div className="ai-cell__config-section">
+                <span className="ai-cell__config-heading">Tính năng</span>
+                <label className={
+                  'ai-cell__config-toggle' +
+                  (activeModel?.supportsThinking ? '' : ' is-disabled')
+                }>
+                  <input
+                    type="checkbox"
+                    checked={modelConfig.thinking}
+                    disabled={!activeModel?.supportsThinking}
+                    onChange={(e) => setModelConfig((c) => ({ ...c, thinking: e.target.checked }))}
+                  />
+                  💭 Extended Thinking
+                </label>
+                <label className={
+                  'ai-cell__config-toggle' +
+                  (activeModel?.supportsWebSearch ? '' : ' is-disabled')
+                }>
+                  <input
+                    type="checkbox"
+                    checked={modelConfig.webSearch}
+                    disabled={!activeModel?.supportsWebSearch}
+                    onChange={(e) => setModelConfig((c) => ({ ...c, webSearch: e.target.checked }))}
+                  />
+                  🌐 Web Search
+                </label>
+              </div>
+            );
+          })()}
         </div>,
         document.body,
       )}

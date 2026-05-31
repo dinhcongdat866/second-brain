@@ -1,12 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { TurnRole } from './aiThreads';
+import type { ModelConfig } from './claudeStream';
 
 const client = new Anthropic({
   apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY as string,
   dangerouslyAllowBrowser: true,
 });
 
-/** Plain turn shape sent to the Claude messages API. */
+/** Plain turn shape sent to the messages API. */
 export type Turn = { role: TurnRole; content: string };
 
 /**
@@ -19,10 +20,16 @@ export function estimateTokens(turns: Turn[]): number {
   return Math.ceil(chars / 4);
 }
 
-const TOKEN_THRESHOLD = 8_000; // compress when history exceeds this
-const KEEP_RECENT = 6;         // always keep the last N turns verbatim
+const TOKEN_THRESHOLD = 8_000;
+const KEEP_RECENT = 6;
 
-async function summarizeOldTurns(turns: Turn[], signal?: AbortSignal): Promise<string> {
+const SUMMARY_SYSTEM =
+  'Tóm tắt ngắn gọn đoạn hội thoại dưới đây (tối đa 3-4 câu). ' +
+  'Giữ lại: chủ đề chính, quyết định đã đưa ra, bối cảnh/tình huống của người dùng, ' +
+  'và các chi tiết cụ thể có thể được nhắc đến về sau. ' +
+  'Trả lời cùng ngôn ngữ với hội thoại.';
+
+async function summarizeWithAnthropic(turns: Turn[], signal?: AbortSignal): Promise<string> {
   const dialogue = turns
     .map((t) => `${t.role === 'user' ? 'User' : 'Assistant'}: ${t.content}`)
     .join('\n\n');
@@ -31,11 +38,7 @@ async function summarizeOldTurns(turns: Turn[], signal?: AbortSignal): Promise<s
     {
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
-      system:
-        'Tóm tắt ngắn gọn đoạn hội thoại dưới đây (tối đa 3-4 câu). ' +
-        'Giữ lại: chủ đề chính, quyết định đã đưa ra, bối cảnh/tình huống của người dùng, ' +
-        'và các chi tiết cụ thể có thể được nhắc đến về sau. ' +
-        'Trả lời cùng ngôn ngữ với hội thoại.',
+      system: SUMMARY_SYSTEM,
       messages: [{ role: 'user', content: dialogue }],
     },
     { signal },
@@ -44,21 +47,43 @@ async function summarizeOldTurns(turns: Turn[], signal?: AbortSignal): Promise<s
   return resp.content[0].type === 'text' ? resp.content[0].text : '';
 }
 
+async function summarizeWithOllama(turns: Turn[], modelName: string, signal?: AbortSignal): Promise<string> {
+  const dialogue = turns
+    .map((t) => `${t.role === 'user' ? 'User' : 'Assistant'}: ${t.content}`)
+    .join('\n\n');
+
+  const baseUrl = (import.meta.env.VITE_OLLAMA_URL as string | undefined) ?? 'http://localhost:11434';
+  const resp = await fetch(`${baseUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: modelName,
+      messages: [
+        { role: 'system', content: SUMMARY_SYSTEM },
+        { role: 'user', content: dialogue },
+      ],
+      stream: false,
+      options: { num_predict: 512 },
+    }),
+    signal,
+  });
+
+  if (!resp.ok) throw new Error(`Ollama summarize ${resp.status}`);
+  const data = await resp.json() as { message?: { content?: string } };
+  return data.message?.content ?? '';
+}
+
 /**
  * Compress old conversation turns into a summary when the history grows large.
  *
- * Strategy (Option 2 — summarize + slide):
- *   - Keep the last KEEP_RECENT turns verbatim.
- *   - Replace everything older with a synthetic summary exchange so Claude
- *     retains long-term context without paying for full token cost.
- *   - Falls back to the original array on any error.
- *
- * The returned array always starts with a 'user' turn (required by the
- * Anthropic messages API alternation rule).
+ * When `config` specifies an Ollama model the summary is generated locally so
+ * no conversation content leaves the machine.  Falls back to Anthropic Haiku
+ * when no config is provided.
  */
 export async function compressHistory(
   turns: Turn[],
   signal?: AbortSignal,
+  config?: ModelConfig,
 ): Promise<Turn[]> {
   if (estimateTokens(turns) <= TOKEN_THRESHOLD || turns.length <= KEEP_RECENT) {
     return turns;
@@ -67,21 +92,23 @@ export async function compressHistory(
   const oldTurns = turns.slice(0, -KEEP_RECENT);
   let recentTurns = turns.slice(-KEEP_RECENT);
 
-  // The window must start with 'user' to satisfy Anthropic's alternation rule.
   while (recentTurns.length > 0 && recentTurns[0].role === 'assistant') {
     recentTurns = recentTurns.slice(1);
   }
   if (recentTurns.length === 0) return turns;
 
   try {
-    const summary = await summarizeOldTurns(oldTurns, signal);
+    const useOllama = config?.model.startsWith('ollama:');
+    const summary = useOllama
+      ? await summarizeWithOllama(oldTurns, config!.model.slice('ollama:'.length), signal)
+      : await summarizeWithAnthropic(oldTurns, signal);
+
     return [
       { role: 'user', content: `[Tóm tắt hội thoại trước]\n${summary}` },
       { role: 'assistant', content: 'Đã ghi nhận.' },
       ...recentTurns,
     ];
   } catch {
-    // Network error, AbortError, etc. — degrade gracefully by sending full history.
     return turns;
   }
 }
