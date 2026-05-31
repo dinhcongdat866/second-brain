@@ -4,10 +4,10 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type * as Y from 'yjs';
 import { addTurn, type TurnRole, type YThread } from '../collab/aiThreads';
-import { streamClaudeReply } from '../collab/claudeStream';
+import { streamClaudeReply, type UsageStats } from '../collab/claudeStream';
 import { compressHistory } from '../collab/historyCompressor';
 import { formatSmartDate, formatFullDate } from '../lib/formatDate';
-import { upsertUserTurn, searchCells } from '../lib/backendSync';
+import { upsertUserTurn, searchCells, logUsage } from '../lib/backendSync';
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -84,6 +84,9 @@ function useTurns(thread: YThread) {
     role: turn.get('role') as TurnRole,
     content: (turn.get('content') as Y.Text).toString(),
     createdAt: (turn.get('created_at') as string) ?? '',
+    tokensIn: turn.get('tokens_in') as number | undefined,
+    tokensOut: turn.get('tokens_out') as number | undefined,
+    costUsd: turn.get('cost_usd') as number | undefined,
   }));
 }
 
@@ -163,6 +166,7 @@ export function AiCell({
   const modalInputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const [sessionCost, setSessionCost] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const wasStreamingRef = useRef(false);
   useEffect(() => {
@@ -230,8 +234,15 @@ export function AiCell({
           getDocContext(),
           compressed,
           yText,
-          () => {
+          (usage: UsageStats) => {
             assistant.set('created_at', new Date().toISOString());
+            if (usage.inputTokens > 0) {
+              assistant.set('tokens_in', usage.inputTokens);
+              assistant.set('tokens_out', usage.outputTokens);
+              assistant.set('cost_usd', usage.costUsd);
+              logUsage(docId, cellId, usage);
+            }
+            setSessionCost((prev) => prev + usage.costUsd);
             abortRef.current = null;
             setStreaming(false);
           },
@@ -364,6 +375,14 @@ export function AiCell({
                       {copiedIdx === i ? <IconCheck /> : <IconCopy />}
                     </button>
                   )}
+                  {turn.tokensIn !== undefined && (
+                    <span
+                      className="ai-turn__usage-cost"
+                      title={`${turn.tokensIn.toLocaleString()} input · ${(turn.tokensOut ?? 0).toLocaleString()} output`}
+                    >
+                      💸 ${(turn.costUsd ?? 0).toFixed(4)}
+                    </span>
+                  )}
                   {turn.createdAt && (
                     <span className="ai-turn__time" title={formatFullDate(turn.createdAt)}>
                       {formatSmartDate(turn.createdAt)}
@@ -459,6 +478,11 @@ export function AiCell({
           <span className="ai-cell__badge">✦ AI</span>
           {minimized && (
             <span className="ai-cell__preview">{previewText}</span>
+          )}
+          {sessionCost > 0 && (
+            <span className="ai-cell__session-cost" title="Tổng chi phí session này">
+              💸 ${sessionCost.toFixed(4)}
+            </span>
           )}
           <div className="ai-cell__header-actions">
             <button

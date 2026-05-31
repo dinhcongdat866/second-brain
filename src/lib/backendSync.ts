@@ -92,6 +92,33 @@ export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
   });
 }
 
+/** Fire-and-forget: log one AI response turn's token usage to Neon for analytics. */
+export function logUsage(
+  docId: string,
+  cellId: string,
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
+    costUsd: number;
+  },
+): void {
+  fetch(`${BACKEND_URL}/usage/log`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      doc_id: docId,
+      cell_id: cellId,
+      input_tokens: usage.inputTokens,
+      output_tokens: usage.outputTokens,
+      cache_read_tokens: usage.cacheReadTokens,
+      cache_creation_tokens: usage.cacheCreationTokens,
+      cost_usd: usage.costUsd,
+    }),
+  }).catch(() => {});
+}
+
 /** Delete the persisted state from Neon (call when a doc is permanently deleted). */
 export function deleteDocState(docId: string): void {
   fetch(`${BACKEND_URL}/documents/${encodeURIComponent(docId)}/state`, {

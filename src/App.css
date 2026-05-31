@@ -688,6 +688,28 @@ body {
   color: var(--nb-text-3);
 }
 
+.ai-turn__usage-cost {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: #f5a623;
+}
+
+/* Assistant turn actions: hidden by default, fade in on hover */
+.ai-turn--assistant .ai-turn__actions {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.ai-turn--assistant:hover .ai-turn__actions {
+  opacity: 1;
+}
+
+.ai-cell__session-cost {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--nb-text-3);
+  margin-right: auto;
+}
+
 .ai-turn__content {
   font-size: 14px;
   line-height: 1.6;

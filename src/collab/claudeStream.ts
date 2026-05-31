@@ -7,6 +7,31 @@ const client = new Anthropic({
   dangerouslyAllowBrowser: true,
 });
 
+export type UsageStats = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  costUsd: number;
+};
+
+// Pricing for claude-sonnet-4-6 (USD per token)
+const PRICE = {
+  input:           3    / 1_000_000,
+  output:          15   / 1_000_000,
+  cacheRead:       0.30 / 1_000_000,
+  cacheCreation:   3    / 1_000_000,
+} as const;
+
+function calcCost(u: Omit<UsageStats, 'costUsd'>): number {
+  return (
+    u.inputTokens         * PRICE.input +
+    u.outputTokens        * PRICE.output +
+    u.cacheReadTokens     * PRICE.cacheRead +
+    u.cacheCreationTokens * PRICE.cacheCreation
+  );
+}
+
 /**
  * Stream a Claude response for the given thread history into `target` Y.Text.
  * The system prompt (doc context) is prompt-cached so repeated queries against
@@ -17,7 +42,7 @@ export async function streamClaudeReply(
   docContext: string,
   turns: Turn[],
   target: Y.Text,
-  onDone: () => void,
+  onDone: (usage: UsageStats) => void,
   onError: (err: Error) => void,
   ragContext = '',
   signal?: AbortSignal,
@@ -53,6 +78,16 @@ export async function streamClaudeReply(
     });
   }
 
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheCreationTokens = 0;
+
+  const buildUsage = (): UsageStats => {
+    const costUsd = calcCost({ inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens });
+    return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, costUsd };
+  };
+
   try {
     const stream = client.messages.stream(
       { model: 'claude-sonnet-4-6', max_tokens: 2048, system, messages },
@@ -60,7 +95,14 @@ export async function streamClaudeReply(
     );
 
     for await (const event of stream) {
-      if (
+      if (event.type === 'message_start') {
+        const u = event.message.usage;
+        inputTokens        = u.input_tokens;
+        cacheReadTokens    = (u as Record<string, number>)['cache_read_input_tokens']    ?? 0;
+        cacheCreationTokens = (u as Record<string, number>)['cache_creation_input_tokens'] ?? 0;
+      } else if (event.type === 'message_delta') {
+        outputTokens = event.usage.output_tokens;
+      } else if (
         event.type === 'content_block_delta' &&
         event.delta.type === 'text_delta'
       ) {
@@ -68,10 +110,10 @@ export async function streamClaudeReply(
       }
     }
 
-    onDone();
+    onDone(buildUsage());
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      onDone();
+      onDone(buildUsage());
       return;
     }
     onError(err instanceof Error ? err : new Error(String(err)));
