@@ -1,13 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type * as Y from 'yjs';
-import type { TurnRole } from './aiThreads';
+import type { Turn } from './historyCompressor';
 
 const client = new Anthropic({
   apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY as string,
   dangerouslyAllowBrowser: true,
 });
-
-type Turn = { role: TurnRole; content: string };
 
 /**
  * Stream a Claude response for the given thread history into `target` Y.Text.

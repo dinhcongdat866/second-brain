@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import type * as Y from 'yjs';
 import { addTurn, type TurnRole, type YThread } from '../collab/aiThreads';
 import { streamClaudeReply } from '../collab/claudeStream';
+import { compressHistory } from '../collab/historyCompressor';
 import { formatSmartDate, formatFullDate } from '../lib/formatDate';
 import { upsertUserTurn, searchCells } from '../lib/backendSync';
 
@@ -214,17 +215,20 @@ export function AiCell({
     abortRef.current = ac;
 
     searchCells(text, 3)
-      .then((results) => {
+      .then(async (results) => {
         if (ac.signal.aborted) return;
         const ragContext = results
           .filter((r) => r.score > 0.3)
           .map((r) => r.content)
           .join('\n\n');
 
+        const compressed = await compressHistory(history, ac.signal);
+        if (ac.signal.aborted) return;
+
         return streamClaudeReply(
           getLocalContext(),
           getDocContext(),
-          history,
+          compressed,
           yText,
           () => {
             assistant.set('created_at', new Date().toISOString());
