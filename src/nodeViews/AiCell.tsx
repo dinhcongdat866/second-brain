@@ -88,6 +88,7 @@ function useTurns(thread: YThread) {
   }, [thread]);
   return thread.toArray().map((turn) => {
     const thinkingYText = turn.get('thinking') as Y.Text | undefined;
+    const rawSources = turn.get('search_sources') as string | undefined;
     return {
       role: turn.get('role') as TurnRole,
       content: (turn.get('content') as Y.Text).toString(),
@@ -96,6 +97,8 @@ function useTurns(thread: YThread) {
       tokensOut: turn.get('tokens_out') as number | undefined,
       costUsd: turn.get('cost_usd') as number | undefined,
       thinking: thinkingYText ? thinkingYText.toString() : undefined,
+      searchQuery: (turn.get('search_query') as string | undefined) ?? undefined,
+      searchSources: rawSources ? (JSON.parse(rawSources) as { url: string; title: string }[]) : undefined,
     };
   });
 }
@@ -176,8 +179,7 @@ export function AiCell({
   const [modelConfig, setModelConfig] = useState<ModelConfig>(DEFAULT_MODEL_CONFIG);
   const [configOpen, setConfigOpen] = useState(false);
   const [panelAnchor, setPanelAnchor] = useState<{ top: number; left: number } | null>(null);
-  const [searchQueries, setSearchQueries] = useState<string[]>([]);
-  const [searchSources, setSearchSources] = useState<{ url: string; title: string }[]>([]);
+  const [searchingActive, setSearchingActive] = useState(false);
   const [thinkingOpen, setThinkingOpen] = useState<Record<number, boolean>>({});
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -271,8 +273,7 @@ export function AiCell({
       assistant.set('thinking', thinkingText);
     }
     setPrompt('');
-    setSearchQueries([]);
-    setSearchSources([]);
+    setSearchingActive(false);
     if (inputRef.current) inputRef.current.style.height = 'auto';
     if (modalInputRef.current) modalInputRef.current.style.height = 'auto';
     setStreaming(true);
@@ -326,8 +327,14 @@ export function AiCell({
             signal: ac.signal,
             config: modelConfig,
             thinkingTarget: thinkingText,
-            onSearching: (q) => setSearchQueries((prev) => [...prev, q]),
-            onSearchResults: (sources) => setSearchSources((prev) => [...prev, ...sources]),
+            onSearching: (q) => {
+              assistant.set('search_query', q);
+              setSearchingActive(true);
+            },
+            onSearchResults: (sources) => {
+              assistant.set('search_sources', JSON.stringify(sources));
+              setSearchingActive(false);
+            },
           },
         );
       })
@@ -438,14 +445,14 @@ export function AiCell({
             ) : (
               // Assistant: no bubble, actions inline below content
               <>
-                {isLastTurn && searchQueries.length > 0 && (
+                {turn.searchQuery && (
                   <details className="ai-turn__search">
-                    <summary className={'ai-turn__search-summary' + (streaming && searchSources.length === 0 ? ' is-active' : '')}>
-                      🌐 {searchSources.length > 0 ? `Đã tìm: "${searchQueries[0]}"` : `Đang tìm: "${searchQueries[0]}"…`}
+                    <summary className={'ai-turn__search-summary' + (isLastTurn && searchingActive ? ' is-active' : '')}>
+                      🌐 {turn.searchSources ? `Đã tìm: "${turn.searchQuery}"` : `Đang tìm: "${turn.searchQuery}"…`}
                     </summary>
-                    {searchSources.length > 0 && (
+                    {turn.searchSources && (
                       <div className="ai-cell__search-sources">
-                        {searchSources.map((s, si) => (
+                        {turn.searchSources.map((s, si) => (
                           <a
                             key={si}
                             href={s.url}
