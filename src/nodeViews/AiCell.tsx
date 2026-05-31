@@ -177,13 +177,24 @@ export function AiCell({
   const [configOpen, setConfigOpen] = useState(false);
   const [panelAnchor, setPanelAnchor] = useState<{ top: number; left: number } | null>(null);
   const [searchQueries, setSearchQueries] = useState<string[]>([]);
+  const [searchSources, setSearchSources] = useState<{ url: string; title: string }[]>([]);
+  const [thinkingOpen, setThinkingOpen] = useState<Record<number, boolean>>({});
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const modalInputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const configPanelRef = useRef<HTMLDivElement>(null);
   const configBtnRef = useRef<HTMLButtonElement>(null);
+  const modalConfigBtnRef = useRef<HTMLButtonElement>(null);
+  const activeConfigBtnRef = useRef<HTMLButtonElement | null>(null);
   const turnsEndRef = useRef<HTMLDivElement>(null);
+
+  const openConfigFrom = (btnRef: React.RefObject<HTMLButtonElement>) => {
+    activeConfigBtnRef.current = btnRef.current;
+    const rect = btnRef.current?.getBoundingClientRect();
+    if (rect) setPanelAnchor({ top: rect.bottom + 4, left: rect.left });
+    setConfigOpen(true);
+  };
 
   // Close config panel on outside click
   useEffect(() => {
@@ -191,7 +202,8 @@ export function AiCell({
     const handler = (e: MouseEvent) => {
       if (
         !configPanelRef.current?.contains(e.target as Node) &&
-        !configBtnRef.current?.contains(e.target as Node)
+        !configBtnRef.current?.contains(e.target as Node) &&
+        !modalConfigBtnRef.current?.contains(e.target as Node)
       ) {
         setConfigOpen(false);
         setPanelAnchor(null);
@@ -205,7 +217,7 @@ export function AiCell({
   useEffect(() => {
     if (!configOpen) return;
     const update = () => {
-      const rect = configBtnRef.current?.getBoundingClientRect();
+      const rect = activeConfigBtnRef.current?.getBoundingClientRect();
       if (rect) setPanelAnchor({ top: rect.bottom + 4, left: rect.left });
     };
     window.addEventListener('scroll', update, true);
@@ -260,6 +272,7 @@ export function AiCell({
     }
     setPrompt('');
     setSearchQueries([]);
+    setSearchSources([]);
     if (inputRef.current) inputRef.current.style.height = 'auto';
     if (modalInputRef.current) modalInputRef.current.style.height = 'auto';
     setStreaming(true);
@@ -314,6 +327,7 @@ export function AiCell({
             config: modelConfig,
             thinkingTarget: thinkingText,
             onSearching: (q) => setSearchQueries((prev) => [...prev, q]),
+            onSearchResults: (sources) => setSearchSources((prev) => [...prev, ...sources]),
           },
         );
       })
@@ -424,10 +438,43 @@ export function AiCell({
             ) : (
               // Assistant: no bubble, actions inline below content
               <>
+                {isLastTurn && searchQueries.length > 0 && (
+                  <details className="ai-turn__search">
+                    <summary className={'ai-turn__search-summary' + (streaming && searchSources.length === 0 ? ' is-active' : '')}>
+                      🌐 {searchSources.length > 0 ? `Đã tìm: "${searchQueries[0]}"` : `Đang tìm: "${searchQueries[0]}"…`}
+                    </summary>
+                    {searchSources.length > 0 && (
+                      <div className="ai-cell__search-sources">
+                        {searchSources.map((s, si) => (
+                          <a
+                            key={si}
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ai-cell__search-source"
+                            title={s.url}
+                          >
+                            <span className="ai-cell__search-source-num">{si + 1}</span>
+                            <span className="ai-cell__search-source-title">{s.title}</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </details>
+                )}
                 {turn.thinking && (
                   <details
                     className="ai-turn__thinking"
-                    open={streaming && isLastTurn && !turn.content || undefined}
+                    open={
+                      (streaming && isLastTurn && !turn.content)
+                        ? true
+                        : (thinkingOpen[i] ?? true)
+                    }
+                    onToggle={(e) => {
+                      if (!(streaming && isLastTurn && !turn.content)) {
+                        setThinkingOpen((prev) => ({ ...prev, [i]: (e.target as HTMLDetailsElement).open }));
+                      }
+                    }}
                   >
                     <summary>
                       💭 Suy nghĩ
@@ -435,7 +482,9 @@ export function AiCell({
                         <span className="ai-turn__cursor" style={{ marginLeft: 4 }}>▍</span>
                       )}
                     </summary>
-                    <div className="ai-turn__thinking-content">{turn.thinking}</div>
+                    <div className="ai-turn__thinking-content">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.thinking}</ReactMarkdown>
+                    </div>
                   </details>
                 )}
                 <TurnContent
@@ -474,16 +523,6 @@ export function AiCell({
           </div>
         );
       })}
-
-      {searchQueries.length > 0 && (
-        <div className="ai-cell__search-list">
-          {searchQueries.map((q, i) => (
-            <div key={i} className={'ai-cell__searching' + (streaming && i === searchQueries.length - 1 ? ' is-active' : '')}>
-              🔍 {q}
-            </div>
-          ))}
-        </div>
-      )}
 
       {error && <div className="ai-cell__error">{error}</div>}
       <div ref={turnsEndRef} />
@@ -584,14 +623,8 @@ export function AiCell({
               type="button"
               className="ai-cell__config-btn"
               onClick={() => {
-                if (configOpen) {
-                  setConfigOpen(false);
-                  setPanelAnchor(null);
-                } else {
-                  const rect = configBtnRef.current?.getBoundingClientRect();
-                  if (rect) setPanelAnchor({ top: rect.bottom + 4, left: rect.left });
-                  setConfigOpen(true);
-                }
+                if (configOpen) { setConfigOpen(false); setPanelAnchor(null); }
+                else openConfigFrom(configBtnRef);
               }}
             >
               {MODELS.find((m) => m.id === modelConfig.model)?.label ?? 'Sonnet'}
@@ -737,14 +770,30 @@ export function AiCell({
           >
             <div className="ai-cell__modal-header">
               <span className="ai-cell__badge">✦ AI</span>
-              <button
-                type="button"
-                className="ai-cell__icon-btn"
-                onClick={() => setMaximized(false)}
-                title="Thu nhỏ (Esc)"
-              >
-                <IconMinimize />
-              </button>
+              <div className="ai-cell__header-right">
+                <button
+                  ref={modalConfigBtnRef}
+                  type="button"
+                  className="ai-cell__config-btn"
+                  onClick={() => {
+                    if (configOpen) { setConfigOpen(false); setPanelAnchor(null); }
+                    else openConfigFrom(modalConfigBtnRef);
+                  }}
+                >
+                  {MODELS.find((m) => m.id === modelConfig.model)?.label ?? 'Sonnet'}
+                  {modelConfig.thinking ? ' · Think' : ''}
+                  {modelConfig.webSearch ? ' · 🌐' : ''}
+                  {' ▾'}
+                </button>
+                <button
+                  type="button"
+                  className="ai-cell__icon-btn"
+                  onClick={() => setMaximized(false)}
+                  title="Thu nhỏ (Esc)"
+                >
+                  <IconMinimize />
+                </button>
+              </div>
             </div>
             <div className="ai-cell__modal-body">
               {renderTurns()}

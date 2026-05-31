@@ -1,4 +1,5 @@
-import Anthropic, { type ThinkingConfigParam } from '@anthropic-ai/sdk';
+import Anthropic from '@anthropic-ai/sdk';
+type ThinkingConfigParam = Anthropic.Messages.ThinkingConfigParam;
 import type * as Y from 'yjs';
 import type { Turn } from './historyCompressor';
 
@@ -82,6 +83,8 @@ function calcCost(u: Omit<UsageStats, 'costUsd'>, model: ModelId): number {
 // streamClaudeReply
 // ---------------------------------------------------------------------------
 
+export type SearchSource = { url: string; title: string };
+
 export type StreamOptions = {
   ragContext?: string;
   signal?: AbortSignal;
@@ -90,6 +93,8 @@ export type StreamOptions = {
   thinkingTarget?: Y.Text;
   /** Called with the web-search query string when Claude issues a search. */
   onSearching?: (query: string) => void;
+  /** Called with the list of sources returned by the web search tool. */
+  onSearchResults?: (sources: SearchSource[]) => void;
 };
 
 /**
@@ -109,7 +114,7 @@ export async function streamClaudeReply(
   onError: (err: Error) => void,
   options: StreamOptions = {},
 ): Promise<void> {
-  const { ragContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching } = options;
+  const { ragContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults } = options;
 
   const messages: Anthropic.MessageParam[] = turns.map((t) => ({
     role: t.role,
@@ -153,7 +158,7 @@ export async function streamClaudeReply(
     : [];
 
   // Thinking needs more headroom for max_tokens.
-  const maxTokens = thinkingEnabled ? 8192 : 2048;
+  const maxTokens = thinkingEnabled ? 16000 : 4096;
 
   // ---------------------------------------------------------------------------
   // Usage tracking
@@ -171,8 +176,7 @@ export async function streamClaudeReply(
   // ---------------------------------------------------------------------------
   // Stream
   // ---------------------------------------------------------------------------
-  let currentToolName: string | null = null;
-  let toolInputBuffer = '';
+
 
   try {
     const stream = client.messages.stream(
@@ -187,18 +191,34 @@ export async function streamClaudeReply(
       { signal },
     );
 
+    // Track server_tool_use input (streamed via input_json_delta, not available at block_start)
+    let searchInputBuf = '';
+    let searchBlockIdx: number | null = null;
+
     for await (const event of stream) {
+      const raw = event as unknown as Record<string, unknown>;
+
       if (event.type === 'message_start') {
         const u = event.message.usage;
         inputTokens        = u.input_tokens;
-        cacheReadTokens    = (u as Record<string, number>)['cache_read_input_tokens']    ?? 0;
-        cacheCreationTokens = (u as Record<string, number>)['cache_creation_input_tokens'] ?? 0;
+        cacheReadTokens    = (u as unknown as Record<string, number>)['cache_read_input_tokens']    ?? 0;
+        cacheCreationTokens = (u as unknown as Record<string, number>)['cache_creation_input_tokens'] ?? 0;
 
       } else if (event.type === 'content_block_start') {
-        const block = event.content_block;
-        if (block.type === 'tool_use') {
-          currentToolName = block.name;
-          toolInputBuffer = '';
+        const block = raw['content_block'] as Record<string, unknown>;
+        const blockType = block['type'] as string;
+
+        if (blockType === 'server_tool_use' && block['name'] === 'web_search') {
+          searchBlockIdx = event.index;
+          searchInputBuf = '';
+        } else if (blockType === 'web_search_tool_result') {
+          const content = block['content'];
+          if (Array.isArray(content)) {
+            const sources = (content as Record<string, string>[])
+              .filter((r) => r['type'] === 'web_search_result' && r['url'] && r['title'])
+              .map((r) => ({ url: r['url'], title: r['title'] }));
+            if (sources.length > 0) onSearchResults?.(sources);
+          }
         }
 
       } else if (event.type === 'content_block_delta') {
@@ -207,17 +227,19 @@ export async function streamClaudeReply(
           target.insert(target.length, delta.text);
         } else if (delta.type === 'thinking_delta' && thinkingTarget) {
           thinkingTarget.insert(thinkingTarget.length, delta.thinking);
-        } else if (delta.type === 'input_json_delta' && currentToolName === 'web_search') {
-          toolInputBuffer += delta.partial_json;
+        } else if (delta.type === 'input_json_delta' && searchBlockIdx !== null) {
+          searchInputBuf += delta.partial_json;
         }
 
-      } else if (event.type === 'content_block_stop' && currentToolName === 'web_search') {
-        try {
-          const parsed = JSON.parse(toolInputBuffer) as Record<string, string>;
-          if (parsed['query']) onSearching?.(parsed['query']);
-        } catch { /* malformed JSON — ignore */ }
-        currentToolName = null;
-        toolInputBuffer = '';
+      } else if (event.type === 'content_block_stop') {
+        if (searchBlockIdx !== null && event.index === searchBlockIdx) {
+          try {
+            const parsed = JSON.parse(searchInputBuf) as Record<string, string>;
+            if (parsed['query']) onSearching?.(parsed['query']);
+          } catch { /* malformed — ignore */ }
+          searchBlockIdx = null;
+          searchInputBuf = '';
+        }
 
       } else if (event.type === 'message_delta') {
         outputTokens = event.usage.output_tokens;
