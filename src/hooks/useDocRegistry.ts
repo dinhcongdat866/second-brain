@@ -10,6 +10,7 @@ import {
   type DocMeta,
 } from '../lib/docRegistry';
 import { deleteDocStorage } from '../collab/ydoc';
+import { deleteDocState } from '../lib/backendSync';
 
 export function useDocRegistry() {
   const [docs, setDocs] = useState<DocMeta[]>(() => listDocs());
@@ -56,7 +57,10 @@ export function useDocRegistry() {
         setActiveDocIdState(next);
       }
       if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
-      storageCleanupRef.current = setTimeout(() => deleteDocStorage(id), 5500);
+      storageCleanupRef.current = setTimeout(() => {
+        deleteDocStorage(id);
+        deleteDocState(id);
+      }, 5500);
     },
     [activeDocId],
   );

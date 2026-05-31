@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:ws": "y-websocket-server",
+    "dev:backend": "cd backend && .venv\\Scripts\\uvicorn app.main:app --reload",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",

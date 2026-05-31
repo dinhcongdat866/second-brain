@@ -40,7 +40,7 @@ import { startAutoSnapshot } from '../collab/snapshots';
 import { createCollabSetup, seedFromContent, seedIfEmpty, wireSaveStatus } from '../collab/ydoc';
 import { addTurn, getThread, sweepOrphanThreads } from '../collab/aiThreads';
 import { consumePendingImport } from '../lib/importState';
-import { createDocSyncer } from '../lib/backendSync';
+import { createDocSyncer, createYjsSyncer, applyServerState } from '../lib/backendSync';
 
 type ProseMirrorMapping = ReturnType<typeof initProseMirrorDoc>['mapping'];
 type Awareness = WebsocketProvider['awareness'];
@@ -102,9 +102,11 @@ export function useNotebookEditor(
     let v: EditorView | undefined;
     let unwireSaveStatus: (() => void) | undefined;
     let stopAutoSnapshot: (() => void) | undefined;
+    let stopYjsSyncer: (() => void) | undefined;
+    let beforeUnloadFlush: (() => void) | undefined;
     let cancelled = false;
 
-    persistence.whenSynced.then(() => {
+    persistence.whenSynced.then(async () => {
       if (cancelled) return;
 
       const pendingImport = consumePendingImport();
@@ -121,6 +123,9 @@ export function useNotebookEditor(
           });
         }
       } else {
+        // Merge server state first so seedIfEmpty sees the real content
+        await applyServerState(activeDocId, doc);
+        if (cancelled) return;
         seedIfEmpty(doc, yXmlFragment);
       }
       sweepOrphanThreads(doc, yXmlFragment);
@@ -128,6 +133,11 @@ export function useNotebookEditor(
       setYdoc(doc);
       unwireSaveStatus = wireSaveStatus(doc);
       stopAutoSnapshot = startAutoSnapshot(doc);
+
+      const yjsSyncer = createYjsSyncer(activeDocId, doc);
+      stopYjsSyncer = yjsSyncer.stop;
+      beforeUnloadFlush = yjsSyncer.flush;
+      window.addEventListener('beforeunload', beforeUnloadFlush);
 
       const { doc: pmDoc, mapping } = initProseMirrorDoc(
         yXmlFragment,
@@ -164,6 +174,8 @@ export function useNotebookEditor(
       cancelled = true;
       unwireSaveStatus?.();
       stopAutoSnapshot?.();
+      stopYjsSyncer?.();
+      if (beforeUnloadFlush) window.removeEventListener('beforeunload', beforeUnloadFlush);
       v?.destroy();
       provider.destroy();
       persistence.destroy();
