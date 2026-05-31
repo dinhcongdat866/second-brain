@@ -555,7 +555,6 @@ body {
   display: flex;
   align-items: center;
   gap: 2px;
-  margin-left: auto;
   flex-shrink: 0;
 }
 
@@ -707,7 +706,154 @@ body {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   color: var(--nb-text-3);
-  margin-right: auto;
+}
+
+/* Right-side group: config btn + actions flush right */
+.ai-cell__header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ── Model / feature config ──────────────────────────────────────── */
+
+.ai-cell__config-btn {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--nb-ai-accent);
+  background: rgba(42, 122, 80, 0.07);
+  border: 1px solid rgba(42, 122, 80, 0.25);
+  border-radius: 5px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s, border-color 0.1s;
+}
+.ai-cell__config-btn:hover {
+  background: rgba(42, 122, 80, 0.13);
+  border-color: rgba(42, 122, 80, 0.4);
+}
+
+/* Portal panel — position:fixed so it escapes overflow:hidden stacking context */
+.ai-cell__config-panel {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid var(--nb-border, #e5e5e5);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+  padding: 8px;
+  min-width: 210px;
+}
+
+.ai-cell__config-section { margin-bottom: 4px; }
+.ai-cell__config-section:last-child { margin-bottom: 0; }
+
+.ai-cell__config-heading {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--nb-text-3);
+  padding: 2px 6px 4px;
+}
+
+.ai-cell__config-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  gap: 12px;
+}
+.ai-cell__config-option:hover { background: var(--nb-hover, rgba(0,0,0,0.04)); }
+.ai-cell__config-option.is-active {
+  background: rgba(139,92,246,0.08);
+  color: var(--nb-ai-accent, #7c3aed);
+}
+
+.ai-cell__config-desc {
+  font-size: 11px;
+  color: var(--nb-text-3);
+}
+
+.ai-cell__config-divider {
+  height: 1px;
+  background: var(--nb-border, #e5e5e5);
+  margin: 6px 0;
+}
+
+.ai-cell__config-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  user-select: none;
+}
+.ai-cell__config-toggle:hover { background: var(--nb-hover, rgba(0,0,0,0.04)); }
+.ai-cell__config-toggle.is-disabled { opacity: 0.35; pointer-events: none; }
+
+/* ── Thinking block ──────────────────────────────────────────────── */
+
+.ai-turn__thinking {
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: rgba(139,92,246,0.04);
+  border: 1px solid rgba(139,92,246,0.15);
+}
+.ai-turn__thinking summary {
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--nb-text-3);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+.ai-turn__thinking summary::-webkit-details-marker { display: none; }
+.ai-turn__thinking[open] summary { border-bottom: 1px solid rgba(139,92,246,0.15); }
+.ai-turn__thinking-content {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--nb-text-2, #555);
+  white-space: pre-wrap;
+  line-height: 1.55;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* ── Web search indicator ────────────────────────────────────────── */
+
+.ai-cell__search-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 2px;
+}
+
+.ai-cell__searching {
+  font-size: 11px;
+  color: var(--nb-text-3);
+  padding: 1px 0;
+}
+
+.ai-cell__searching.is-active {
+  animation: ai-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ai-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
 }
 
 .ai-turn__content {

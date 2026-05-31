@@ -2,9 +2,15 @@ import { createPortal } from 'react-dom';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type * as Y from 'yjs';
+import * as Y from 'yjs';
 import { addTurn, type TurnRole, type YThread } from '../collab/aiThreads';
-import { streamClaudeReply, type UsageStats } from '../collab/claudeStream';
+import {
+  streamClaudeReply,
+  type UsageStats,
+  type ModelConfig,
+  DEFAULT_MODEL_CONFIG,
+  MODELS,
+} from '../collab/claudeStream';
 import { compressHistory } from '../collab/historyCompressor';
 import { formatSmartDate, formatFullDate } from '../lib/formatDate';
 import { upsertUserTurn, searchCells, logUsage } from '../lib/backendSync';
@@ -80,14 +86,18 @@ function useTurns(thread: YThread) {
     thread.observeDeep(handler);
     return () => thread.unobserveDeep(handler);
   }, [thread]);
-  return thread.toArray().map((turn) => ({
-    role: turn.get('role') as TurnRole,
-    content: (turn.get('content') as Y.Text).toString(),
-    createdAt: (turn.get('created_at') as string) ?? '',
-    tokensIn: turn.get('tokens_in') as number | undefined,
-    tokensOut: turn.get('tokens_out') as number | undefined,
-    costUsd: turn.get('cost_usd') as number | undefined,
-  }));
+  return thread.toArray().map((turn) => {
+    const thinkingYText = turn.get('thinking') as Y.Text | undefined;
+    return {
+      role: turn.get('role') as TurnRole,
+      content: (turn.get('content') as Y.Text).toString(),
+      createdAt: (turn.get('created_at') as string) ?? '',
+      tokensIn: turn.get('tokens_in') as number | undefined,
+      tokensOut: turn.get('tokens_out') as number | undefined,
+      costUsd: turn.get('cost_usd') as number | undefined,
+      thinking: thinkingYText ? thinkingYText.toString() : undefined,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -162,11 +172,50 @@ export function AiCell({
     return () => window.removeEventListener('keydown', handler);
   }, [maximized]);
 
+  const [sessionCost, setSessionCost] = useState(0);
+  const [modelConfig, setModelConfig] = useState<ModelConfig>(DEFAULT_MODEL_CONFIG);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [panelAnchor, setPanelAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [searchQueries, setSearchQueries] = useState<string[]>([]);
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const modalInputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const configPanelRef = useRef<HTMLDivElement>(null);
+  const configBtnRef = useRef<HTMLButtonElement>(null);
+  const turnsEndRef = useRef<HTMLDivElement>(null);
 
-  const [sessionCost, setSessionCost] = useState(0);
+  // Close config panel on outside click
+  useEffect(() => {
+    if (!configOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        !configPanelRef.current?.contains(e.target as Node) &&
+        !configBtnRef.current?.contains(e.target as Node)
+      ) {
+        setConfigOpen(false);
+        setPanelAnchor(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [configOpen]);
+
+  // Keep portal panel anchored when page scrolls
+  useEffect(() => {
+    if (!configOpen) return;
+    const update = () => {
+      const rect = configBtnRef.current?.getBoundingClientRect();
+      if (rect) setPanelAnchor({ top: rect.bottom + 4, left: rect.left });
+    };
+    window.addEventListener('scroll', update, true);
+    return () => window.removeEventListener('scroll', update, true);
+  }, [configOpen]);
+
+  // Scroll last turn into view when new turn added or streaming starts
+  useEffect(() => {
+    turnsEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [turns.length, streaming]);
   const [finishing, setFinishing] = useState(false);
   const wasStreamingRef = useRef(false);
   useEffect(() => {
@@ -201,8 +250,16 @@ export function AiCell({
     upsertUserTurn(cellId, docId, text);
     const assistant = addTurn(thread, 'assistant');
     const yText = assistant.get('content') as Y.Text;
+
+    // Thinking Y.Text — created before stream so peers see it immediately.
+    const thinkingEnabled = modelConfig.thinking && modelConfig.model !== 'claude-haiku-4-5-20251001';
+    let thinkingText: Y.Text | undefined;
+    if (thinkingEnabled) {
+      thinkingText = new Y.Text();
+      assistant.set('thinking', thinkingText);
+    }
     setPrompt('');
-    // Reset textarea height
+    setSearchQueries([]);
     if (inputRef.current) inputRef.current.style.height = 'auto';
     if (modalInputRef.current) modalInputRef.current.style.height = 'auto';
     setStreaming(true);
@@ -246,9 +303,18 @@ export function AiCell({
             abortRef.current = null;
             setStreaming(false);
           },
-          (err) => { abortRef.current = null; setStreaming(false); setError(err.message); },
-          ragContext,
-          ac.signal,
+          (err) => {
+            abortRef.current = null;
+            setStreaming(false);
+            setError(err.message);
+          },
+          {
+            ragContext,
+            signal: ac.signal,
+            config: modelConfig,
+            thinkingTarget: thinkingText,
+            onSearching: (q) => setSearchQueries((prev) => [...prev, q]),
+          },
         );
       })
       .catch((err: unknown) => {
@@ -358,6 +424,20 @@ export function AiCell({
             ) : (
               // Assistant: no bubble, actions inline below content
               <>
+                {turn.thinking && (
+                  <details
+                    className="ai-turn__thinking"
+                    open={streaming && isLastTurn && !turn.content || undefined}
+                  >
+                    <summary>
+                      💭 Suy nghĩ
+                      {streaming && isLastTurn && !turn.content && (
+                        <span className="ai-turn__cursor" style={{ marginLeft: 4 }}>▍</span>
+                      )}
+                    </summary>
+                    <div className="ai-turn__thinking-content">{turn.thinking}</div>
+                  </details>
+                )}
                 <TurnContent
                   role={turn.role}
                   content={turn.content}
@@ -395,7 +475,18 @@ export function AiCell({
         );
       })}
 
+      {searchQueries.length > 0 && (
+        <div className="ai-cell__search-list">
+          {searchQueries.map((q, i) => (
+            <div key={i} className={'ai-cell__searching' + (streaming && i === searchQueries.length - 1 ? ' is-active' : '')}>
+              🔍 {q}
+            </div>
+          ))}
+        </div>
+      )}
+
       {error && <div className="ai-cell__error">{error}</div>}
+      <div ref={turnsEndRef} />
     </div>
   );
 
@@ -475,15 +566,40 @@ export function AiCell({
       >
         {/* Header */}
         <div className="ai-cell__header">
+          {/* Left: badge + session cost */}
           <span className="ai-cell__badge">✦ AI</span>
-          {minimized && (
-            <span className="ai-cell__preview">{previewText}</span>
-          )}
           {sessionCost > 0 && (
             <span className="ai-cell__session-cost" title="Tổng chi phí session này">
               💸 ${sessionCost.toFixed(4)}
             </span>
           )}
+          {minimized && (
+            <span className="ai-cell__preview">{previewText}</span>
+          )}
+
+          {/* Right group: config button + actions */}
+          <div className="ai-cell__header-right">
+            <button
+              ref={configBtnRef}
+              type="button"
+              className="ai-cell__config-btn"
+              onClick={() => {
+                if (configOpen) {
+                  setConfigOpen(false);
+                  setPanelAnchor(null);
+                } else {
+                  const rect = configBtnRef.current?.getBoundingClientRect();
+                  if (rect) setPanelAnchor({ top: rect.bottom + 4, left: rect.left });
+                  setConfigOpen(true);
+                }
+              }}
+            >
+              {MODELS.find((m) => m.id === modelConfig.model)?.label ?? 'Sonnet'}
+              {modelConfig.thinking ? ' · Think' : ''}
+              {modelConfig.webSearch ? ' · 🌐' : ''}
+              {' ▾'}
+            </button>
+
           <div className="ai-cell__header-actions">
             <button
               type="button"
@@ -534,6 +650,7 @@ export function AiCell({
               </button>
             )}
           </div>
+          </div>{/* end header-right */}
         </div>
 
         {/* Body */}
@@ -544,6 +661,65 @@ export function AiCell({
           </>
         )}
       </div>
+
+      {/* Config panel — portal to escape overflow:hidden stacking context */}
+      {configOpen && panelAnchor && createPortal(
+        <div
+          ref={configPanelRef}
+          className="ai-cell__config-panel"
+          style={{ top: panelAnchor.top, left: panelAnchor.left }}
+        >
+          <div className="ai-cell__config-section">
+            <span className="ai-cell__config-heading">Model</span>
+            {MODELS.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={'ai-cell__config-option' + (modelConfig.model === m.id ? ' is-active' : '')}
+                onClick={() => {
+                  setModelConfig((c) => ({
+                    ...c,
+                    model: m.id,
+                    thinking: m.supportsThinking ? c.thinking : false,
+                  }));
+                  setConfigOpen(false);
+                  setPanelAnchor(null);
+                }}
+              >
+                <span>{m.label}</span>
+                <span className="ai-cell__config-desc">{m.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="ai-cell__config-divider" />
+
+          <div className="ai-cell__config-section">
+            <span className="ai-cell__config-heading">Tính năng</span>
+            <label className={
+              'ai-cell__config-toggle' +
+              (MODELS.find((m) => m.id === modelConfig.model)?.supportsThinking ? '' : ' is-disabled')
+            }>
+              <input
+                type="checkbox"
+                checked={modelConfig.thinking}
+                disabled={!MODELS.find((m) => m.id === modelConfig.model)?.supportsThinking}
+                onChange={(e) => setModelConfig((c) => ({ ...c, thinking: e.target.checked }))}
+              />
+              💭 Extended Thinking
+            </label>
+            <label className="ai-cell__config-toggle">
+              <input
+                type="checkbox"
+                checked={modelConfig.webSearch}
+                onChange={(e) => setModelConfig((c) => ({ ...c, webSearch: e.target.checked }))}
+              />
+              🌐 Web Search
+            </label>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* Maximize modal */}
       {maximized && createPortal(
