@@ -30,7 +30,6 @@ export function useDocRegistry() {
     refresh();
     setActiveDocId(doc.id);
     setActiveDocIdState(doc.id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /** Create a named doc and navigate to it. Used by import flow. */
@@ -39,13 +38,11 @@ export function useDocRegistry() {
     refresh();
     setActiveDocId(doc.id);
     setActiveDocIdState(doc.id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRename = useCallback((id: string, name: string) => {
     renameDoc(id, name);
     refresh();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleDelete = useCallback(
@@ -68,7 +65,6 @@ export function useDocRegistry() {
     restoreDoc(meta);
     refresh();
     if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return {

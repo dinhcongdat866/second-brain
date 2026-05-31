@@ -353,7 +353,11 @@ export const smartSelectAll: Command = (state, dispatch) => {
   const cellStart = $from.start(cellDepth);
   const cellEnd = $from.end(cellDepth);
 
-  const alreadyCellSelected = from === cellStart && to === cellEnd;
+  const expectedSel = TextSelection.between(
+    state.doc.resolve(cellStart),
+    state.doc.resolve(cellEnd),
+  );
+  const alreadyCellSelected = from === expectedSel.from && to === expectedSel.to;
 
   if (alreadyCellSelected) {
     // Stage 2: select entire document
