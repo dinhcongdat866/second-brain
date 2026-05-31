@@ -1,4 +1,7 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useReducer, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type * as Y from 'yjs';
 import { addTurn, type TurnRole, type YThread } from '../collab/aiThreads';
 import { streamClaudeReply } from '../collab/claudeStream';
@@ -6,7 +9,7 @@ import { formatSmartDate, formatFullDate } from '../lib/formatDate';
 import { upsertUserTurn, searchCells } from '../lib/backendSync';
 
 // ---------------------------------------------------------------------------
-// Icons (inline SVG — no external dependency)
+// Icons
 // ---------------------------------------------------------------------------
 
 function IconCopy() {
@@ -34,8 +37,39 @@ function IconPencil() {
   );
 }
 
+function IconMaximize() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+      <line x1="3" y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+
+function IconMinimize() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="4 14 10 14 10 20" />
+      <polyline points="20 10 14 10 14 4" />
+      <line x1="10" y1="14" x2="3" y2="21" />
+      <line x1="21" y1="3" x2="14" y2="10" />
+    </svg>
+  );
+}
+
+function IconSend() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 10 4 15 9 20" />
+      <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
-// useTurns — re-render on any Yjs change in the thread
+// useTurns
 // ---------------------------------------------------------------------------
 
 function useTurns(thread: YThread) {
@@ -50,6 +84,35 @@ function useTurns(thread: YThread) {
     content: (turn.get('content') as Y.Text).toString(),
     createdAt: (turn.get('created_at') as string) ?? '',
   }));
+}
+
+// ---------------------------------------------------------------------------
+// TurnContent — plain text for user, markdown for assistant
+// ---------------------------------------------------------------------------
+
+function TurnContent({
+  role,
+  content,
+  isStreaming,
+  isLastTurn,
+}: {
+  role: TurnRole;
+  content: string;
+  isStreaming: boolean;
+  isLastTurn: boolean;
+}) {
+  if (role === 'user') {
+    return <div className="ai-turn__content">{content}</div>;
+  }
+
+  return (
+    <div className="ai-turn__content ai-turn__md">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      {isStreaming && isLastTurn && (
+        <span className="ai-turn__cursor">▍</span>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -76,13 +139,10 @@ export function AiCell({
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [minimized, setMinimized] = useState(false);
+  const [maximized, setMaximized] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
-  // Edit mode: index in thread from which turns will be replaced on next submit.
-  // Thread is NOT modified yet — cancel leaves everything intact.
   const [editFromIdx, setEditFromIdx] = useState<number | null>(null);
-
-  // Two-step delete confirmation: first click → pendingDelete, second → onDelete.
   const [pendingDelete, setPendingDelete] = useState(false);
   useEffect(() => {
     if (!pendingDelete) return;
@@ -90,10 +150,18 @@ export function AiCell({
     return () => clearTimeout(t);
   }, [pendingDelete]);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Close maximize with Escape
+  useEffect(() => {
+    if (!maximized) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setMaximized(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [maximized]);
+
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const modalInputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Streaming → done: briefly flag `finishing` for the final aurora gust.
   const [finishing, setFinishing] = useState(false);
   const wasStreamingRef = useRef(false);
   useEffect(() => {
@@ -106,12 +174,18 @@ export function AiCell({
     wasStreamingRef.current = streaming;
   }, [streaming]);
 
+  // Auto-grow textarea
+  const growTextarea = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
+
   const submit = () => {
     const text = prompt.trim();
     if (!text || streaming) return;
     setError(null);
 
-    // In edit mode: delete the overwritten turns first, then proceed normally.
     if (editFromIdx !== null) {
       const deleteCount = thread.length - editFromIdx;
       if (deleteCount > 0) thread.delete(editFromIdx, deleteCount);
@@ -123,6 +197,9 @@ export function AiCell({
     const assistant = addTurn(thread, 'assistant');
     const yText = assistant.get('content') as Y.Text;
     setPrompt('');
+    // Reset textarea height
+    if (inputRef.current) inputRef.current.style.height = 'auto';
+    if (modalInputRef.current) modalInputRef.current.style.height = 'auto';
     setStreaming(true);
 
     const history = thread
@@ -133,9 +210,6 @@ export function AiCell({
         content: (t.get('content') as Y.Text).toString(),
       }));
 
-    // Fetch semantically related notes, then stream. Fire in parallel with
-    // no await on search so UI feels instant — search result arrives fast
-    // enough before the first token anyway.
     const ac = new AbortController();
     abortRef.current = ac;
 
@@ -152,7 +226,11 @@ export function AiCell({
           getDocContext(),
           history,
           yText,
-          () => { abortRef.current = null; setStreaming(false); },
+          () => {
+            assistant.set('created_at', new Date().toISOString());
+            abortRef.current = null;
+            setStreaming(false);
+          },
           (err) => { abortRef.current = null; setStreaming(false); setError(err.message); },
           ragContext,
           ac.signal,
@@ -165,7 +243,6 @@ export function AiCell({
       });
   };
 
-  // Start editing the last user turn without immediately modifying the thread.
   const startEdit = () => {
     if (streaming) return;
     const arr = thread.toArray();
@@ -179,8 +256,9 @@ export function AiCell({
     setPrompt(text);
     setError(null);
     requestAnimationFrame(() => {
-      inputRef.current?.focus();
-      inputRef.current?.setSelectionRange(text.length, text.length);
+      const ref = maximized ? modalInputRef.current : inputRef.current;
+      ref?.focus();
+      ref?.setSelectionRange(text.length, text.length);
     });
   };
 
@@ -197,7 +275,6 @@ export function AiCell({
     });
   };
 
-  // Index of last user turn (for the edit button)
   let lastUserTurnIdx = -1;
   for (let i = turns.length - 1; i >= 0; i--) {
     if (turns[i].role === 'user') { lastUserTurnIdx = i; break; }
@@ -206,190 +283,273 @@ export function AiCell({
   const previewText =
     turns.length > 0 ? turns[0].content.slice(0, 60) : 'Chưa có hội thoại';
 
-  return (
-    <div
-      className={
-        'ai-cell__inner' +
-        (streaming ? ' is-streaming' : '') +
-        (finishing ? ' is-finishing' : '') +
-        (minimized ? ' is-minimized' : '')
-      }
-    >
-      {/* ── Header ── */}
-      <div className="ai-cell__header">
-        <span className="ai-cell__badge">✦ AI</span>
-        {minimized && (
-          <span className="ai-cell__preview">{previewText}</span>
-        )}
-        <div className="ai-cell__header-actions">
-          <button
-            type="button"
-            className="ai-cell__icon-btn"
-            onClick={() => { setMinimized((v) => !v); setPendingDelete(false); }}
-            title={minimized ? 'Mở rộng' : 'Thu gọn'}
+  // ---------------------------------------------------------------------------
+  // Shared render pieces
+  // ---------------------------------------------------------------------------
+
+  const renderTurns = () => (
+    <div className="ai-cell__turns">
+      {turns.length === 0 && (
+        <div className="ai-cell__empty">Hỏi AI về nội dung phía trên…</div>
+      )}
+
+      {turns.map((turn, i) => {
+        const isPendingReplace = editFromIdx !== null && i >= editFromIdx;
+        const isLastTurn = i === turns.length - 1;
+
+        return (
+          <div
+            key={i}
+            className={
+              `ai-turn ai-turn--${turn.role}` +
+              (isPendingReplace ? ' ai-turn--pending-replace' : '')
+            }
           >
-            {minimized ? '▶' : '▼'}
-          </button>
-
-          {/* Two-step delete confirmation */}
-          {pendingDelete ? (
-            <>
-              <span className="ai-cell__del-label">Xoá?</span>
-              <button
-                type="button"
-                className="ai-cell__icon-btn ai-cell__delete--confirm"
-                onClick={onDelete}
-                title="Xác nhận xoá"
-              >
-                ✓
-              </button>
-              <button
-                type="button"
-                className="ai-cell__icon-btn"
-                onClick={() => setPendingDelete(false)}
-                title="Huỷ"
-              >
-                ✗
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="ai-cell__icon-btn ai-cell__delete"
-              onClick={() => setPendingDelete(true)}
-              title="Xoá AI cell (Ctrl+Z để khôi phục)"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Body ── */}
-      {!minimized && (
-        <>
-          <div className="ai-cell__turns">
-            {turns.length === 0 && (
-              <div className="ai-cell__empty">Hỏi AI về nội dung phía trên…</div>
-            )}
-
-            {turns.map((turn, i) => {
-              // Turns at or after editFromIdx are "pending replacement"
-              const isPendingReplace =
-                editFromIdx !== null && i >= editFromIdx;
-
-              return (
-                <div
-                  key={i}
-                  className={
-                    `ai-turn ai-turn--${turn.role}` +
-                    (isPendingReplace ? ' ai-turn--pending-replace' : '')
-                  }
-                >
+            {turn.role === 'user' ? (
+              // User: bubble wraps label + content only; actions sit below
+              <>
+                <div className="ai-turn__bubble">
                   <div className="ai-turn__meta">
-                    <span className="ai-turn__role">
-                      {turn.role === 'user' ? 'Bạn' : 'AI'}
-                    </span>
-                    {turn.createdAt && (
-                      <span
-                        className="ai-turn__time"
-                        title={formatFullDate(turn.createdAt)}
-                      >
-                        {formatSmartDate(turn.createdAt)}
-                      </span>
-                    )}
+                    <span className="ai-turn__role">Bạn</span>
                     {isPendingReplace && (
                       <span className="ai-turn__replace-badge">sẽ bị thay</span>
                     )}
                   </div>
-
-                  <div className="ai-turn__content">
-                    {turn.content}
-                    {turn.role === 'assistant' &&
-                      turn.content === '' &&
-                      streaming && (
-                        <span className="ai-turn__cursor">▍</span>
-                      )}
-                  </div>
-
-                  {/* Action buttons */}
-                  <div className="ai-turn__actions">
-                    {turn.role === 'assistant' && turn.content && !isPendingReplace && (
-                      <button
-                        type="button"
-                        className="ai-turn__action-btn"
-                        onClick={() => copyTurn(turn.content, i)}
-                        title="Copy"
-                      >
-                        {copiedIdx === i ? <IconCheck /> : <IconCopy />}
-                      </button>
-                    )}
-                    {turn.role === 'user' &&
-                      i === lastUserTurnIdx &&
-                      !streaming &&
-                      editFromIdx === null && (
-                        <button
-                          type="button"
-                          className="ai-turn__action-btn"
-                          onClick={startEdit}
-                          title="Sửa tin nhắn này"
-                        >
-                          <IconPencil />
-                        </button>
-                      )}
-                  </div>
+                  <TurnContent
+                    role={turn.role}
+                    content={turn.content}
+                    isStreaming={streaming}
+                    isLastTurn={isLastTurn}
+                  />
                 </div>
-              );
-            })}
-
-            {error && <div className="ai-cell__error">{error}</div>}
-          </div>
-
-          {/* ── Input ── */}
-          <div className="ai-cell__input">
-            <input
-              ref={inputRef}
-              type="text"
-              value={prompt}
-              placeholder={editFromIdx !== null ? 'Sửa và gửi lại…' : 'Nhập prompt cho AI…'}
-              disabled={streaming}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { e.preventDefault(); submit(); }
-                if (e.key === 'Escape' && editFromIdx !== null) { e.preventDefault(); cancelEdit(); }
-              }}
-            />
-            {editFromIdx !== null && (
-              <button
-                type="button"
-                className="ai-cell__cancel-btn"
-                onClick={cancelEdit}
-                title="Huỷ chỉnh sửa (Esc)"
-              >
-                Huỷ
-              </button>
+                <div className="ai-turn__actions">
+                  {i === lastUserTurnIdx && !streaming && editFromIdx === null && (
+                    <button
+                      type="button"
+                      className="ai-turn__action-btn"
+                      onClick={startEdit}
+                      title="Sửa tin nhắn này"
+                    >
+                      <IconPencil />
+                    </button>
+                  )}
+                  {turn.createdAt && (
+                    <span className="ai-turn__time" title={formatFullDate(turn.createdAt)}>
+                      {formatSmartDate(turn.createdAt)}
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              // Assistant: no bubble, actions inline below content
+              <>
+                <TurnContent
+                  role={turn.role}
+                  content={turn.content}
+                  isStreaming={streaming}
+                  isLastTurn={isLastTurn}
+                />
+                <div className="ai-turn__actions">
+                  {turn.content && !isPendingReplace && (
+                    <button
+                      type="button"
+                      className="ai-turn__action-btn"
+                      onClick={() => copyTurn(turn.content, i)}
+                      title="Copy"
+                    >
+                      {copiedIdx === i ? <IconCheck /> : <IconCopy />}
+                    </button>
+                  )}
+                  {turn.createdAt && (
+                    <span className="ai-turn__time" title={formatFullDate(turn.createdAt)}>
+                      {formatSmartDate(turn.createdAt)}
+                    </span>
+                  )}
+                </div>
+              </>
             )}
-            {streaming ? (
-              <button
-                type="button"
-                className="ai-cell__stop-btn"
-                onClick={() => abortRef.current?.abort()}
-                title="Dừng stream"
-              >
-                ■ Dừng
-              </button>
+          </div>
+        );
+      })}
+
+      {error && <div className="ai-cell__error">{error}</div>}
+    </div>
+  );
+
+  const renderInput = (ref: React.RefObject<HTMLTextAreaElement | null>) => (
+    <div className="ai-cell__input">
+      <textarea
+        ref={ref}
+        rows={1}
+        value={prompt}
+        placeholder={editFromIdx !== null ? 'Sửa và gửi lại…' : 'Nhập prompt cho AI…'}
+        disabled={streaming}
+        onChange={(e) => {
+          setPrompt(e.target.value);
+          growTextarea(e.target);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            submit();
+          }
+          if (e.key === 'Escape' && editFromIdx !== null) {
+            e.preventDefault();
+            cancelEdit();
+          }
+        }}
+      />
+      {editFromIdx !== null && (
+        <button
+          type="button"
+          className="ai-cell__cancel-btn"
+          onClick={cancelEdit}
+          title="Huỷ chỉnh sửa (Esc)"
+        >
+          Huỷ
+        </button>
+      )}
+      {streaming ? (
+        <button
+          type="button"
+          className="ai-cell__stop-btn"
+          onClick={() => abortRef.current?.abort()}
+          title="Dừng stream"
+        >
+          ■ Dừng
+        </button>
+      ) : editFromIdx !== null ? (
+        <button type="button" onClick={submit} disabled={prompt.trim() === ''}>
+          Gửi lại
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="ai-cell__send-btn"
+          onClick={submit}
+          disabled={prompt.trim() === ''}
+          title="Gửi (Enter)"
+        >
+          <IconSend />
+        </button>
+      )}
+    </div>
+  );
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
+
+  return (
+    <>
+      <div
+        className={
+          'ai-cell__inner' +
+          (streaming ? ' is-streaming' : '') +
+          (finishing ? ' is-finishing' : '') +
+          (minimized ? ' is-minimized' : '')
+        }
+      >
+        {/* Header */}
+        <div className="ai-cell__header">
+          <span className="ai-cell__badge">✦ AI</span>
+          {minimized && (
+            <span className="ai-cell__preview">{previewText}</span>
+          )}
+          <div className="ai-cell__header-actions">
+            <button
+              type="button"
+              className="ai-cell__icon-btn"
+              onClick={() => setMaximized(true)}
+              title="Xem toàn màn hình"
+            >
+              <IconMaximize />
+            </button>
+
+            <button
+              type="button"
+              className="ai-cell__icon-btn"
+              onClick={() => { setMinimized((v) => !v); setPendingDelete(false); }}
+              title={minimized ? 'Mở rộng' : 'Thu gọn'}
+            >
+              {minimized ? '▶' : '▼'}
+            </button>
+
+            {pendingDelete ? (
+              <>
+                <span className="ai-cell__del-label">Xoá?</span>
+                <button
+                  type="button"
+                  className="ai-cell__icon-btn ai-cell__delete--confirm"
+                  onClick={onDelete}
+                  title="Xác nhận xoá"
+                >
+                  ✓
+                </button>
+                <button
+                  type="button"
+                  className="ai-cell__icon-btn"
+                  onClick={() => setPendingDelete(false)}
+                  title="Huỷ"
+                >
+                  ✗
+                </button>
+              </>
             ) : (
               <button
                 type="button"
-                onClick={submit}
-                disabled={prompt.trim() === ''}
+                className="ai-cell__icon-btn ai-cell__delete"
+                onClick={() => setPendingDelete(true)}
+                title="Xoá AI cell (Ctrl+Z để khôi phục)"
               >
-                {editFromIdx !== null ? 'Gửi lại' : 'Gửi'}
+                ✕
               </button>
             )}
           </div>
-        </>
+        </div>
+
+        {/* Body */}
+        {!minimized && (
+          <>
+            {renderTurns()}
+            {renderInput(inputRef)}
+          </>
+        )}
+      </div>
+
+      {/* Maximize modal */}
+      {maximized && createPortal(
+        <div
+          className="ai-cell__modal-overlay"
+          onClick={() => setMaximized(false)}
+        >
+          <div
+            className={
+              'ai-cell__modal' +
+              (streaming ? ' is-streaming' : '') +
+              (finishing ? ' is-finishing' : '')
+            }
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ai-cell__modal-header">
+              <span className="ai-cell__badge">✦ AI</span>
+              <button
+                type="button"
+                className="ai-cell__icon-btn"
+                onClick={() => setMaximized(false)}
+                title="Thu nhỏ (Esc)"
+              >
+                <IconMinimize />
+              </button>
+            </div>
+            <div className="ai-cell__modal-body">
+              {renderTurns()}
+            </div>
+            {renderInput(modalInputRef)}
+          </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }

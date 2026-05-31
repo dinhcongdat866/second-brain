@@ -27,7 +27,7 @@ export function useDocRegistry() {
   }, []);
 
   const createNewDoc = useCallback(() => {
-    const doc = createDoc('Untitled');
+    const doc = createDoc('New Document');
     refresh();
     setActiveDocId(doc.id);
     setActiveDocIdState(doc.id);

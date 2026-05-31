@@ -88,7 +88,7 @@ export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
   await fetch(`${BACKEND_URL}/documents/${encodeURIComponent(docId)}/state`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/octet-stream' },
-    body: state,
+    body: new Blob([new Uint8Array(state)]),
   });
 }
 
