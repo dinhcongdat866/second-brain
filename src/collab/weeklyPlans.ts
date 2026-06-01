@@ -116,6 +116,66 @@ export function toggleTodo(plan: Y.Map<unknown>, day: DayKey, todoId: string): v
   }
 }
 
+/**
+ * Maps every *visible* (rendered) character index to its index in the raw
+ * markdown source. Marker characters (`**`, `_`, `~~`, `` ` ``, and link
+ * `[...](...)` syntax) contribute no visible character and are skipped, so a
+ * selection made against rendered text can be located in the stored source.
+ * Mirrors the constructs handled by renderMd.
+ */
+function visibleToRawMap(raw: string): number[] {
+  const map: number[] = [];
+  const linkRe = /^\[([^\]]+)\]\(([^)]+)\)/;
+  let i = 0;
+  while (i < raw.length) {
+    const m = linkRe.exec(raw.slice(i));
+    if (m) {
+      const textStart = i + 1; // skip '['
+      for (let k = 0; k < m[1].length; k++) map.push(textStart + k);
+      i += m[0].length;
+      continue;
+    }
+    if (raw.startsWith('**', i) || raw.startsWith('~~', i)) { i += 2; continue; }
+    if (raw[i] === '_' || raw[i] === '`') { i += 1; continue; }
+    map.push(i);
+    i += 1;
+  }
+  return map;
+}
+
+/**
+ * Wraps the rendered-text selection [visStart, visEnd) of a todo with the
+ * given markers. Offsets are positions in the *visible* text; they are mapped
+ * back to raw-source positions so wrapping works even when the todo already
+ * contains markdown (each visible char maps to exactly one raw char).
+ */
+export function formatTodoText(
+  plan: Y.Map<unknown>,
+  day: DayKey,
+  todoId: string,
+  visStart: number,
+  visEnd: number,
+  open: string,
+  close: string,
+): void {
+  const list = getDayList(plan, day);
+  if (!list) return;
+  for (let i = 0; i < list.length; i++) {
+    const todo = list.get(i);
+    if (todo.get('id') !== todoId) continue;
+    const text = todo.get('text') as string;
+    const map = visibleToRawMap(text);
+    if (visStart < 0 || visEnd > map.length || visStart >= visEnd) return;
+    const rawStart = map[visStart];
+    const rawEnd = map[visEnd - 1] + 1;
+    todo.set(
+      'text',
+      text.slice(0, rawStart) + open + text.slice(rawStart, rawEnd) + close + text.slice(rawEnd),
+    );
+    return;
+  }
+}
+
 export function deleteTodo(plan: Y.Map<unknown>, day: DayKey, todoId: string): void {
   const list = getDayList(plan, day);
   if (!list) return;

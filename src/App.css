@@ -1805,6 +1805,95 @@ body {
    WEEKLY PLANNER CELL
    ============================================================ */
 
+/* ---------- Links inside ProseMirror ---------- */
+
+.ProseMirror a {
+  color: #3b6fcc;
+  text-decoration: underline;
+  text-decoration-color: rgba(59, 111, 204, 0.45);
+  cursor: pointer;
+}
+
+.ProseMirror a:hover {
+  color: #2a52a0;
+}
+
+/* ---------- Floating Toolbar ---------- */
+
+.floating-toolbar {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 10px));
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px;
+  background: #1c1c1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  animation: ftb-in 0.1s ease;
+  pointer-events: all;
+}
+
+@keyframes ftb-in {
+  from { opacity: 0; transform: translate(-50%, calc(-100% - 6px)); }
+  to   { opacity: 1; transform: translate(-50%, calc(-100% - 10px)); }
+}
+
+.ftb__btn {
+  border: none;
+  background: transparent;
+  color: #d0d0d0;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.1s, color 0.1s;
+}
+
+.ftb__btn:hover  { background: rgba(255,255,255,0.12); color: #fff; }
+.ftb__btn--on    { background: rgba(255,255,255,0.2);  color: #fff; }
+
+.ftb__btn code {
+  color: var(--nb-code-color);
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  font-size: 11px;
+}
+
+.ftb__sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(255,255,255,0.15);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+.ftb__link-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ftb__link-input {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  padding: 3px 8px;
+  width: 210px;
+  outline: none;
+  font-family: inherit;
+}
+
+.ftb__link-input::placeholder { color: rgba(255,255,255,0.35); }
+.ftb__link-input:focus { border-color: rgba(255,255,255,0.5); }
+
+/* ---------- Weekly ---------- */
+
 .weekly-cell-wrapper {
   margin: 4px 0;
 }
@@ -1814,7 +1903,6 @@ body {
   border: 1px solid var(--nb-weekly-border);
   border-radius: var(--nb-r-cell);
   padding: 12px 14px;
-  user-select: none;
   overflow-x: auto;
 }
 
@@ -1936,6 +2024,12 @@ body {
 .weekly-todo__text--done {
   text-decoration: line-through;
   color: var(--nb-text-3);
+}
+
+.weekly-todo__text a {
+  color: #3b6fcc;
+  text-decoration: underline;
+  text-decoration-color: rgba(59, 111, 204, 0.45);
 }
 
 .weekly-todo__del {

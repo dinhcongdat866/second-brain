@@ -31,6 +31,7 @@ import {
   guardProtectedCells,
 } from '../commands';
 import { ensureCellPlugin } from '../plugins/ensureCellPlugin';
+import { selectionPlugin } from '../plugins/selectionPlugin';
 import { slashMenuPlugin } from '../plugins/slashMenuPlugin';
 import { placeholderPlugin } from '../plugins/placeholderPlugin';
 import { bindYDoc } from '../plugins/slashOptions';
@@ -86,6 +87,7 @@ function createPlugins(
     }),
     keymap(baseKeymap),
     ensureCellPlugin,
+    selectionPlugin,
     placeholderPlugin,
     pasteNormPlugin,
   ];
@@ -165,6 +167,17 @@ export function useNotebookEditor(
             new AiCellView(node, view, getPos, doc, activeDocId),
           weekly_planner_cell: (node, view, getPos) =>
             new WeeklyCellView(node, view, getPos, doc),
+        },
+        handleDOMEvents: {
+          click(_view, event) {
+            const anchor = (event.target as HTMLElement).closest('a');
+            if (anchor?.href) {
+              event.preventDefault();
+              window.open(anchor.href, '_blank', 'noopener,noreferrer');
+              return true;
+            }
+            return false;
+          },
         },
         transformPastedHTML,
         dispatchTransaction(tr) {

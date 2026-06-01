@@ -3,6 +3,7 @@ import type * as Y from 'yjs';
 import type { EditorView } from 'prosemirror-view';
 
 import { appendMarkdownCell, makeAppendAiCell, makeAppendWeeklyCell } from './commands';
+import { FloatingToolbar } from './components/FloatingToolbar';
 import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
@@ -162,6 +163,7 @@ function App() {
             <CellAdder view={view} ydoc={ydoc} />
           </div>
           <SlashMenu view={view} />
+          <FloatingToolbar view={view} />
         </main>
       </div>
 

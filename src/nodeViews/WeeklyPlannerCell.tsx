@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
 import type * as Y from 'yjs';
 import {
   DAY_KEYS,
@@ -8,15 +8,204 @@ import {
   addTodo,
   toggleTodo,
   deleteTodo,
+  formatTodoText,
   readAllDays,
   weekRangeLabel,
   todayDayKey,
 } from '../collab/weeklyPlans';
 
-interface Props {
-  plan: Y.Map<unknown>;
-  onDelete: () => void;
+// ---------------------------------------------------------------------------
+// Inline markdown renderer — bold, italic, strikethrough, code, link
+// ---------------------------------------------------------------------------
+
+function renderMd(raw: string): string {
+  const esc = raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return esc
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>')
+    .replace(/_(.*?)_/gs, '<em>$1</em>')
+    .replace(/~~(.*?)~~/gs, '<s>$1</s>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
+
+// ---------------------------------------------------------------------------
+// Native-selection toolbar for weekly cell
+// ---------------------------------------------------------------------------
+
+interface FormatContext {
+  todoId: string;
+  day: DayKey;
+  /** Selection bounds as offsets within the todo's rendered (visible) text. */
+  start: number;
+  end: number;
+}
+
+/** Visible-character offset of (node, offset) within `span`'s rendered text. */
+function visibleOffsetWithin(span: Element, node: Node, offset: number): number {
+  const r = document.createRange();
+  r.selectNodeContents(span);
+  try {
+    r.setEnd(node, offset);
+  } catch {
+    return (span.textContent ?? '').length;
+  }
+  return r.toString().length;
+}
+
+interface WeeklySelectionToolbarProps {
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  plan: Y.Map<unknown>;
+}
+
+function WeeklySelectionToolbar({ containerRef, plan }: WeeklySelectionToolbarProps) {
+  const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(null);
+  const [linkMode, setLinkMode] = useState(false);
+  // Position frozen when link mode opens — kept in state (not a ref) so it
+  // can be read during render without violating the rules of hooks.
+  const [linkPos, setLinkPos] = useState<{ left: number; top: number } | null>(null);
+  const [linkUrl, setLinkUrl] = useState('');
+  const savedLink = useRef<FormatContext | null>(null);
+  // Saved at selection time so button clicks don't need a live window.getSelection()
+  const savedFormatRef = useRef<FormatContext | null>(null);
+  const linkModeRef = useRef(false);
+  const linkInputRef = useRef<HTMLInputElement>(null);
+  const showTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => {
+    const onSelectionChange = () => {
+      if (linkModeRef.current) return;
+      clearTimeout(showTimer.current);
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !sel.toString()) {
+        setToolbarPos(null);
+        savedFormatRef.current = null;
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      if (!containerRef.current?.contains(range.commonAncestorContainer)) {
+        setToolbarPos(null);
+        savedFormatRef.current = null;
+        return;
+      }
+      const node = range.startContainer;
+      const span = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Element)
+        ?.closest('[data-todo-id]');
+      if (!span) {
+        setToolbarPos(null);
+        savedFormatRef.current = null;
+        return;
+      }
+      const a = visibleOffsetWithin(span, range.startContainer, range.startOffset);
+      const b = visibleOffsetWithin(span, range.endContainer, range.endOffset);
+      savedFormatRef.current = {
+        todoId: span.getAttribute('data-todo-id')!,
+        day: span.getAttribute('data-day')! as DayKey,
+        start: Math.min(a, b),
+        end: Math.max(a, b),
+      };
+      const rect = range.getBoundingClientRect();
+      showTimer.current = setTimeout(() => {
+        setToolbarPos({ left: (rect.left + rect.right) / 2, top: rect.top });
+      }, 220);
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', onSelectionChange);
+      clearTimeout(showTimer.current);
+    };
+  }, [containerRef]);
+
+  useEffect(() => {
+    if (linkMode) linkInputRef.current?.focus();
+  }, [linkMode]);
+
+  useEffect(() => () => clearTimeout(showTimer.current), []);
+
+  const applyFormat = useCallback((open: string, close: string) => {
+    if (!savedFormatRef.current) return;
+    const { todoId, day, start, end } = savedFormatRef.current;
+    formatTodoText(plan, day, todoId, start, end, open, close);
+    savedFormatRef.current = null;
+    window.getSelection()?.removeAllRanges();
+    setToolbarPos(null);
+  }, [plan]);
+
+  const enterLinkMode = useCallback(() => {
+    if (!savedFormatRef.current || !toolbarPos) return;
+    savedLink.current = { ...savedFormatRef.current };
+    setLinkPos(toolbarPos);
+    linkModeRef.current = true;
+    setLinkMode(true);
+  }, [toolbarPos]);
+
+  const applyLink = useCallback(() => {
+    if (!savedLink.current) return;
+    const raw = linkUrl.trim();
+    if (!raw) return;
+    const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    const { todoId, day, start, end } = savedLink.current;
+    formatTodoText(plan, day, todoId, start, end, '[', `](${href})`);
+    linkModeRef.current = false;
+    setLinkMode(false);
+    setLinkUrl('');
+    savedLink.current = null;
+    setLinkPos(null);
+    setToolbarPos(null);
+  }, [plan, linkUrl]);
+
+  const cancelLink = useCallback(() => {
+    linkModeRef.current = false;
+    setLinkMode(false);
+    setLinkUrl('');
+    savedLink.current = null;
+    setLinkPos(null);
+    setToolbarPos(null);
+  }, []);
+
+  const displayPos = linkMode ? linkPos : toolbarPos;
+  if (!displayPos) return null;
+
+  return (
+    <div
+      className="floating-toolbar"
+      style={{ left: displayPos.left, top: displayPos.top }}
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      {linkMode ? (
+        <div className="ftb__link-row">
+          <input
+            ref={linkInputRef}
+            className="ftb__link-input"
+            placeholder="https://..."
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); applyLink(); }
+              if (e.key === 'Escape') { e.preventDefault(); cancelLink(); }
+            }}
+          />
+          <button className="ftb__btn" onMouseDown={(e) => e.preventDefault()} onClick={applyLink} title="Apply">↵</button>
+        </div>
+      ) : (
+        <>
+          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); applyFormat('**', '**'); }} title="Bold"><b>B</b></button>
+          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); applyFormat('_', '_'); }} title="Italic"><i>I</i></button>
+          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); applyFormat('~~', '~~'); }} title="Strikethrough"><s>S</s></button>
+          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); applyFormat('`', '`'); }} title="Code"><code>{`</>`}</code></button>
+          <div className="ftb__sep" />
+          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); enterLinkMode(); }} title="Link">⌖</button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Day column
+// ---------------------------------------------------------------------------
 
 interface DayColumnProps {
   day: DayKey;
@@ -30,7 +219,6 @@ function DayColumn({ day, todos, isToday, plan }: DayColumnProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    // Prevent ProseMirror from intercepting keystrokes inside the NodeView.
     e.stopPropagation();
     if (e.key === 'Enter' && input.trim()) {
       addTodo(plan, day, input);
@@ -51,9 +239,12 @@ function DayColumn({ day, todos, isToday, plan }: DayColumnProps) {
               onChange={() => toggleTodo(plan, day, todo.id)}
               onKeyDown={(e) => e.stopPropagation()}
             />
-            <span className={`weekly-todo__text${todo.done ? ' weekly-todo__text--done' : ''}`}>
-              {todo.text}
-            </span>
+            <span
+              data-todo-id={todo.id}
+              data-day={day}
+              className={`weekly-todo__text${todo.done ? ' weekly-todo__text--done' : ''}`}
+              dangerouslySetInnerHTML={{ __html: renderMd(todo.text) }}
+            />
             <button
               type="button"
               className="weekly-todo__del"
@@ -78,8 +269,18 @@ function DayColumn({ day, todos, isToday, plan }: DayColumnProps) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Root component
+// ---------------------------------------------------------------------------
+
+interface Props {
+  plan: Y.Map<unknown>;
+  onDelete: () => void;
+}
+
 export function WeeklyPlannerCell({ plan, onDelete }: Props) {
   const [days, setDays] = useState<AllDays>(() => readAllDays(plan));
+  const containerRef = useRef<HTMLDivElement>(null);
   const weekStart = plan.get('weekStart') as string;
   const todayKey = todayDayKey(weekStart);
 
@@ -90,7 +291,7 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
   }, [plan]);
 
   return (
-    <div className="weekly-cell">
+    <div className="weekly-cell" ref={containerRef}>
       <div className="weekly-cell__header">
         <span className="weekly-cell__title">📅 {weekRangeLabel(weekStart)}</span>
         <button
@@ -113,6 +314,7 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
           />
         ))}
       </div>
+      <WeeklySelectionToolbar containerRef={containerRef} plan={plan} />
     </div>
   );
 }

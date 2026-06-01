@@ -1,4 +1,4 @@
-import { Schema, type Node as PMNode } from 'prosemirror-model';
+import { Schema, type Node as PMNode, type MarkSpec } from 'prosemirror-model';
 import { schema as basicSchema } from 'prosemirror-schema-basic';
 
 // ---------------------------------------------------------------------------
@@ -90,7 +90,12 @@ export const notebookSchema = new Schema({
     text: basicSchema.spec.nodes.get('text')!,
     hard_break: basicSchema.spec.nodes.get('hard_break')!,
   },
-  marks: basicSchema.spec.marks,
+  marks: (basicSchema.spec.marks as unknown as {
+    addToEnd(key: string, val: MarkSpec): typeof basicSchema.spec.marks;
+  }).addToEnd('strikethrough', {
+    parseDOM: [{ tag: 's' }, { tag: 'del' }, { tag: 'strike' }],
+    toDOM(): [string, number] { return ['s', 0]; },
+  }),
 });
 
 // ---------------------------------------------------------------------------
