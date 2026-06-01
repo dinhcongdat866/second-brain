@@ -15,8 +15,9 @@ import {
   toggleMark,
 } from 'prosemirror-commands';
 import type * as Y from 'yjs';
-import { notebookSchema, createMarkdownCell, createAiCell } from './schema';
+import { notebookSchema, createMarkdownCell, createAiCell, createWeeklyPlannerCell } from './schema';
 import { getThread } from './collab/aiThreads';
+import { getWeeklyPlan } from './collab/weeklyPlans';
 
 // ---------------------------------------------------------------------------
 // Insert hard break (Enter, Shift-Enter)
@@ -80,8 +81,8 @@ function insertCellAfterCurrent(cell: PMNode): Command {
 
     const tr = state.tr.insert(insertPos, cell);
 
-    if (cell.type.name === 'ai_cell') {
-      // ai_cell is an atom — no text position inside; select the node itself.
+    if (cell.type.spec.atom) {
+      // atom node — no text position inside; select the node itself.
       tr.setSelection(NodeSelection.create(tr.doc, insertPos));
     } else {
       // markdown_cell: open token (1) + paragraph open token (1) = +2
@@ -401,6 +402,17 @@ export const appendMarkdownCell: Command = (state, dispatch) => {
   return true;
 };
 
+export function makeInsertWeeklyCell(ydoc: Y.Doc): Command {
+  return (state, dispatch) => {
+    const cell = createWeeklyPlannerCell();
+    ydoc.transact(() => {
+      insertCellAfterCurrent(cell)(state, dispatch);
+      getWeeklyPlan(ydoc, cell.attrs.id as string);
+    });
+    return true;
+  };
+}
+
 export function makeAppendAiCell(ydoc: Y.Doc): Command {
   return (state, dispatch) => {
     const cell = createAiCell();
@@ -417,6 +429,51 @@ export function makeAppendAiCell(ydoc: Y.Doc): Command {
     return true;
   };
 }
+
+export function makeAppendWeeklyCell(ydoc: Y.Doc): Command {
+  return (state, dispatch) => {
+    const cell = createWeeklyPlannerCell();
+    const insertPos = state.doc.content.size;
+    ydoc.transact(() => {
+      if (dispatch) {
+        const tr = state.tr.insert(insertPos, cell);
+        tr.setSelection(NodeSelection.create(tr.doc, insertPos));
+        tr.scrollIntoView();
+        dispatch(tr);
+      }
+      getWeeklyPlan(ydoc, cell.attrs.id as string);
+    });
+    return true;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Guard: prevent Backspace from deleting ai_cell / weekly_cell
+// ---------------------------------------------------------------------------
+// These cells must be removed via their × button only.
+// Two cases to block:
+//   1. NodeSelection directly on a protected cell (Backspace would delete it).
+//   2. Cursor at offset 0 inside a block whose preceding doc-level sibling is a
+//      protected cell (joinBackward would consume it).
+// ---------------------------------------------------------------------------
+
+const PROTECTED_CELLS = new Set(['ai_cell', 'weekly_planner_cell']);
+
+export const guardProtectedCells: Command = (state) => {
+  const { selection } = state;
+
+  if (selection instanceof NodeSelection) {
+    if (PROTECTED_CELLS.has(selection.node.type.name)) return true;
+  }
+
+  const { $from, empty } = selection;
+  if (empty && $from.parentOffset === 0 && $from.depth >= 1) {
+    const nodeBefore = state.doc.resolve($from.before(1)).nodeBefore;
+    if (nodeBefore && PROTECTED_CELLS.has(nodeBefore.type.name)) return true;
+  }
+
+  return false;
+};
 
 // ---------------------------------------------------------------------------
 // Convert empty heading → paragraph on Backspace

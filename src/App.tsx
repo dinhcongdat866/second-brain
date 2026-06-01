@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import type * as Y from 'yjs';
 import type { EditorView } from 'prosemirror-view';
 
-import { appendMarkdownCell, makeAppendAiCell } from './commands';
+import { appendMarkdownCell, makeAppendAiCell, makeAppendWeeklyCell } from './commands';
 import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
@@ -43,6 +43,16 @@ function CellAdder({
       >
         + AI Cell
       </button>
+      <button
+        type="button"
+        className="cell-adder__btn"
+        onClick={() => {
+          makeAppendWeeklyCell(ydoc)(view.state, view.dispatch.bind(view));
+          view.focus();
+        }}
+      >
+        + Weekly
+      </button>
     </div>
   );
 }
@@ -53,7 +63,28 @@ function App() {
   const { view, ydoc } = useNotebookEditor(editorRef, registry.activeDocId);
   const [showHistory, setShowHistory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(220);
+  const [resizing, setResizing] = useState(false);
   const saveStatus = useUIStore((s) => s.saveStatus);
+
+  const startSidebarResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    setResizing(true);
+
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.max(150, Math.min(500, startWidth + ev.clientX - startX));
+      setSidebarWidth(next);
+    };
+    const onUp = () => {
+      setResizing(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [sidebarWidth]);
 
   const activeDocName =
     registry.docs.find((d) => d.id === registry.activeDocId)?.name ?? '';
@@ -106,17 +137,24 @@ function App() {
         </button>
       </header>
 
-      <div className="app-body">
+      <div className="app-body" style={resizing ? { cursor: 'col-resize', userSelect: 'none' } : undefined}>
         {sidebarOpen && (
-          <Sidebar
-            docs={registry.docs}
-            activeId={registry.activeDocId}
-            onSelect={registry.selectDoc}
-            onCreate={registry.createNewDoc}
-            onRename={registry.renameDoc}
-            onDelete={registry.deleteDoc}
-            onRestore={registry.restoreDoc}
-          />
+          <>
+            <Sidebar
+              docs={registry.docs}
+              activeId={registry.activeDocId}
+              onSelect={registry.selectDoc}
+              onCreate={registry.createNewDoc}
+              onRename={registry.renameDoc}
+              onDelete={registry.deleteDoc}
+              onRestore={registry.restoreDoc}
+              style={{ width: sidebarWidth }}
+            />
+            <div
+              className={`sidebar-resize-handle${resizing ? ' sidebar-resize-handle--dragging' : ''}`}
+              onMouseDown={startSidebarResize}
+            />
+          </>
         )}
         <main className="app-main">
           <div className="notebook-wrap">

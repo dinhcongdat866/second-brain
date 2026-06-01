@@ -28,6 +28,7 @@ import {
   smartSelectAll,
   deleteEmptyCell,
   convertEmptyHeadingToParagraph,
+  guardProtectedCells,
 } from '../commands';
 import { ensureCellPlugin } from '../plugins/ensureCellPlugin';
 import { slashMenuPlugin } from '../plugins/slashMenuPlugin';
@@ -36,9 +37,11 @@ import { bindYDoc } from '../plugins/slashOptions';
 import { transformPastedHTML, pasteNormPlugin } from '../clipboard';
 import { AiCellView } from '../nodeViews/aiCellView';
 import { MarkdownCellView } from '../nodeViews/markdownCellView';
+import { WeeklyCellView } from '../nodeViews/weeklyCellView';
 import { startAutoSnapshot } from '../collab/snapshots';
 import { createCollabSetup, seedFromContent, seedIfEmpty, wireSaveStatus } from '../collab/ydoc';
 import { addTurn, getThread, sweepOrphanThreads } from '../collab/aiThreads';
+import { sweepOrphanWeeklyPlans } from '../collab/weeklyPlans';
 import { consumePendingImport } from '../lib/importState';
 import { createDocSyncer, createYjsSyncer, applyServerState } from '../lib/backendSync';
 
@@ -66,6 +69,7 @@ function createPlugins(
       'Shift-Enter': insertHardBreak,
       'Mod-Enter': exitToParagraph,
       'Backspace': chainCommands(
+        guardProtectedCells,
         convertEmptyHeadingToParagraph,
         deleteEmptyCell,
         exitBlockquoteOnBackspace,
@@ -129,6 +133,7 @@ export function useNotebookEditor(
         seedIfEmpty(doc, yXmlFragment);
       }
       sweepOrphanThreads(doc, yXmlFragment);
+      sweepOrphanWeeklyPlans(doc, yXmlFragment);
       bindYDoc(doc);
       setYdoc(doc);
       unwireSaveStatus = wireSaveStatus(doc);
@@ -158,6 +163,8 @@ export function useNotebookEditor(
             new MarkdownCellView(node, view, getPos),
           ai_cell: (node, view, getPos) =>
             new AiCellView(node, view, getPos, doc, activeDocId),
+          weekly_planner_cell: (node, view, getPos) =>
+            new WeeklyCellView(node, view, getPos, doc),
         },
         transformPastedHTML,
         dispatchTransaction(tr) {

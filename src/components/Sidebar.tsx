@@ -60,6 +60,7 @@ interface Props {
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onRestore: (meta: DocMeta) => void;
+  style?: React.CSSProperties;
 }
 
 export function Sidebar({
@@ -70,6 +71,7 @@ export function Sidebar({
   onRename,
   onDelete,
   onRestore,
+  style,
 }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -207,7 +209,7 @@ export function Sidebar({
   );
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" style={style}>
       <div className="sidebar__header">
         <span className="sidebar__title">Documents</span>
       </div>

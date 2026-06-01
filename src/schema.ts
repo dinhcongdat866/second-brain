@@ -65,6 +65,18 @@ export const notebookSchema = new Schema({
       },
     },
 
+    // weekly_planner_cell: atom — 7-column weekly todo grid.
+    // Data (todos per day) lives in Yjs (collab/weeklyPlans).
+    weekly_planner_cell: {
+      group: 'cell',
+      atom: true,
+      attrs: baseCellAttrs,
+      parseDOM: [{ tag: 'div[data-type="weekly-planner-cell"]' }],
+      toDOM(node) {
+        return ['div', { 'data-type': 'weekly-planner-cell', 'data-id': node.attrs.id }];
+      },
+    },
+
     // ---- Block-level content inside markdown_cell ----
     // Override group from schema-basic to ensure they belong to 'block', not 'cell'.
 
@@ -107,6 +119,10 @@ export function createMarkdownCell(text = ''): PMNode {
 
 export function createAiCell(): PMNode {
   return notebookSchema.nodes.ai_cell.create(makeCellAttrs());
+}
+
+export function createWeeklyPlannerCell(): PMNode {
+  return notebookSchema.nodes.weekly_planner_cell.create(makeCellAttrs());
 }
 
 export function createInitialDoc(): PMNode {

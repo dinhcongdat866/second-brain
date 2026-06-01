@@ -183,7 +183,7 @@ export function AiCell({
   const activeConfigBtnRef = useRef<HTMLButtonElement | null>(null);
   const turnsEndRef = useRef<HTMLDivElement>(null);
 
-  const openConfigFrom = (btnRef: React.RefObject<HTMLButtonElement>) => {
+  const openConfigFrom = (btnRef: React.RefObject<HTMLButtonElement | null>) => {
     activeConfigBtnRef.current = btnRef.current;
     const rect = btnRef.current?.getBoundingClientRect();
     if (rect) setPanelAnchor({ top: rect.bottom + 4, left: rect.left });

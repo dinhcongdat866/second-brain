@@ -3,6 +3,7 @@ import type { EditorView } from 'prosemirror-view';
 import {
   insertMarkdownCell,
   makeInsertAiCell,
+  makeInsertWeeklyCell,
   smartInsertTextblock,
   smartInsertBlockquote,
   smartInsertDivider,
@@ -164,12 +165,25 @@ export const SLASH_OPTIONS: SlashOption[] = [
     keywords: ['ai', 'cell', 'chat', 'assistant', 'hoi', 'prompt'],
     run: (view) => {
       if (!_ydoc) {
-        // ydoc not bound yet — should never happen after app init,
-        // but fail gracefully rather than crash.
         console.warn('[slashOptions] insertAiCell called before ydoc was bound');
         return;
       }
       dispatch(view, makeInsertAiCell(_ydoc));
+    },
+  },
+  {
+    id: 'weekly-cell',
+    label: 'Weekly planner',
+    description: 'Lịch tuần 7 cột với todo list',
+    icon: '📅',
+    group: 'cell',
+    keywords: ['week', 'weekly', 'planner', 'todo', 'lich', 'tuan', 'calendar'],
+    run: (view) => {
+      if (!_ydoc) {
+        console.warn('[slashOptions] insertWeeklyCell called before ydoc was bound');
+        return;
+      }
+      dispatch(view, makeInsertWeeklyCell(_ydoc));
     },
   },
 ];

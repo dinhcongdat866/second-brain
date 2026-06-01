@@ -27,7 +27,7 @@ export const ensureCellPlugin = new Plugin({
     // (ai_cell is an atom — content.size is always 0, but its real content
     //  lives in Yjs, so "empty" here does NOT mean "discardable".)
     const name = onlyChild.type.name;
-    const isLegitCell = name === 'markdown_cell' || name === 'ai_cell';
+    const isLegitCell = name === 'markdown_cell' || name === 'ai_cell' || name === 'weekly_planner_cell';
 
     // Only fixup if doc has shrunk to a single empty non-cell block
     if (isEmpty && !isLegitCell) {
