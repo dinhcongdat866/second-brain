@@ -38,7 +38,10 @@
   --nb-weekly-bg:       #f6f4ff;
   --nb-weekly-border:   #d4cdf5;
   --nb-weekly-accent:   #5046a6;
-  --nb-weekly-today-bg: #f0eeff;
+  /* "Today" uses a warm amber — complementary to the cool indigo theme so it
+     pops against both the lavender cell bg and the plain day columns. */
+  --nb-weekly-today-bg:     #fff4d6;
+  --nb-weekly-today-accent: #f08c00;
 
   /* ── Accent — warm amber (primary buttons, active states) ── */
   --nb-accent:        #7c6030;
@@ -2036,7 +2039,9 @@ body {
 
 .weekly-day--today {
   background: var(--nb-weekly-today-bg);
-  border-color: var(--nb-weekly-border);
+  border-color: var(--nb-weekly-today-accent);
+  /* inset bar (layout-safe — no border-width shift) for an unmistakable cue */
+  box-shadow: inset 3px 0 0 var(--nb-weekly-today-accent);
 }
 
 .weekly-day__header {
@@ -2050,7 +2055,7 @@ body {
 }
 
 .weekly-day--today .weekly-day__header {
-  color: var(--nb-weekly-accent);
+  color: var(--nb-weekly-today-accent);
 }
 
 /* ---- Todos ---- */
