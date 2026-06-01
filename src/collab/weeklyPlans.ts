@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { STYLE_OPEN_RE, STYLE_CLOSE_RE, type StyleKind } from '../lib/toolbarStyles';
 
 export const WEEKLY_PLANS_KEY = 'weeklyPlans';
 
@@ -135,6 +136,12 @@ function visibleToRawMap(raw: string): number[] {
       i += m[0].length;
       continue;
     }
+    // Style markers `{c=...}` / `{/c}` contribute no visible char.
+    const rest = raw.slice(i);
+    const styleOpen = STYLE_OPEN_RE.exec(rest);
+    if (styleOpen) { i += styleOpen[0].length; continue; }
+    const styleClose = STYLE_CLOSE_RE.exec(rest);
+    if (styleClose) { i += styleClose[0].length; continue; }
     if (raw.startsWith('**', i) || raw.startsWith('~~', i)) { i += 2; continue; }
     if (raw[i] === '_' || raw[i] === '`') { i += 1; continue; }
     map.push(i);
@@ -171,6 +178,58 @@ export function formatTodoText(
     todo.set(
       'text',
       text.slice(0, rawStart) + open + text.slice(rawStart, rawEnd) + close + text.slice(rawEnd),
+    );
+    return;
+  }
+}
+
+const KIND_CHAR: Record<StyleKind, string> = { color: 'c', bg: 'b', size: 's' };
+
+/**
+ * Removes the style markers of `kind` enclosing the rendered-text selection —
+ * strips the nearest `{x=...}` opener before the selection and its matching
+ * `{/x}` closer after it. Best-effort: handles the common "select a styled run
+ * and reset it" case.
+ */
+export function clearTodoStyle(
+  plan: Y.Map<unknown>,
+  day: DayKey,
+  todoId: string,
+  visStart: number,
+  visEnd: number,
+  kind: StyleKind,
+): void {
+  const list = getDayList(plan, day);
+  if (!list) return;
+  const ch = KIND_CHAR[kind];
+  for (let i = 0; i < list.length; i++) {
+    const todo = list.get(i);
+    if (todo.get('id') !== todoId) continue;
+    const text = todo.get('text') as string;
+    const map = visibleToRawMap(text);
+    if (visStart < 0 || visEnd > map.length || visStart >= visEnd) return;
+    const rawStart = map[visStart];
+    const rawEnd = map[visEnd - 1] + 1;
+
+    const before = text.slice(0, rawStart);
+    const middle = text.slice(rawStart, rawEnd);
+    const after = text.slice(rawEnd);
+
+    // Nearest opener `{ch=...}` in `before`.
+    const openRe = new RegExp(`\\{${ch}=[^}]+\\}`, 'g');
+    let open: RegExpExecArray | null = null;
+    for (let m = openRe.exec(before); m; m = openRe.exec(before)) open = m;
+    const closeTok = `{/${ch}}`;
+    const closeIdx = after.indexOf(closeTok);
+    if (!open || closeIdx === -1) return; // nothing enclosing — no-op
+
+    todo.set(
+      'text',
+      before.slice(0, open.index) +
+        before.slice(open.index + open[0].length) +
+        middle +
+        after.slice(0, closeIdx) +
+        after.slice(closeIdx + closeTok.length),
     );
     return;
   }

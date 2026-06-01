@@ -4,11 +4,29 @@ import { TextSelection } from 'prosemirror-state';
 import { toggleMark } from 'prosemirror-commands';
 import { notebookSchema } from '../schema';
 import { subscribeToSelection } from '../plugins/selectionPlugin';
+import { ColorPalette, SizePicker } from './ToolbarPickers';
+import { TEXT_COLORS, BG_COLORS, FONT_SIZES } from '../lib/toolbarStyles';
 
 // Atom NodeView containers — clicks here won't update PM selection.
 const ATOM_CELL_SELECTOR = '.weekly-cell-wrapper, .ai-cell';
 
 const PROTECTED = new Set(['ai_cell', 'weekly_planner_cell']);
+
+type Flyout = 'text' | 'bg' | 'size' | null;
+interface ActiveStyles { color: string | null; bg: string | null; size: string | null; }
+
+/** Reads the attr value of a mark covering the current selection (or null). */
+function getMarkAttr(view: EditorView, markName: string, attrKey: string): string | null {
+  const markType = notebookSchema.marks[markName];
+  if (!markType) return null;
+  const { from, to } = view.state.selection;
+  let val: string | null = null;
+  view.state.doc.nodesBetween(from, to, (node) => {
+    const m = node.marks.find((mk) => mk.type === markType);
+    if (m) val = m.attrs[attrKey] as string;
+  });
+  return val;
+}
 
 function isMarkActive(view: EditorView, markName: string): boolean {
   const markType = notebookSchema.marks[markName];
@@ -31,6 +49,8 @@ function getExistingHref(view: EditorView): string {
 export function FloatingToolbar({ view }: { view: EditorView | null }) {
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const [activeMarks, setActiveMarks] = useState<Set<string>>(new Set());
+  const [activeStyles, setActiveStyles] = useState<ActiveStyles>({ color: null, bg: null, size: null });
+  const [flyout, setFlyout] = useState<Flyout>(null);
   const [linkMode, setLinkMode] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const linkInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +68,7 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
     setLinkMode(false);
     setLinkUrl('');
     savedRange.current = null;
+    setFlyout(null);
     setPos(null);
   }, []);
 
@@ -55,6 +76,7 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
     savedRange.current = { from: v.state.selection.from, to: v.state.selection.to };
     setLinkUrl(getExistingHref(v));
     linkModeRef.current = true;
+    setFlyout(null);
     setLinkMode(true);
   }, []);
 
@@ -79,6 +101,7 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
 
       clearTimeout(showTimer.current);
       dismissedRef.current = true;
+      setFlyout(null);
       setPos(null);
       exitLinkMode();
     };
@@ -94,6 +117,7 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
       if (!(selection instanceof TextSelection) || selection.empty) {
         if (!linkModeRef.current) {
           clearTimeout(showTimer.current);
+          setFlyout(null);
           setPos(null);
         }
         return;
@@ -124,11 +148,17 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
       for (const name of ['strong', 'em', 'strikethrough', 'code', 'link']) {
         if (isMarkActive(v, name)) marks.add(name);
       }
+      const styles: ActiveStyles = {
+        color: getMarkAttr(v, 'text_color', 'color'),
+        bg: getMarkAttr(v, 'bg_color', 'color'),
+        size: getMarkAttr(v, 'font_size', 'size'),
+      };
 
       clearTimeout(showTimer.current);
       showTimer.current = setTimeout(() => {
         setPos({ left, top });
         setActiveMarks(marks);
+        setActiveStyles(styles);
       }, 220);
     });
   }, [view]);
@@ -144,6 +174,21 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
     const markType = notebookSchema.marks[markName];
     if (!markType) return;
     toggleMark(markType)(view.state, view.dispatch);
+    view.focus();
+  }, [view]);
+
+  // Set/replace (or clear, when attrs is null) an attribute-carrying style mark
+  // over the current selection.
+  const applyStyleMark = useCallback((markName: string, attrs: Record<string, string> | null) => {
+    if (!view) return;
+    const markType = notebookSchema.marks[markName];
+    if (!markType) return;
+    const { from, to, empty } = view.state.selection;
+    if (empty) return;
+    const tr = view.state.tr.removeMark(from, to, markType);
+    if (attrs) tr.addMark(from, to, markType.create(attrs));
+    view.dispatch(tr);
+    setFlyout(null);
     view.focus();
   }, [view]);
 
@@ -195,6 +240,35 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
             onClick={() => activeMarks.has('link') ? applyMark('link') : enterLinkMode(view)}
             title="Link"
           >⌖</button>
+          <div className="ftb__sep" />
+          <button
+            className={`ftb__btn${flyout === 'text' ? ' ftb__btn--on' : ''}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setFlyout((f) => (f === 'text' ? null : 'text'))}
+            title="Text color"
+          ><span className="ftb__ico" style={{ borderBottom: `2px solid ${activeStyles.color ?? 'currentColor'}` }}>A</span></button>
+          <button
+            className={`ftb__btn${flyout === 'bg' ? ' ftb__btn--on' : ''}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setFlyout((f) => (f === 'bg' ? null : 'bg'))}
+            title="Highlight"
+          ><span className="ftb__ico" style={{ background: activeStyles.bg ?? undefined, borderRadius: 2, padding: '0 2px' }}>A</span></button>
+          <button
+            className={`ftb__btn${flyout === 'size' ? ' ftb__btn--on' : ''}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setFlyout((f) => (f === 'size' ? null : 'size'))}
+            title="Font size"
+          >A↕</button>
+
+          {flyout === 'text' && (
+            <ColorPalette swatches={TEXT_COLORS} active={activeStyles.color} onPick={(v) => applyStyleMark('text_color', v ? { color: v } : null)} />
+          )}
+          {flyout === 'bg' && (
+            <ColorPalette swatches={BG_COLORS} active={activeStyles.bg} onPick={(v) => applyStyleMark('bg_color', v ? { color: v } : null)} />
+          )}
+          {flyout === 'size' && (
+            <SizePicker swatches={FONT_SIZES} active={activeStyles.size} onPick={(v) => applyStyleMark('font_size', v ? { size: v } : null)} />
+          )}
         </>
       )}
     </div>

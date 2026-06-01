@@ -9,13 +9,25 @@ import {
   toggleTodo,
   deleteTodo,
   formatTodoText,
+  clearTodoStyle,
   readAllDays,
   weekRangeLabel,
   todayDayKey,
 } from '../collab/weeklyPlans';
+import {
+  TEXT_COLORS,
+  BG_COLORS,
+  FONT_SIZES,
+  weeklyOpen,
+  weeklyClose,
+  renderStyleMarkers,
+  type StyleKind,
+} from '../lib/toolbarStyles';
+import { ColorPalette, SizePicker } from '../components/ToolbarPickers';
 
 // ---------------------------------------------------------------------------
-// Inline markdown renderer — bold, italic, strikethrough, code, link
+// Inline markdown renderer — bold, italic, strikethrough, code, link + style
+// markers ({c=…}/{b=…}/{s=…} → spans, validated in renderStyleMarkers)
 // ---------------------------------------------------------------------------
 
 function renderMd(raw: string): string {
@@ -23,13 +35,16 @@ function renderMd(raw: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-  return esc
+  const withMd = esc
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
     .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>')
     .replace(/_(.*?)_/gs, '<em>$1</em>')
     .replace(/~~(.*?)~~/gs, '<s>$1</s>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
+  return renderStyleMarkers(withMd);
 }
+
+type WeeklyFlyout = 'text' | 'bg' | 'size' | null;
 
 // ---------------------------------------------------------------------------
 // Native-selection toolbar for weekly cell
@@ -62,6 +77,7 @@ interface WeeklySelectionToolbarProps {
 
 function WeeklySelectionToolbar({ containerRef, plan }: WeeklySelectionToolbarProps) {
   const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(null);
+  const [flyout, setFlyout] = useState<WeeklyFlyout>(null);
   const [linkMode, setLinkMode] = useState(false);
   // Position frozen when link mode opens — kept in state (not a ref) so it
   // can be read during render without violating the rules of hooks.
@@ -78,6 +94,7 @@ function WeeklySelectionToolbar({ containerRef, plan }: WeeklySelectionToolbarPr
     const onSelectionChange = () => {
       if (linkModeRef.current) return;
       clearTimeout(showTimer.current);
+      setFlyout(null);
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !sel.toString()) {
         setToolbarPos(null);
@@ -130,6 +147,20 @@ function WeeklySelectionToolbar({ containerRef, plan }: WeeklySelectionToolbarPr
     formatTodoText(plan, day, todoId, start, end, open, close);
     savedFormatRef.current = null;
     window.getSelection()?.removeAllRanges();
+    setFlyout(null);
+    setToolbarPos(null);
+  }, [plan]);
+
+  const applyStyle = useCallback((kind: StyleKind, value: string | null) => {
+    if (!savedFormatRef.current) return;
+    const { todoId, day, start, end } = savedFormatRef.current;
+    // Strip any existing marker of this kind first so re-applying replaces it
+    // instead of nesting {c=..}{c=..} (which the renderer can't parse).
+    clearTodoStyle(plan, day, todoId, start, end, kind);
+    if (value) formatTodoText(plan, day, todoId, start, end, weeklyOpen(kind, value), weeklyClose(kind));
+    savedFormatRef.current = null;
+    window.getSelection()?.removeAllRanges();
+    setFlyout(null);
     setToolbarPos(null);
   }, [plan]);
 
@@ -197,6 +228,35 @@ function WeeklySelectionToolbar({ containerRef, plan }: WeeklySelectionToolbarPr
           <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); applyFormat('`', '`'); }} title="Code"><code>{`</>`}</code></button>
           <div className="ftb__sep" />
           <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); enterLinkMode(); }} title="Link">⌖</button>
+          <div className="ftb__sep" />
+          <button
+            className={`ftb__btn${flyout === 'text' ? ' ftb__btn--on' : ''}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setFlyout((f) => (f === 'text' ? null : 'text'))}
+            title="Text color"
+          ><span className="ftb__ico" style={{ borderBottom: '2px solid currentColor' }}>A</span></button>
+          <button
+            className={`ftb__btn${flyout === 'bg' ? ' ftb__btn--on' : ''}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setFlyout((f) => (f === 'bg' ? null : 'bg'))}
+            title="Highlight"
+          ><span className="ftb__ico" style={{ borderRadius: 2, padding: '0 2px' }}>A</span></button>
+          <button
+            className={`ftb__btn${flyout === 'size' ? ' ftb__btn--on' : ''}`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setFlyout((f) => (f === 'size' ? null : 'size'))}
+            title="Font size"
+          >A↕</button>
+
+          {flyout === 'text' && (
+            <ColorPalette swatches={TEXT_COLORS} active={null} onPick={(v) => applyStyle('color', v)} />
+          )}
+          {flyout === 'bg' && (
+            <ColorPalette swatches={BG_COLORS} active={null} onPick={(v) => applyStyle('bg', v)} />
+          )}
+          {flyout === 'size' && (
+            <SizePicker swatches={FONT_SIZES} active={null} onPick={(v) => applyStyle('size', v)} />
+          )}
         </>
       )}
     </div>

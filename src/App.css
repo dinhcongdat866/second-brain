@@ -1892,6 +1892,73 @@ body {
 .ftb__link-input::placeholder { color: rgba(255,255,255,0.35); }
 .ftb__link-input:focus { border-color: rgba(255,255,255,0.5); }
 
+/* ---------- Toolbar style pickers (color / bg / size) ---------- */
+
+.ftb__ico {
+  display: inline-block;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ftb-flyout {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 6px;
+  padding: 6px;
+  background: #1c1c1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 7px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  z-index: 1;
+}
+
+.ftb-flyout--colors {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+}
+
+.ftb-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 5px;
+  cursor: pointer;
+  color: #d0d0d0;
+  font-size: 13px;
+  line-height: 1;
+  background: transparent;
+  transition: transform 0.08s, box-shadow 0.08s;
+}
+.ftb-swatch:hover { transform: scale(1.12); }
+.ftb-swatch--clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.06);
+}
+.ftb-swatch--on { box-shadow: 0 0 0 2px #fff; }
+
+.ftb-flyout--sizes { display: flex; gap: 4px; }
+
+.ftb-size {
+  min-width: 28px;
+  padding: 4px 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: transparent;
+  color: #d0d0d0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+}
+.ftb-size:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.ftb-size--on { background: rgba(255,255,255,0.2); color: #fff; }
+
 /* ---------- Weekly ---------- */
 
 .weekly-cell-wrapper {

@@ -26,6 +26,10 @@ const baseCellAttrs = {
 //             (paragraph, heading, blockquote, horizontal_rule)
 // doc only accepts 'cell' — cells cannot nest into each other.
 
+// OrderedMap (from prosemirror-model) supports `.addToEnd` but its bundled
+// types don't expose it; this self-returning shape lets us chain marks.
+type ChainableMarks = { addToEnd(key: string, val: MarkSpec): ChainableMarks };
+
 export const notebookSchema = new Schema({
   nodes: {
     // Root: only cells at top level
@@ -90,12 +94,34 @@ export const notebookSchema = new Schema({
     text: basicSchema.spec.nodes.get('text')!,
     hard_break: basicSchema.spec.nodes.get('hard_break')!,
   },
-  marks: (basicSchema.spec.marks as unknown as {
-    addToEnd(key: string, val: MarkSpec): typeof basicSchema.spec.marks;
-  }).addToEnd('strikethrough', {
-    parseDOM: [{ tag: 's' }, { tag: 'del' }, { tag: 'strike' }],
-    toDOM(): [string, number] { return ['s', 0]; },
-  }),
+  marks: (basicSchema.spec.marks as unknown as ChainableMarks)
+    .addToEnd('strikethrough', {
+      parseDOM: [{ tag: 's' }, { tag: 'del' }, { tag: 'strike' }],
+      toDOM(): [string, number] { return ['s', 0]; },
+    })
+    // Inline styles applied via the floating toolbar. Each carries its CSS
+    // value as an attr and renders as a <span style>. parseDOM lets pasted
+    // HTML / re-parsed content round-trip the style.
+    // inclusive: false → the mark does not "stick" to its boundaries, so text
+    // typed right after a styled run is NOT carried into the style.
+    .addToEnd('text_color', {
+      attrs: { color: {} },
+      inclusive: false,
+      parseDOM: [{ style: 'color', getAttrs: (v) => ({ color: v }) }],
+      toDOM(mark) { return ['span', { style: `color: ${mark.attrs.color}` }, 0]; },
+    })
+    .addToEnd('bg_color', {
+      attrs: { color: {} },
+      inclusive: false,
+      parseDOM: [{ style: 'background-color', getAttrs: (v) => ({ color: v }) }],
+      toDOM(mark) { return ['span', { style: `background-color: ${mark.attrs.color}` }, 0]; },
+    })
+    .addToEnd('font_size', {
+      attrs: { size: {} },
+      inclusive: false,
+      parseDOM: [{ style: 'font-size', getAttrs: (v) => ({ size: v }) }],
+      toDOM(mark) { return ['span', { style: `font-size: ${mark.attrs.size}` }, 0]; },
+    }) as unknown as typeof basicSchema.spec.marks,
 });
 
 // ---------------------------------------------------------------------------
