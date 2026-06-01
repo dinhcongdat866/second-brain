@@ -3,8 +3,12 @@ type ThinkingConfigParam = Anthropic.Messages.ThinkingConfigParam;
 import type * as Y from 'yjs';
 import type { Turn } from './historyCompressor';
 
+// Calls go through the backend reverse proxy (`/anthropic`), which injects the
+// real API key server-side. The key never ships in the browser bundle.
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:8000';
 const client = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY as string,
+  baseURL: `${BACKEND_URL}/anthropic`,
+  apiKey: 'proxied-by-backend',
   dangerouslyAllowBrowser: true,
 });
 

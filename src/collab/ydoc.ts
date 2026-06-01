@@ -12,8 +12,9 @@ import { useUIStore } from '../stores/uiStore';
  */
 export const XML_FRAGMENT_NAME = 'prosemirror';
 
-/** URL of the self-hosted y-websocket sync server (dev: `pnpm dev:ws`). */
-export const WS_URL = 'ws://localhost:1234';
+/** URL of the y-websocket sync server. Dev: `pnpm dev:ws` (ws://localhost:1234);
+ *  prod: set VITE_WS_URL to the deployed relay (wss://<app>.fly.dev). */
+export const WS_URL = (import.meta.env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:1234';
 
 /** IndexedDB key for a given doc. 'default' maps to the original store. */
 export const collabDbName = (docId: string) => `notebook:${docId}`;

@@ -21,6 +21,9 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/.venv/
 
+# Claude Code
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

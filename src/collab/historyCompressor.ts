@@ -2,8 +2,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { TurnRole } from './aiThreads';
 import type { ModelConfig } from './claudeStream';
 
+// Routed through the backend reverse proxy — see claudeStream.ts.
+const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:8000';
 const client = new Anthropic({
-  apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY as string,
+  baseURL: `${BACKEND_URL}/anthropic`,
+  apiKey: 'proxied-by-backend',
   dangerouslyAllowBrowser: true,
 });
 
