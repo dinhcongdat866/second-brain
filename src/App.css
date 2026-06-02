@@ -1988,11 +1988,57 @@ body {
   margin-bottom: 10px;
 }
 
+.weekly-cell__weeknav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .weekly-cell__title {
   font-size: 13px;
   font-weight: 600;
   color: var(--nb-weekly-accent);
   letter-spacing: 0.01em;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--nb-r-xs);
+  font-family: inherit;
+}
+
+.weekly-cell__title:hover {
+  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+}
+
+.weekly-cell__weekbtn {
+  background: none;
+  border: none;
+  color: var(--nb-weekly-accent);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: var(--nb-r-xs);
+  opacity: 0.6;
+}
+
+.weekly-cell__weekbtn:hover {
+  opacity: 1;
+  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+}
+
+/* Inline date editor — shown when the week label is clicked. */
+.weekly-cell__dateedit {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nb-weekly-accent);
+  font-family: inherit;
+  background: var(--nb-bg, #fff);
+  border: 1px solid var(--nb-weekly-accent);
+  border-radius: var(--nb-r-xs);
+  padding: 1px 4px;
 }
 
 .weekly-cell__delete {

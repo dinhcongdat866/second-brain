@@ -76,6 +76,19 @@ export function getWeeklyPlan(ydoc: Y.Doc, cellId: string): Y.Map<unknown> {
   return plan;
 }
 
+/** Snap an arbitrary 'YYYY-MM-DD' date to the Monday of its week and store it. */
+export function setWeekStart(plan: Y.Map<unknown>, dateStr: string): void {
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  plan.set('weekStart', getMondayOf(new Date(y, mo - 1, d)));
+}
+
+/** Shift the plan's week by `deltaWeeks` (±). Stays normalized to Monday. */
+export function shiftWeek(plan: Y.Map<unknown>, deltaWeeks: number): void {
+  const cur = plan.get('weekStart') as string;
+  const [y, mo, d] = cur.split('-').map(Number);
+  plan.set('weekStart', getMondayOf(new Date(y, mo - 1, d + deltaWeeks * 7)));
+}
+
 export function getDayList(plan: Y.Map<unknown>, day: DayKey): YDayList {
   return plan.get(day) as YDayList;
 }

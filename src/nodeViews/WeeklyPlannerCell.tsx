@@ -13,6 +13,8 @@ import {
   readAllDays,
   weekRangeLabel,
   todayDayKey,
+  setWeekStart,
+  shiftWeek,
 } from '../collab/weeklyPlans';
 import {
   TEXT_COLORS,
@@ -340,20 +342,77 @@ interface Props {
 
 export function WeeklyPlannerCell({ plan, onDelete }: Props) {
   const [days, setDays] = useState<AllDays>(() => readAllDays(plan));
+  const [weekStart, setWeekStartState] = useState<string>(() => plan.get('weekStart') as string);
+  const [editingWeek, setEditingWeek] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const weekStart = plan.get('weekStart') as string;
+  const dateRef = useRef<HTMLInputElement>(null);
   const todayKey = todayDayKey(weekStart);
 
   useEffect(() => {
-    const handler = () => setDays(readAllDays(plan));
+    const handler = () => {
+      setDays(readAllDays(plan));
+      setWeekStartState(plan.get('weekStart') as string);
+    };
     plan.observeDeep(handler);
     return () => plan.unobserveDeep(handler);
   }, [plan]);
 
+  // When the date field opens, focus it and try to pop the native picker
+  // (visible input → showPicker is reliable; falls back to plain focus).
+  useEffect(() => {
+    if (!editingWeek) return;
+    const el = dateRef.current;
+    if (!el) return;
+    el.focus();
+    try { el.showPicker?.(); } catch { /* unsupported — input is still usable */ }
+  }, [editingWeek]);
+
   return (
     <div className="weekly-cell" ref={containerRef}>
       <div className="weekly-cell__header">
-        <span className="weekly-cell__title">📅 {weekRangeLabel(weekStart)}</span>
+        <div className="weekly-cell__weeknav">
+          <button
+            type="button"
+            className="weekly-cell__weekbtn"
+            onClick={() => shiftWeek(plan, -1)}
+            title="Tuần trước"
+          >
+            ‹
+          </button>
+          {editingWeek ? (
+            <input
+              ref={dateRef}
+              type="date"
+              className="weekly-cell__dateedit"
+              value={weekStart}
+              onChange={(e) => {
+                if (e.target.value) setWeekStart(plan, e.target.value);
+                setEditingWeek(false);
+              }}
+              onBlur={() => setEditingWeek(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' || e.key === 'Enter') setEditingWeek(false);
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              className="weekly-cell__title"
+              onClick={() => setEditingWeek(true)}
+              title="Đổi tuần"
+            >
+              📅 {weekRangeLabel(weekStart)}
+            </button>
+          )}
+          <button
+            type="button"
+            className="weekly-cell__weekbtn"
+            onClick={() => shiftWeek(plan, 1)}
+            title="Tuần sau"
+          >
+            ›
+          </button>
+        </div>
         <button
           type="button"
           className="weekly-cell__delete"
