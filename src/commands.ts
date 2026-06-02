@@ -82,8 +82,12 @@ function insertCellAfterCurrent(cell: PMNode): Command {
     const tr = state.tr.insert(insertPos, cell);
 
     if (cell.type.spec.atom) {
-      // atom node — no text position inside; select the node itself.
-      tr.setSelection(NodeSelection.create(tr.doc, insertPos));
+      // Atom cell: place the cursor just before it instead of leaving the atom
+      // NodeSelected. A locally-NodeSelected atom that a remote peer deletes
+      // desyncs the y-prosemirror view (the node lingers on screen though Yjs
+      // removed it); not selecting the atom sidesteps that. The user clicks
+      // into the React UI next anyway.
+      tr.setSelection(Selection.near(tr.doc.resolve(insertPos), -1));
     } else {
       // markdown_cell: open token (1) + paragraph open token (1) = +2
       tr.setSelection(TextSelection.create(tr.doc, insertPos + 2));
@@ -420,7 +424,7 @@ export function makeAppendAiCell(ydoc: Y.Doc): Command {
     ydoc.transact(() => {
       if (dispatch) {
         const tr = state.tr.insert(insertPos, cell);
-        tr.setSelection(NodeSelection.create(tr.doc, insertPos));
+        tr.setSelection(Selection.near(tr.doc.resolve(insertPos), -1));
         tr.scrollIntoView();
         dispatch(tr);
       }
@@ -437,7 +441,7 @@ export function makeAppendWeeklyCell(ydoc: Y.Doc): Command {
     ydoc.transact(() => {
       if (dispatch) {
         const tr = state.tr.insert(insertPos, cell);
-        tr.setSelection(NodeSelection.create(tr.doc, insertPos));
+        tr.setSelection(Selection.near(tr.doc.resolve(insertPos), -1));
         tr.scrollIntoView();
         dispatch(tr);
       }
