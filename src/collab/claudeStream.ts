@@ -2,10 +2,10 @@ import Anthropic from '@anthropic-ai/sdk';
 type ThinkingConfigParam = Anthropic.Messages.ThinkingConfigParam;
 import type * as Y from 'yjs';
 import type { Turn } from './historyCompressor';
+import { BACKEND_URL, OLLAMA_URL } from '../lib/config';
 
 // Calls go through the backend reverse proxy (`/anthropic`), which injects the
 // real API key server-side. The key never ships in the browser bundle.
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:8000';
 const client = new Anthropic({
   baseURL: `${BACKEND_URL}/anthropic`,
   apiKey: 'proxied-by-backend',
@@ -125,7 +125,7 @@ function calcCost(u: Omit<UsageStats, 'costUsd'>, model: ModelId): number {
 // Ollama streaming
 // ---------------------------------------------------------------------------
 
-const OLLAMA_BASE = (import.meta.env.VITE_OLLAMA_URL as string | undefined) ?? 'http://localhost:11434';
+const OLLAMA_BASE = OLLAMA_URL;
 
 async function streamOllamaReply(
   systemPrompt: string,

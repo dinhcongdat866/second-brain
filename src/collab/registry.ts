@@ -16,8 +16,9 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
-import { WS_URL, collabRoom, collabDbName } from './ydoc';
+import { collabRoom, collabDbName } from './ydoc';
 import { applyServerState } from '../lib/backendSync';
+import { WS_URL } from '../lib/config';
 
 /** doc_id / room suffix for the registry's own Y.Doc. */
 export const REGISTRY_DOC_ID = '__registry__';

@@ -1,7 +1,7 @@
 import * as Y from 'yjs';
 import type { Node as PMNode } from 'prosemirror-model';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000';
+import { BACKEND_URL, EMBED_DEBOUNCE_MS, YJS_SAVE_DEBOUNCE_MS } from './config';
+import { apiFetch } from './http';
 
 interface CellPayload {
   cell_id: string;
@@ -21,7 +21,7 @@ function extractMarkdownCells(doc: PMNode, docId: string): CellPayload[] {
 }
 
 async function upsertCell(payload: CellPayload): Promise<void> {
-  await fetch(`${BACKEND_URL}/embeddings/upsert`, {
+  await apiFetch('/embeddings/upsert', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -45,10 +45,9 @@ export interface SearchResult {
 /** Semantic search across all indexed cells. Returns empty array if backend unreachable. */
 export async function searchCells(query: string, limit = 5): Promise<SearchResult[]> {
   try {
-    const res = await fetch(
-      `${BACKEND_URL}/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+    const res = await apiFetch(
+      `/search?q=${encodeURIComponent(query)}&limit=${limit}`,
     );
-    if (!res.ok) return [];
     return (await res.json()) as SearchResult[];
   } catch {
     return [];
@@ -61,10 +60,9 @@ export async function searchCells(query: string, limit = 5): Promise<SearchResul
  */
 export async function fetchDocState(docId: string): Promise<Uint8Array | null> {
   try {
-    const res = await fetch(
-      `${BACKEND_URL}/documents/${encodeURIComponent(docId)}/state`,
+    const res = await apiFetch(
+      `/documents/${encodeURIComponent(docId)}/state`,
     );
-    if (!res.ok) return null;
     return new Uint8Array(await res.arrayBuffer());
   } catch {
     return null;
@@ -85,7 +83,7 @@ export async function applyServerState(docId: string, ydoc: Y.Doc): Promise<bool
 /** Persist the full Yjs state to Neon (upsert). Silently ignores network errors. */
 export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
   const state = Y.encodeStateAsUpdate(ydoc);
-  await fetch(`${BACKEND_URL}/documents/${encodeURIComponent(docId)}/state`, {
+  await apiFetch(`/documents/${encodeURIComponent(docId)}/state`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/octet-stream' },
     body: new Blob([new Uint8Array(state)]),
@@ -126,7 +124,7 @@ export function logUsage(
     costUsd: number;
   },
 ): void {
-  fetch(`${BACKEND_URL}/usage/log`, {
+  apiFetch('/usage/log', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -143,7 +141,7 @@ export function logUsage(
 
 /** Delete the persisted state from Neon (call when a doc is permanently deleted). */
 export function deleteDocState(docId: string): void {
-  fetch(`${BACKEND_URL}/documents/${encodeURIComponent(docId)}/state`, {
+  apiFetch(`/documents/${encodeURIComponent(docId)}/state`, {
     method: 'DELETE',
   }).catch(() => {});
 }
@@ -152,7 +150,7 @@ export function deleteDocState(docId: string): void {
  * Wire a debounced Yjs → Neon saver onto a Y.Doc.
  * Also exposes `flush()` for immediate save (use in beforeunload).
  */
-export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = 4_000) {
+export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = YJS_SAVE_DEBOUNCE_MS) {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const persist = () => saveDocState(docId, ydoc).catch(() => {});
@@ -186,7 +184,7 @@ export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = 4_000) 
 }
 
 /** Returns a debounced sync function. Call on every docChanged transaction. */
-export function createDocSyncer(docId: string, debounceMs = 2000) {
+export function createDocSyncer(docId: string, debounceMs = EMBED_DEBOUNCE_MS) {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   return function syncDoc(doc: PMNode): void {

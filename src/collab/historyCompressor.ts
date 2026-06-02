@@ -1,9 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { TurnRole } from './aiThreads';
 import type { ModelConfig } from './claudeStream';
+import { BACKEND_URL, OLLAMA_URL } from '../lib/config';
 
 // Routed through the backend reverse proxy — see claudeStream.ts.
-const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:8000';
 const client = new Anthropic({
   baseURL: `${BACKEND_URL}/anthropic`,
   apiKey: 'proxied-by-backend',
@@ -55,8 +55,7 @@ async function summarizeWithOllama(turns: Turn[], modelName: string, signal?: Ab
     .map((t) => `${t.role === 'user' ? 'User' : 'Assistant'}: ${t.content}`)
     .join('\n\n');
 
-  const baseUrl = (import.meta.env.VITE_OLLAMA_URL as string | undefined) ?? 'http://localhost:11434';
-  const resp = await fetch(`${baseUrl}/api/chat`, {
+  const resp = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
