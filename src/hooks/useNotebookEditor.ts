@@ -41,6 +41,7 @@ import { MarkdownCellView } from '../nodeViews/markdownCellView';
 import { WeeklyCellView } from '../nodeViews/weeklyCellView';
 import { startAutoSnapshot } from '../collab/snapshots';
 import { createCollabSetup, seedFromContent, seedIfEmpty, wireSaveStatus } from '../collab/ydoc';
+import { runMigrations } from '../collab/schemaMigrations';
 import { addTurn, getThread, sweepOrphanThreads } from '../collab/aiThreads';
 import { sweepOrphanWeeklyPlans } from '../collab/weeklyPlans';
 import { consumePendingImport } from '../lib/importState';
@@ -136,6 +137,7 @@ export function useNotebookEditor(
       }
       sweepOrphanThreads(doc, yXmlFragment);
       sweepOrphanWeeklyPlans(doc, yXmlFragment);
+      runMigrations(doc); // bring old docs up to the current schema before binding
       bindYDoc(doc);
       setYdoc(doc);
       unwireSaveStatus = wireSaveStatus(doc);
@@ -160,48 +162,63 @@ export function useNotebookEditor(
         window.removeEventListener('beforeunload', onPageHide);
       };
 
-      const { doc: pmDoc, mapping } = initProseMirrorDoc(
-        yXmlFragment,
-        notebookSchema,
-      );
-      const state = EditorState.create({
-        schema: notebookSchema,
-        doc: pmDoc,
-        plugins: createPlugins(yXmlFragment, mapping, provider.awareness),
-      });
+      // Binding can throw if the stored content doesn't fit the current schema
+      // (an unhandled incompatible change). Never let that discard data: the
+      // Yjs doc stays intact (recoverable / exportable); we just surface the
+      // failure instead of silently rendering blank. The real fix for any such
+      // case is a registered migration (see collab/schemaMigrations).
+      try {
+        const { doc: pmDoc, mapping } = initProseMirrorDoc(
+          yXmlFragment,
+          notebookSchema,
+        );
+        const state = EditorState.create({
+          schema: notebookSchema,
+          doc: pmDoc,
+          plugins: createPlugins(yXmlFragment, mapping, provider.awareness),
+        });
 
-      const syncDoc = createDocSyncer(activeDocId);
+        const syncDoc = createDocSyncer(activeDocId);
 
-      v = new EditorView(editorRef.current!, {
-        state,
-        nodeViews: {
-          markdown_cell: (node, view, getPos) =>
-            new MarkdownCellView(node, view, getPos),
-          ai_cell: (node, view, getPos) =>
-            new AiCellView(node, view, getPos, doc, activeDocId),
-          weekly_planner_cell: (node, view, getPos) =>
-            new WeeklyCellView(node, view, getPos, doc),
-        },
-        handleDOMEvents: {
-          click(_view, event) {
-            const anchor = (event.target as HTMLElement).closest('a');
-            if (anchor?.href) {
-              event.preventDefault();
-              window.open(anchor.href, '_blank', 'noopener,noreferrer');
-              return true;
-            }
-            return false;
+        v = new EditorView(editorRef.current!, {
+          state,
+          nodeViews: {
+            markdown_cell: (node, view, getPos) =>
+              new MarkdownCellView(node, view, getPos),
+            ai_cell: (node, view, getPos) =>
+              new AiCellView(node, view, getPos, doc, activeDocId),
+            weekly_planner_cell: (node, view, getPos) =>
+              new WeeklyCellView(node, view, getPos, doc),
           },
-        },
-        transformPastedHTML,
-        dispatchTransaction(tr) {
-          const next = v!.state.apply(tr);
-          v!.updateState(next);
-          if (tr.docChanged) syncDoc(next.doc);
-        },
-      });
+          handleDOMEvents: {
+            click(_view, event) {
+              const anchor = (event.target as HTMLElement).closest('a');
+              if (anchor?.href) {
+                event.preventDefault();
+                window.open(anchor.href, '_blank', 'noopener,noreferrer');
+                return true;
+              }
+              return false;
+            },
+          },
+          transformPastedHTML,
+          dispatchTransaction(tr) {
+            const next = v!.state.apply(tr);
+            v!.updateState(next);
+            if (tr.docChanged) syncDoc(next.doc);
+          },
+        });
 
-      setView(v);
+        setView(v);
+      } catch (err) {
+        console.error(
+          `[useNotebookEditor] Failed to bind doc "${activeDocId}" to the ` +
+            `current schema. Data is preserved in Yjs (export to recover). ` +
+            `An incompatible schema change needs a migration in ` +
+            `collab/schemaMigrations.`,
+          err,
+        );
+      }
     });
 
     return () => {
