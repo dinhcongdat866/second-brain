@@ -9,10 +9,10 @@
 const MAX_EDGE = 1568;
 const QUALITY = 0.82;
 
-/** Resize an image file to a JPEG data URL with its long edge ≤ MAX_EDGE. */
-export async function resizeImageToDataUrl(file: File): Promise<string> {
+/** Draw a downscaled copy of `file` onto a canvas (long edge ≤ maxEdge). */
+async function drawDownscaled(file: File, maxEdge: number): Promise<HTMLCanvasElement> {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);
   const height = Math.round(bitmap.height * scale);
 
@@ -26,7 +26,26 @@ export async function resizeImageToDataUrl(file: File): Promise<string> {
   }
   ctx.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
+  return canvas;
+}
+
+/** Resize an image file to a JPEG data URL with its long edge ≤ MAX_EDGE. */
+export async function resizeImageToDataUrl(file: File): Promise<string> {
+  const canvas = await drawDownscaled(file, MAX_EDGE);
   return canvas.toDataURL('image/jpeg', QUALITY);
+}
+
+/** Resize an image file to a JPEG Blob (for upload). Larger default edge for
+ *  document images that are viewed full-size, not just understood by the model. */
+export async function resizeImageToBlob(file: File, maxEdge = 1920, quality = 0.85): Promise<Blob> {
+  const canvas = await drawDownscaled(file, maxEdge);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('canvas.toBlob returned null'))),
+      'image/jpeg',
+      quality,
+    ),
+  );
 }
 
 export interface ApiImage {

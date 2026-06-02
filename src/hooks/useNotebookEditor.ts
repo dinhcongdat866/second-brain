@@ -36,6 +36,7 @@ import { slashMenuPlugin } from '../plugins/slashMenuPlugin';
 import { placeholderPlugin } from '../plugins/placeholderPlugin';
 import { bindYDoc } from '../plugins/slashOptions';
 import { transformPastedHTML, pasteNormPlugin } from '../clipboard';
+import { imagePastePlugin } from '../plugins/imagePastePlugin';
 import { AiCellView } from '../nodeViews/aiCellView';
 import { MarkdownCellView } from '../nodeViews/markdownCellView';
 import { WeeklyCellView } from '../nodeViews/weeklyCellView';
@@ -54,11 +55,13 @@ function createPlugins(
   yXmlFragment: Y.XmlFragment,
   mapping: ProseMirrorMapping,
   awareness: Awareness,
+  docId: string,
 ) {
   return [
     ySyncPlugin(yXmlFragment, { mapping }),
     yCursorPlugin(awareness),
     yUndoPlugin(),
+    imagePastePlugin(() => docId),
     slashMenuPlugin,
     keymap({
       'Mod-z': undo,
@@ -175,7 +178,7 @@ export function useNotebookEditor(
         const state = EditorState.create({
           schema: notebookSchema,
           doc: pmDoc,
-          plugins: createPlugins(yXmlFragment, mapping, provider.awareness),
+          plugins: createPlugins(yXmlFragment, mapping, provider.awareness, activeDocId),
         });
 
         const syncDoc = createDocSyncer(activeDocId);

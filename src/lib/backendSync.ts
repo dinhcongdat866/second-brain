@@ -147,6 +147,31 @@ export function deleteDocState(docId: string): void {
 }
 
 /**
+ * Upload an image blob and return an absolute URL to it, or null on failure.
+ * The document stores only this URL — never the image bytes (see models.Image).
+ */
+export async function uploadImage(blob: Blob, docId: string): Promise<string | null> {
+  try {
+    const res = await apiFetch(`/images?doc_id=${encodeURIComponent(docId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': blob.type || 'image/jpeg' },
+      body: blob,
+    });
+    const { id } = (await res.json()) as { id: string };
+    return `${BACKEND_URL}/images/${id}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Remove all images belonging to a deleted document. */
+export function deleteDocImages(docId: string): void {
+  apiFetch(`/images/by-doc/${encodeURIComponent(docId)}`, {
+    method: 'DELETE',
+  }).catch(() => {});
+}
+
+/**
  * Wire a debounced Yjs → Neon saver onto a Y.Doc.
  * Also exposes `flush()` for immediate save (use in beforeunload).
  */

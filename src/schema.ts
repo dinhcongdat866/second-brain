@@ -91,6 +91,25 @@ export const notebookSchema = new Schema({
       ...basicSchema.spec.nodes.get('horizontal_rule')!,
       group: 'block',
     },
+    // Block image — the `src` is a backend URL, never embedded bytes, so the
+    // Yjs doc stays lightweight (see backend models.Image for the rationale).
+    image: {
+      group: 'block',
+      attrs: { src: {}, alt: { default: null } },
+      draggable: true,
+      parseDOM: [
+        {
+          tag: 'img[src]',
+          getAttrs(dom) {
+            const el = dom as HTMLElement;
+            return { src: el.getAttribute('src'), alt: el.getAttribute('alt') };
+          },
+        },
+      ],
+      toDOM(node) {
+        return ['img', { src: node.attrs.src as string, alt: (node.attrs.alt as string) ?? '', class: 'nb-image', loading: 'lazy' }];
+      },
+    },
     text: basicSchema.spec.nodes.get('text')!,
     hard_break: basicSchema.spec.nodes.get('hard_break')!,
   },

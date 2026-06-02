@@ -13,7 +13,7 @@ import {
   type RegistrySetup,
 } from '../collab/registry';
 import { deleteDocStorage } from '../collab/ydoc';
-import { deleteDocState, createYjsSyncer } from '../lib/backendSync';
+import { deleteDocState, deleteDocImages, createYjsSyncer } from '../lib/backendSync';
 
 const ACTIVE_KEY = 'active-doc-id';
 
@@ -106,6 +106,7 @@ export function useDocRegistry() {
       storageCleanupRef.current = setTimeout(() => {
         deleteDocStorage(id);
         deleteDocState(id);
+        deleteDocImages(id);
       }, 5500);
     },
     [activeDocId],

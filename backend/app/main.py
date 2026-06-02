@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db.migrations import run_migrations
-from app.routers import embeddings, search, documents, usage, ai
+from app.routers import embeddings, search, documents, usage, ai, images
 
 
 @asynccontextmanager
@@ -27,6 +27,7 @@ app.include_router(search.router)
 app.include_router(documents.router)
 app.include_router(usage.router)
 app.include_router(ai.router)
+app.include_router(images.router)
 
 
 @app.get("/health")

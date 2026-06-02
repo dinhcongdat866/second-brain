@@ -38,6 +38,26 @@ class UsageLog(Base):
     )
 
 
+class Image(Base):
+    """Standalone image blobs referenced by URL from the document.
+
+    Kept out of the Yjs doc on purpose: the doc is loaded fully into memory and
+    re-synced/re-saved on every edit, and with gc:false nothing is ever pruned —
+    so embedding image bytes there would bloat it permanently. As separate rows
+    the doc only stores a short URL; images are served on demand and cached.
+    """
+    __tablename__ = "images"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # server-generated uuid
+    doc_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    content_type: Mapped[str] = mapped_column(String, nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+
 class CellEmbedding(Base):
     __tablename__ = "cell_embeddings"
 
