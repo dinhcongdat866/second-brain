@@ -7,17 +7,23 @@
 
 const env = import.meta.env;
 
+/** Strip trailing slashes so `${URL}/path` never produces a `//` (which 404s). */
+const trimUrl = (url: string) => url.replace(/\/+$/, '');
+
 /** FastAPI backend (RAG, Yjs persistence, Anthropic reverse-proxy). */
-export const BACKEND_URL =
-  (env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:8000';
+export const BACKEND_URL = trimUrl(
+  (env.VITE_BACKEND_URL as string | undefined) ?? 'http://localhost:8000',
+);
 
 /** y-websocket sync relay. */
-export const WS_URL =
-  (env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:1234';
+export const WS_URL = trimUrl(
+  (env.VITE_WS_URL as string | undefined) ?? 'ws://localhost:1234',
+);
 
 /** Local Ollama daemon (optional, privacy provider). */
-export const OLLAMA_URL =
-  (env.VITE_OLLAMA_URL as string | undefined) ?? 'http://localhost:11434';
+export const OLLAMA_URL = trimUrl(
+  (env.VITE_OLLAMA_URL as string | undefined) ?? 'http://localhost:11434',
+);
 
 // --- Timings (ms) ---------------------------------------------------------
 
