@@ -1,0 +1,14 @@
+/* Design system entry point.
+ * Order mirrors the original single-file cascade: tokens first, then components
+ * roughly in their original top-to-bottom order so equal-specificity rules keep
+ * their relative precedence. */
+
+@import './tokens.css';
+@import './base.css';
+@import './editor.css';
+@import './slash-menu.css';
+@import './ai-cell.css';
+@import './snapshot-modal.css';
+@import './sidebar.css';
+@import './toolbar.css';
+@import './weekly-cell.css';

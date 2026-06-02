@@ -1,0 +1,61 @@
+/* ============================================================
+   DESIGN SYSTEM — CSS custom properties
+   All visual constants live here. Change a token → the whole
+   UI updates. Nothing is hard-coded below this block.
+   ============================================================ */
+
+:root {
+  /* ── Page background — warm parchment (Apple Books vibe) ── */
+  --nb-bg-page:       #fdf8ed;
+  --nb-bg-surface:    #fffef9;   /* cells / cards */
+  --nb-bg-hover:      #f5ecd5;
+
+  /* ── Borders ── */
+  --nb-border-faint:  #ede5d3;
+  --nb-border:        #d6c9b0;
+  --nb-border-focus:  #b5a078;
+
+  /* ── Text ── */
+  --nb-text:          #1c1814;
+  --nb-text-2:        #6b6256;
+  --nb-text-3:        #a89f90;
+
+  /* ── AI cell — sage / mint green ── */
+  --nb-ai-bg:            #f0faf4;
+  --nb-ai-bg-surface:    #f8fdfb;
+  --nb-ai-border:        #bfe8cf;
+  --nb-ai-border-focus:  #7ec8a0;
+  --nb-ai-border-header: #d4f0e2;
+  --nb-ai-accent:        #2a7a50;
+  --nb-ai-accent-hover:  #1b5c3a;
+  --nb-ai-text:          #1a3828;
+  --nb-ai-text-2:        #4a7a60;
+  --nb-ai-muted:         #94c4aa;
+  --ai-user-bubble:      rgba(0, 0, 0, 0.07);
+  --nb-code-color:       #8b3e1a;
+
+  /* ── Weekly planner cell — soft lavender/indigo ── */
+  --nb-weekly-bg:       #f6f4ff;
+  --nb-weekly-border:   #d4cdf5;
+  --nb-weekly-accent:   #5046a6;
+  /* "Today" uses a warm amber — complementary to the cool indigo theme so it
+     pops against both the lavender cell bg and the plain day columns. */
+  --nb-weekly-today-bg:     #fff4d6;
+  --nb-weekly-today-accent: #f08c00;
+
+  /* ── Accent — warm amber (primary buttons, active states) ── */
+  --nb-accent:        #7c6030;
+  --nb-accent-hover:  #5c4820;
+  --nb-accent-light:  #ede0c4;
+
+  /* ── Radii ── */
+  --nb-r-cell:  8px;
+  --nb-r-sm:    5px;
+  --nb-r-xs:    3px;
+
+  /* ── Shadows ── */
+  --nb-shadow-sm:  0 1px 3px rgba(60, 40, 10, 0.06);
+  --nb-shadow-md:  0 4px 12px rgba(60, 40, 10, 0.09);
+}
+
+

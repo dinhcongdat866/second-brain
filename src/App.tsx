@@ -12,7 +12,7 @@ import { useNotebookEditor } from './hooks/useNotebookEditor';
 import { exportDocToMarkdown, saveMarkdownFile } from './lib/exportMarkdown';
 import { importMarkdownAsNewDoc } from './lib/importMarkdown';
 import { useUIStore } from './stores/uiStore';
-import './App.css';
+import './styles/main.css';
 
 function CellAdder({
   view,

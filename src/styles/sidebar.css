@@ -1,0 +1,271 @@
+/* ---------- Sidebar ---------- */
+
+.sidebar {
+  width: 220px; /* overridden by inline style when drag-resized */
+  min-width: 150px;
+  max-width: 500px;
+  flex-shrink: 0;
+  background: var(--nb-bg-page);
+  border-right: 1px solid var(--nb-border-faint);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar-resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  z-index: 10;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle--dragging {
+  background: var(--nb-border-focus);
+}
+
+.sidebar__header {
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--nb-border-faint);
+  flex-shrink: 0;
+}
+
+.sidebar__title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--nb-text-3);
+}
+
+.sidebar__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 10px;
+  border-radius: var(--nb-r-sm);
+  cursor: pointer;
+  transition: background 0.1s;
+  min-width: 0;
+}
+
+.sidebar__item:hover {
+  background: var(--nb-bg-hover);
+}
+
+.sidebar__item--active {
+  background: var(--nb-accent-light);
+}
+
+.sidebar__item--active:hover {
+  background: var(--nb-accent-light);
+  filter: brightness(0.97);
+}
+
+.sidebar__item-name {
+  flex: 1;
+  font-size: 13.5px;
+  color: var(--nb-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar__item--active .sidebar__item-name {
+  color: var(--nb-accent);
+  font-weight: 500;
+}
+
+.sidebar__item-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.sidebar__item:hover .sidebar__item-actions,
+.sidebar__item--active:hover .sidebar__item-actions {
+  opacity: 1;
+}
+
+.sidebar__action-btn {
+  border: none;
+  background: transparent;
+  color: var(--nb-text-3);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: var(--nb-r-xs);
+  transition: color 0.1s, background 0.1s;
+}
+
+.sidebar__action-btn:hover {
+  color: var(--nb-text-2);
+  background: var(--nb-bg-hover);
+}
+
+.sidebar__action-btn--delete:hover {
+  color: #c03030;
+  background: rgba(200, 50, 50, 0.08);
+}
+
+.sidebar__item--confirming {
+  background: rgba(200, 50, 50, 0.05);
+}
+
+.sidebar__item-name--muted {
+  color: var(--nb-text-3);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.sidebar__del-confirm {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sidebar__del-yes,
+.sidebar__del-cancel {
+  border: none;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 2px 7px;
+  border-radius: var(--nb-r-xs);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.1s;
+}
+
+.sidebar__del-yes {
+  background: rgba(200, 50, 50, 0.12);
+  color: #c03030;
+}
+
+.sidebar__del-yes:hover {
+  background: rgba(200, 50, 50, 0.22);
+}
+
+.sidebar__del-cancel {
+  background: var(--nb-bg-hover);
+  color: var(--nb-text-2);
+}
+
+.sidebar__del-cancel:hover {
+  background: var(--nb-border-faint);
+}
+
+.sidebar__undo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background: var(--nb-accent-light);
+  border-radius: var(--nb-r-sm);
+  border: 1px solid var(--nb-border);
+}
+
+.sidebar__undo-label {
+  font-size: 11.5px;
+  color: var(--nb-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar__undo-btn {
+  flex-shrink: 0;
+  border: none;
+  background: var(--nb-accent);
+  color: #fff;
+  font-size: 11.5px;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--nb-r-xs);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.sidebar__undo-btn:hover {
+  background: var(--nb-accent-hover);
+}
+
+.sidebar__rename-input {
+  flex: 1;
+  border: 1px solid var(--nb-border-focus);
+  border-radius: var(--nb-r-xs);
+  padding: 2px 6px;
+  font-size: 13.5px;
+  font-family: inherit;
+  background: var(--nb-bg-surface);
+  color: var(--nb-text);
+  outline: none;
+  min-width: 0;
+}
+
+.sidebar__footer {
+  padding: 8px;
+  border-top: 1px solid var(--nb-border-faint);
+  flex-shrink: 0;
+}
+
+.sidebar__new-btn {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px dashed var(--nb-border);
+  border-radius: var(--nb-r-sm);
+  background: transparent;
+  color: var(--nb-text-2);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.12s, color 0.12s;
+}
+
+.sidebar__new-btn:hover {
+  border-color: var(--nb-border-focus);
+  background: var(--nb-bg-hover);
+  color: var(--nb-text);
+}
+
+
+/* =====================================================================
+   Sidebar — date groups
+   ===================================================================== */
+
+.sidebar__group {
+  margin-bottom: 4px;
+}
+
+.sidebar__group-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--nb-text-3);
+  padding: 8px 10px 3px;
+  cursor: default;
+  user-select: none;
+}
+
+
