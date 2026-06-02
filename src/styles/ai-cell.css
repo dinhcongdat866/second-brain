@@ -133,20 +133,20 @@
 
 .ai-cell__delete:hover {
   background: rgba(200, 60, 60, 0.08);
-  color: #c03030;
+  color: var(--nb-danger);
 }
 
 /* Two-step delete confirm */
 .ai-cell__del-label {
   font-size: 11px;
-  color: #c03030;
+  color: var(--nb-danger);
   font-weight: 500;
 }
 
 .ai-cell__delete--confirm {
   border: none;
   background: transparent;
-  color: #c03030;
+  color: var(--nb-danger);
   cursor: pointer;
   font-size: 12px;
   padding: 3px 6px;
@@ -176,9 +176,9 @@
 }
 
 .ai-cell__stop-btn {
-  border: 1px solid #f87171;
+  border: 1px solid var(--nb-danger-light);
   background: transparent;
-  color: #f87171;
+  color: var(--nb-danger-light);
   border-radius: 5px;
   padding: 4px 10px;
   font-size: 12px;
@@ -295,7 +295,7 @@
 /* Portal panel — position:fixed so it escapes overflow:hidden stacking context */
 .ai-cell__config-panel {
   position: fixed;
-  z-index: 9999;
+  z-index: var(--z-toast);
   background: #fff;
   border: 1px solid var(--nb-border, #e5e5e5);
   border-radius: 8px;
@@ -549,7 +549,7 @@
 
 .ai-cell__error {
   font-size: 12px;
-  color: #c03030;
+  color: var(--nb-danger);
   background: rgba(200, 50, 50, 0.06);
   padding: 6px 8px;
   border-radius: var(--nb-r-xs);
@@ -744,8 +744,8 @@
 .ai-cell__modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 1000;
+  background: var(--nb-overlay);
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;

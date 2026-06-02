@@ -19,7 +19,7 @@
   cursor: col-resize;
   background: transparent;
   transition: background 0.15s;
-  z-index: 10;
+  z-index: var(--z-sticky);
 }
 
 .sidebar-resize-handle:hover,
@@ -120,7 +120,7 @@
 }
 
 .sidebar__action-btn--delete:hover {
-  color: #c03030;
+  color: var(--nb-danger);
   background: rgba(200, 50, 50, 0.08);
 }
 
@@ -155,7 +155,7 @@
 
 .sidebar__del-yes {
   background: rgba(200, 50, 50, 0.12);
-  color: #c03030;
+  color: var(--nb-danger);
 }
 
 .sidebar__del-yes:hover {

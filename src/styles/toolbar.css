@@ -3,7 +3,7 @@
 .floating-toolbar {
   position: fixed;
   transform: translate(-50%, calc(-100% - 10px));
-  z-index: 300;
+  z-index: var(--z-overlay);
   display: flex;
   align-items: center;
   gap: 2px;
@@ -91,7 +91,7 @@
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 7px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-  z-index: 1;
+  z-index: var(--z-base);
 }
 
 .ftb-flyout--colors {

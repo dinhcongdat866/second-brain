@@ -53,9 +53,62 @@
   --nb-r-sm:    5px;
   --nb-r-xs:    3px;
 
+  /* ── Danger / destructive ── */
+  --nb-danger:        #c03030;
+  --nb-danger-hover:  #a02020;
+  --nb-danger-light:  #f87171;
+
+  /* ── Neutral / theme-agnostic surfaces ── */
+  --nb-white:         #ffffff;
+  --nb-neutral-200:   #e5e5e5;
+  --nb-neutral-300:   #d0d0d0;
+  --nb-overlay:       rgba(0, 0, 0, 0.45);   /* modal / dialog backdrop */
+
+  /* ── Spacing scale (t-shirt sizing; matches values used across the app) ── */
+  --space-2xs:  2px;
+  --space-xs:   4px;
+  --space-sm:   6px;
+  --space-md:   8px;
+  --space-lg:   12px;
+  --space-xl:   16px;
+  --space-2xl:  24px;
+  --space-3xl:  32px;
+
+  /* ── Typography ── */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --text-xs:    11px;
+  --text-sm:    12px;
+  --text-md:    13px;
+  --text-base:  14px;
+  --text-lg:    16px;
+  --text-xl:    20px;
+  --weight-normal:    400;
+  --weight-medium:    500;
+  --weight-semibold:  600;
+  --weight-bold:      700;
+
+  /* ── Radii (additions to the base set above) ── */
+  --nb-r-md:    6px;
+  --nb-r-lg:    12px;
+  --nb-r-full:  999px;
+
   /* ── Shadows ── */
   --nb-shadow-sm:  0 1px 3px rgba(60, 40, 10, 0.06);
   --nb-shadow-md:  0 4px 12px rgba(60, 40, 10, 0.09);
+  --nb-shadow-lg:  0 6px 24px rgba(60, 40, 10, 0.12);
+
+  /* ── Z-index scale ── */
+  --z-base:      1;
+  --z-sticky:    10;
+  --z-dropdown:  200;
+  --z-overlay:   300;
+  --z-modal:     1000;
+  --z-toast:     9999;
+
+  /* ── Motion ── */
+  --dur-fast:  0.12s;
+  --dur-base:  0.2s;
+  --ease:      cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 

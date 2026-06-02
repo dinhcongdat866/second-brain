@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: var(--z-dropdown);
 }
 
 .snap-modal {
@@ -144,7 +144,7 @@
 .snap-item:hover .snap-item__del  { opacity: 1; }
 .snap-item__del:hover {
   background: rgba(200, 50, 50, 0.08);
-  color: #c03030;
+  color: var(--nb-danger);
 }
 
 .snap-preview {

@@ -95,7 +95,7 @@
 }
 
 .weekly-cell__delete:hover {
-  color: #c03030;
+  color: var(--nb-danger);
 }
 
 /* ---- Grid ---- */
@@ -204,7 +204,7 @@
 }
 
 .weekly-todo__del:hover {
-  color: #c03030;
+  color: var(--nb-danger);
 }
 
 /* ---- Add input ---- */

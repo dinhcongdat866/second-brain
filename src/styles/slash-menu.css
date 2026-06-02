@@ -1,7 +1,7 @@
 /* ---------- Slash menu popover ---------- */
 
 .slash-menu {
-  z-index: 1000;
+  z-index: var(--z-modal);
   width: 300px;
   max-height: 340px;
   overflow-y: auto;
