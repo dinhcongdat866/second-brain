@@ -17,15 +17,12 @@ import {
   shiftWeek,
 } from '../collab/weeklyPlans';
 import {
-  TEXT_COLORS,
-  BG_COLORS,
-  FONT_SIZES,
   weeklyOpen,
   weeklyClose,
   renderStyleMarkers,
   type StyleKind,
 } from '../lib/toolbarStyles';
-import { ColorPalette, SizePicker } from '../components/ToolbarPickers';
+import { SelectionToolbarShell } from '../components/SelectionToolbarShell';
 
 // ---------------------------------------------------------------------------
 // Inline markdown renderer — bold, italic, strikethrough, code, link + style
@@ -240,70 +237,27 @@ function WeeklySelectionToolbar({ containerRef, plan }: WeeklySelectionToolbarPr
   const displayPos = linkMode ? linkPos : toolbarPos;
   if (!displayPos) return null;
 
-  return (
-    <div
-      className="floating-toolbar"
-      style={{ left: displayPos.left, top: displayPos.top }}
-      onMouseDown={(e) => e.preventDefault()}
-    >
-      {linkMode ? (
-        <div className="ftb__link-row">
-          <input
-            ref={linkInputRef}
-            className="ftb__link-input"
-            placeholder="https://..."
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); applyLink(); }
-              if (e.key === 'Escape') { e.preventDefault(); cancelLink(); }
-            }}
-          />
-          <button className="ftb__btn" onMouseDown={(e) => e.preventDefault()} onClick={applyLink} title="Apply">↵</button>
-        </div>
-      ) : (
-        <>
-          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); applyFormat('**', '**'); }} title="Bold"><b>B</b></button>
-          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); applyFormat('_', '_'); }} title="Italic"><i>I</i></button>
-          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); applyFormat('~~', '~~'); }} title="Strikethrough"><s>S</s></button>
-          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); applyFormat('`', '`'); }} title="Code"><code>{`</>`}</code></button>
-          <div className="ftb__sep" />
-          <button className="ftb__btn" onMouseDown={(e) => { e.preventDefault(); enterLinkMode(); }} title="Link">⌖</button>
-          <div className="ftb__sep" />
-          <button
-            className={`ftb__btn${flyout === 'text' ? ' ftb__btn--on' : ''}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setFlyout((f) => (f === 'text' ? null : 'text'))}
-            title="Text color"
-          ><span className="ftb__ico" style={{ borderBottom: '2px solid currentColor' }}>A</span></button>
-          <button
-            className={`ftb__btn${flyout === 'bg' ? ' ftb__btn--on' : ''}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setFlyout((f) => (f === 'bg' ? null : 'bg'))}
-            title="Highlight"
-          ><span className="ftb__ico" style={{ borderRadius: 2, padding: '0 2px' }}>A</span></button>
-          <button
-            className={`ftb__btn${flyout === 'size' ? ' ftb__btn--on' : ''}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setFlyout((f) => (f === 'size' ? null : 'size'))}
-            title="Font size"
-          >A↕</button>
+  const MARK_PAIRS = {
+    strong: ['**', '**'], em: ['_', '_'], strikethrough: ['~~', '~~'], code: ['`', '`'],
+  } as const;
 
-          {flyout === 'text' && (
-            <ColorPalette swatches={TEXT_COLORS} active={null} onPick={(v) => applyStyle('color', v)} />
-          )}
-          {flyout === 'bg' && (
-            <ColorPalette swatches={BG_COLORS} active={null} onPick={(v) => applyStyle('bg', v)} />
-          )}
-          {flyout === 'size' && (
-            <SizePicker swatches={FONT_SIZES} active={null} onPick={(v) => applyStyle('size', v)} />
-          )}
-        </>
-      )}
-    </div>
+  return (
+    <SelectionToolbarShell
+      pos={displayPos}
+      flyout={flyout}
+      setFlyout={setFlyout}
+      linkMode={linkMode}
+      linkUrl={linkUrl}
+      linkInputRef={linkInputRef}
+      onLinkChange={setLinkUrl}
+      onLinkApply={applyLink}
+      onLinkCancel={cancelLink}
+      onLinkTrigger={enterLinkMode}
+      onMark={(name) => { const [o, c] = MARK_PAIRS[name]; applyFormat(o, c); }}
+      onStyle={applyStyle}
+    />
   );
 }
-
 // ---------------------------------------------------------------------------
 // Day column
 // ---------------------------------------------------------------------------

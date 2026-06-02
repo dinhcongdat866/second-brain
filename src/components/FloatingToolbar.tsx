@@ -4,16 +4,19 @@ import { TextSelection } from 'prosemirror-state';
 import { toggleMark } from 'prosemirror-commands';
 import { notebookSchema } from '../schema';
 import { subscribeToSelection } from '../plugins/selectionPlugin';
-import { ColorPalette, SizePicker } from './ToolbarPickers';
-import { TEXT_COLORS, BG_COLORS, FONT_SIZES } from '../lib/toolbarStyles';
+import { SelectionToolbarShell, type ActiveStyles, type ToolbarFlyout } from './SelectionToolbarShell';
+import type { StyleKind } from '../lib/toolbarStyles';
 
 // Atom NodeView containers — clicks here won't update PM selection.
 const ATOM_CELL_SELECTOR = '.weekly-cell-wrapper, .ai-cell';
 
 const PROTECTED = new Set(['ai_cell', 'weekly_planner_cell']);
 
-type Flyout = 'text' | 'bg' | 'size' | null;
-interface ActiveStyles { color: string | null; bg: string | null; size: string | null; }
+const STYLE_MARK: Record<StyleKind, { mark: string; attr: string }> = {
+  color: { mark: 'text_color', attr: 'color' },
+  bg:    { mark: 'bg_color',   attr: 'color' },
+  size:  { mark: 'font_size',  attr: 'size' },
+};
 
 /** Reads the attr value of a mark covering the current selection (or null). */
 function getMarkAttr(view: EditorView, markName: string, attrKey: string): string | null {
@@ -50,7 +53,7 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const [activeMarks, setActiveMarks] = useState<Set<string>>(new Set());
   const [activeStyles, setActiveStyles] = useState<ActiveStyles>({ color: null, bg: null, size: null });
-  const [flyout, setFlyout] = useState<Flyout>(null);
+  const [flyout, setFlyout] = useState<ToolbarFlyout>(null);
   const [linkMode, setLinkMode] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const linkInputRef = useRef<HTMLInputElement>(null);
@@ -204,73 +207,30 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
     view.focus();
   }, [view, linkUrl, exitLinkMode]);
 
+  const applyStyle = useCallback((kind: StyleKind, value: string | null) => {
+    const { mark, attr } = STYLE_MARK[kind];
+    applyStyleMark(mark, value ? { [attr]: value } : null);
+  }, [applyStyleMark]);
+
   if (!view || !pos) return null;
 
   return (
-    <div
-      ref={toolbarRef}
-      className="floating-toolbar"
-      style={{ left: pos.left, top: pos.top }}
-      onMouseDown={(e) => e.preventDefault()}
-    >
-      {linkMode ? (
-        <div className="ftb__link-row">
-          <input
-            ref={linkInputRef}
-            className="ftb__link-input"
-            placeholder="https://..."
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); applyLink(); }
-              if (e.key === 'Escape') { e.preventDefault(); exitLinkMode(); view.focus(); }
-            }}
-          />
-          <button className="ftb__btn" onMouseDown={(e) => e.preventDefault()} onClick={applyLink} title="Apply">↵</button>
-        </div>
-      ) : (
-        <>
-          <button className={`ftb__btn${activeMarks.has('strong') ? ' ftb__btn--on' : ''}`} onClick={() => applyMark('strong')} title="Bold (Ctrl+B)"><b>B</b></button>
-          <button className={`ftb__btn${activeMarks.has('em') ? ' ftb__btn--on' : ''}`} onClick={() => applyMark('em')} title="Italic (Ctrl+I)"><i>I</i></button>
-          <button className={`ftb__btn${activeMarks.has('strikethrough') ? ' ftb__btn--on' : ''}`} onClick={() => applyMark('strikethrough')} title="Strikethrough"><s>S</s></button>
-          <button className={`ftb__btn${activeMarks.has('code') ? ' ftb__btn--on' : ''}`} onClick={() => applyMark('code')} title="Inline code (Ctrl+E)"><code>{`</>`}</code></button>
-          <div className="ftb__sep" />
-          <button
-            className={`ftb__btn${activeMarks.has('link') ? ' ftb__btn--on' : ''}`}
-            onClick={() => activeMarks.has('link') ? applyMark('link') : enterLinkMode(view)}
-            title="Link"
-          >⌖</button>
-          <div className="ftb__sep" />
-          <button
-            className={`ftb__btn${flyout === 'text' ? ' ftb__btn--on' : ''}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setFlyout((f) => (f === 'text' ? null : 'text'))}
-            title="Text color"
-          ><span className="ftb__ico" style={{ borderBottom: `2px solid ${activeStyles.color ?? 'currentColor'}` }}>A</span></button>
-          <button
-            className={`ftb__btn${flyout === 'bg' ? ' ftb__btn--on' : ''}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setFlyout((f) => (f === 'bg' ? null : 'bg'))}
-            title="Highlight"
-          ><span className="ftb__ico" style={{ background: activeStyles.bg ?? undefined, borderRadius: 2, padding: '0 2px' }}>A</span></button>
-          <button
-            className={`ftb__btn${flyout === 'size' ? ' ftb__btn--on' : ''}`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => setFlyout((f) => (f === 'size' ? null : 'size'))}
-            title="Font size"
-          >A↕</button>
-
-          {flyout === 'text' && (
-            <ColorPalette swatches={TEXT_COLORS} active={activeStyles.color} onPick={(v) => applyStyleMark('text_color', v ? { color: v } : null)} />
-          )}
-          {flyout === 'bg' && (
-            <ColorPalette swatches={BG_COLORS} active={activeStyles.bg} onPick={(v) => applyStyleMark('bg_color', v ? { color: v } : null)} />
-          )}
-          {flyout === 'size' && (
-            <SizePicker swatches={FONT_SIZES} active={activeStyles.size} onPick={(v) => applyStyleMark('font_size', v ? { size: v } : null)} />
-          )}
-        </>
-      )}
-    </div>
+    <SelectionToolbarShell
+      containerRef={toolbarRef}
+      pos={pos}
+      activeMarks={activeMarks}
+      activeStyles={activeStyles}
+      flyout={flyout}
+      setFlyout={setFlyout}
+      linkMode={linkMode}
+      linkUrl={linkUrl}
+      linkInputRef={linkInputRef}
+      onLinkChange={setLinkUrl}
+      onLinkApply={applyLink}
+      onLinkCancel={() => { exitLinkMode(); view.focus(); }}
+      onLinkTrigger={() => (activeMarks.has('link') ? applyMark('link') : enterLinkMode(view))}
+      onMark={applyMark}
+      onStyle={applyStyle}
+    />
   );
 }
