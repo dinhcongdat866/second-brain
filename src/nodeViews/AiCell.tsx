@@ -156,6 +156,15 @@ export function AiCell({
   docId: string;
 }) {
   const turns = useTurns(thread);
+
+  // Presentation state derived from the thread (Yjs) — so peers who didn't type
+  // the prompt still see the running cost + streaming aurora. An assistant turn
+  // is "streaming" while it has no created_at yet (set in onDone/onError).
+  const sessionCost = turns.reduce((sum, t) => sum + (t.costUsd ?? 0), 0);
+  const lastTurn = turns[turns.length - 1];
+  const isStreamingShared =
+    !!lastTurn && lastTurn.role === 'assistant' && !lastTurn.createdAt;
+
   const [prompt, setPrompt] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +175,6 @@ export function AiCell({
   const [editFromIdx, setEditFromIdx] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState(false);
 
-  const [sessionCost, setSessionCost] = useState(0);
   const [modelConfig, setModelConfig] = useState<ModelConfig>(DEFAULT_MODEL_CONFIG);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [configOpen, setConfigOpen] = useState(false);
@@ -244,14 +252,14 @@ export function AiCell({
   const [finishing, setFinishing] = useState(false);
   const wasStreamingRef = useRef(false);
   useEffect(() => {
-    if (wasStreamingRef.current && !streaming) {
+    if (wasStreamingRef.current && !isStreamingShared) {
       setFinishing(true);
       const t = setTimeout(() => setFinishing(false), 1000);
-      wasStreamingRef.current = streaming;
+      wasStreamingRef.current = isStreamingShared;
       return () => clearTimeout(t);
     }
-    wasStreamingRef.current = streaming;
-  }, [streaming]);
+    wasStreamingRef.current = isStreamingShared;
+  }, [isStreamingShared]);
 
   // Auto-grow textarea
   const growTextarea = (el: HTMLTextAreaElement | null) => {
@@ -324,11 +332,15 @@ export function AiCell({
               assistant.set('cost_usd', usage.costUsd);
               logUsage(docId, cellId, usage);
             }
-            setSessionCost((prev) => prev + usage.costUsd);
             abortRef.current = null;
             setStreaming(false);
           },
           (err) => {
+            // Stamp created_at so the streaming aurora resolves for all viewers
+            // (isStreamingShared keys off a missing timestamp).
+            if (!assistant.get('created_at')) {
+              assistant.set('created_at', new Date().toISOString());
+            }
             abortRef.current = null;
             setStreaming(false);
             setError(err.message);
@@ -350,6 +362,9 @@ export function AiCell({
         );
       })
       .catch((err: unknown) => {
+        if (!assistant.get('created_at')) {
+          assistant.set('created_at', new Date().toISOString());
+        }
         abortRef.current = null;
         setStreaming(false);
         setError(err instanceof Error ? err.message : String(err));
@@ -431,7 +446,7 @@ export function AiCell({
                   <TurnContent
                     role={turn.role}
                     content={turn.content}
-                    isStreaming={streaming}
+                    isStreaming={isStreamingShared}
                     isLastTurn={isLastTurn}
                   />
                 </div>
@@ -484,19 +499,19 @@ export function AiCell({
                   <details
                     className="ai-turn__thinking"
                     open={
-                      (streaming && isLastTurn && !turn.content)
+                      (isStreamingShared && isLastTurn && !turn.content)
                         ? true
                         : (thinkingOpen[i] ?? true)
                     }
                     onToggle={(e) => {
-                      if (!(streaming && isLastTurn && !turn.content)) {
+                      if (!(isStreamingShared && isLastTurn && !turn.content)) {
                         setThinkingOpen((prev) => ({ ...prev, [i]: (e.target as HTMLDetailsElement).open }));
                       }
                     }}
                   >
                     <summary>
                       💭 Suy nghĩ
-                      {streaming && isLastTurn && !turn.content && (
+                      {isStreamingShared && isLastTurn && !turn.content && (
                         <span className="ai-turn__cursor" style={{ marginLeft: 4 }}>▍</span>
                       )}
                     </summary>
@@ -508,7 +523,7 @@ export function AiCell({
                 <TurnContent
                   role={turn.role}
                   content={turn.content}
-                  isStreaming={streaming}
+                  isStreaming={isStreamingShared}
                   isLastTurn={isLastTurn}
                 />
                 <div className="ai-turn__actions">
@@ -626,7 +641,7 @@ export function AiCell({
           {/* Left: badge + session cost */}
           <span className="ai-cell__badge">✦ AI</span>
           {sessionCost > 0 && (
-            <span className="ai-cell__session-cost" title="Tổng chi phí session này">
+            <span className="ai-cell__session-cost" title="Tổng chi phí hội thoại (đồng bộ mọi người xem)">
               💸 ${sessionCost.toFixed(4)}
             </span>
           )}
@@ -825,7 +840,7 @@ export function AiCell({
           <div
             className={
               'ai-cell__modal' +
-              (streaming ? ' is-streaming' : '') +
+              (isStreamingShared ? ' is-streaming' : '') +
               (finishing ? ' is-finishing' : '')
             }
             onClick={(e) => e.stopPropagation()}
