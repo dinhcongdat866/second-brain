@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { DocMeta } from '../lib/docRegistry';
+import type { DocMeta } from '../collab/registry';
 
 // ---------------------------------------------------------------------------
 // Date grouping helpers
