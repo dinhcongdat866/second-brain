@@ -322,8 +322,8 @@ export async function streamClaudeReply(
       if (event.type === 'message_start') {
         const u = event.message.usage;
         inputTokens         = u.input_tokens;
-        cacheReadTokens     = (u as unknown as Record<string, number>)['cache_read_input_tokens']    ?? 0;
-        cacheCreationTokens = (u as unknown as Record<string, number>)['cache_creation_input_tokens'] ?? 0;
+        cacheReadTokens     = u.cache_read_input_tokens     ?? 0;
+        cacheCreationTokens = u.cache_creation_input_tokens ?? 0;
 
       } else if (event.type === 'content_block_start') {
         const block = raw['content_block'] as Record<string, unknown>;

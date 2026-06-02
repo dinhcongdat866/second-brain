@@ -159,7 +159,15 @@ function App() {
         )}
         <main className="app-main">
           <div className="notebook-wrap">
+            {/* editorRef must stay mounted for the EditorView to attach; the
+                loading overlay sits on top until the doc has synced + bound. */}
             <div ref={editorRef} className="notebook-editor" />
+            {!view && (
+              <div className="notebook-loading" role="status">
+                <span className="notebook-loading__spinner" aria-hidden="true" />
+                Đang tải tài liệu…
+              </div>
+            )}
             <CellAdder view={view} ydoc={ydoc} />
           </div>
           <SlashMenu view={view} />

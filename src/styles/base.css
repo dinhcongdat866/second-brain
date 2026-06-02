@@ -69,6 +69,33 @@ body {
   max-width: 960px;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* Loading overlay shown until the Y.Doc has synced and the editor is bound. */
+.notebook-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  color: var(--nb-text-3);
+  font-size: var(--text-base);
+  background: var(--nb-bg-page);
+}
+
+.notebook-loading__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--nb-border-faint);
+  border-top-color: var(--nb-accent);
+  border-radius: var(--nb-r-full);
+  animation: nb-spin 0.7s linear infinite;
+}
+
+@keyframes nb-spin {
+  to { transform: rotate(360deg); }
 }
 
 .notebook-editor {
