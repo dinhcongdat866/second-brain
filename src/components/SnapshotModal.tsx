@@ -8,7 +8,8 @@
  * Restore works by computing the snapshot PM doc, then dispatching a single
  * PM transaction that replaces all current content. ySyncPlugin forwards it
  * to the XmlFragment → synced to all peers via WebSocket like any edit.
- * aiThreads are NOT restored (only the document structure is restored).
+ * The sidecar maps (aiThreads, weeklyPlans) are restored too — see
+ * restoreSidecarMaps in collab/snapshots.
  */
 
 import { useEffect, useReducer, useRef, useState } from 'react';
@@ -26,6 +27,7 @@ import {
   takeSnapshot,
   deleteSnapshot,
   getSnapshotEncoded,
+  restoreSidecarMaps,
   type SnapshotMeta,
 } from '../collab/snapshots';
 
@@ -83,6 +85,10 @@ function restoreSnapshot(
   const snapDoc = Y.createDocFromSnapshot(ydoc, snapshot);
   const snapFrag = snapDoc.getXmlFragment(XML_FRAGMENT_NAME);
   const { doc: snapPmDoc } = initProseMirrorDoc(snapFrag, notebookSchema);
+
+  // Restore the sidecar maps (aiThreads, weeklyPlans) BEFORE replacing the PM
+  // content — the replace remounts the NodeViews, which then read these maps.
+  restoreSidecarMaps(ydoc, snapDoc);
   snapDoc.destroy();
 
   // Replace the entire doc content with the snapshot's content.

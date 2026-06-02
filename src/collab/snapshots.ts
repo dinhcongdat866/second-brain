@@ -93,6 +93,78 @@ export function deleteSnapshot(ydoc: Y.Doc, id: string): void {
   getSnapshotsMap(ydoc).delete(id);
 }
 
+// ---------------------------------------------------------------------------
+// Sidecar-map restore (aiThreads, weeklyPlans)
+// ---------------------------------------------------------------------------
+// The snapshot captures the WHOLE Y.Doc, including the aiThreads / weeklyPlans
+// maps that live outside the ProseMirror XmlFragment. Restoring the document
+// therefore needs to copy those maps back too — but Yjs types can't be moved
+// between docs, so we deep-clone every nested value into fresh types.
+
+/** Maps whose content lives outside the PM doc and must be restored separately. */
+const SIDECAR_KEYS = ['aiThreads', 'weeklyPlans'] as const;
+
+function cloneYValue(v: unknown): unknown {
+  if (v instanceof Y.Text) {
+    const t = new Y.Text();
+    if (v.length > 0) t.insert(0, v.toString());
+    return t;
+  }
+  if (v instanceof Y.Array) {
+    const a = new Y.Array<unknown>();
+    a.push(v.toArray().map(cloneYValue));
+    return a;
+  }
+  if (v instanceof Y.Map) {
+    const m = new Y.Map<unknown>();
+    v.forEach((val, k) => m.set(k, cloneYValue(val)));
+    return m;
+  }
+  return v; // primitive — copied by value
+}
+
+// In-place reconcilers. We MUST preserve the identity of the existing Y types:
+// the ai/weekly NodeViews are atom nodes the editor reuses across a restore
+// (no remount), so their `observeDeep` only fires if we mutate the SAME object
+// they're subscribed to — replacing it with a fresh clone would go unnoticed.
+
+function syncTextInto(dest: Y.Text, src: Y.Text): void {
+  if (dest.length > 0) dest.delete(0, dest.length);
+  if (src.length > 0) dest.insert(0, src.toString());
+}
+
+function syncArrayInto(dest: Y.Array<unknown>, src: Y.Array<unknown>): void {
+  if (dest.length > 0) dest.delete(0, dest.length);
+  dest.push(src.toArray().map(cloneYValue));
+}
+
+function syncMapInto(dest: Y.Map<unknown>, src: Y.Map<unknown>): void {
+  for (const k of [...dest.keys()]) {
+    if (!src.has(k)) dest.delete(k);
+  }
+  src.forEach((v, k) => {
+    const existing = dest.get(k);
+    if (v instanceof Y.Map && existing instanceof Y.Map) syncMapInto(existing, v);
+    else if (v instanceof Y.Array && existing instanceof Y.Array) syncArrayInto(existing, v);
+    else if (v instanceof Y.Text && existing instanceof Y.Text) syncTextInto(existing, v);
+    else dest.set(k, cloneYValue(v)); // new key or type changed
+  });
+}
+
+/**
+ * Reconcile the live doc's sidecar maps (aiThreads, weeklyPlans) to match the
+ * snapshot's versions, mutating in place so subscribed NodeViews re-render.
+ * Runs in a single transaction so peers receive one update. Call BEFORE the
+ * XmlFragment is restored.
+ */
+export function restoreSidecarMaps(liveYdoc: Y.Doc, snapDoc: Y.Doc): void {
+  liveYdoc.transact(() => {
+    for (const key of SIDECAR_KEYS) {
+      syncMapInto(liveYdoc.getMap<unknown>(key), snapDoc.getMap<unknown>(key));
+    }
+  });
+}
+
 /** Delete oldest snapshots beyond maxCount. */
 function pruneSnapshots(ydoc: Y.Doc, maxCount: number): void {
   const all = listSnapshots(ydoc); // newest-first
