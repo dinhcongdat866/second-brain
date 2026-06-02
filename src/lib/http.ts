@@ -10,12 +10,14 @@
 import { BACKEND_URL } from './config';
 
 export class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    readonly path: string,
-  ) {
+  readonly status: number;
+  readonly path: string;
+
+  constructor(status: number, path: string) {
     super(`Backend responded ${status} for ${path}`);
     this.name = 'HttpError';
+    this.status = status;
+    this.path = path;
   }
 }
 
