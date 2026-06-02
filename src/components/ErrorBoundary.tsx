@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import i18n from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -36,14 +37,11 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="app-error">
         <div className="app-error__card">
-          <h1 className="app-error__title">Đã xảy ra lỗi giao diện</h1>
-          <p className="app-error__msg">
-            Dữ liệu của bạn vẫn an toàn (lưu trong trình duyệt và trên server).
-            Thử tải lại trang.
-          </p>
+          <h1 className="app-error__title">{i18n.t('error.title')}</h1>
+          <p className="app-error__msg">{i18n.t('error.body')}</p>
           <pre className="app-error__detail">{error.message}</pre>
           <button className="app-error__btn" onClick={this.handleReload}>
-            Tải lại
+            {i18n.t('error.reload')}
           </button>
         </div>
       </div>

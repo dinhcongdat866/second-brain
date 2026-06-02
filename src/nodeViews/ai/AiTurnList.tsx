@@ -1,4 +1,5 @@
 import { type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { TurnRole } from '../../collab/aiThreads';
@@ -64,10 +65,11 @@ export function AiTurnList({
   error,
   turnsEndRef,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <div className="ai-cell__turns">
       {turns.length === 0 && (
-        <div className="ai-cell__empty">Hỏi AI về nội dung phía trên…</div>
+        <div className="ai-cell__empty">{t('ai.empty')}</div>
       )}
 
       {turns.map((turn, i) => {
@@ -87,9 +89,9 @@ export function AiTurnList({
               <>
                 <div className="ai-turn__bubble">
                   <div className="ai-turn__meta">
-                    <span className="ai-turn__role">Bạn</span>
+                    <span className="ai-turn__role">{t('ai.you')}</span>
                     {isPendingReplace && (
-                      <span className="ai-turn__replace-badge">sẽ bị thay</span>
+                      <span className="ai-turn__replace-badge">{t('ai.willBeReplaced')}</span>
                     )}
                   </div>
                   <TurnContent
@@ -105,7 +107,7 @@ export function AiTurnList({
                       type="button"
                       className="ai-turn__action-btn"
                       onClick={onStartEdit}
-                      title="Sửa tin nhắn này"
+                      title={t('ai.editMessage')}
                     >
                       <IconPencil />
                     </button>
@@ -123,7 +125,7 @@ export function AiTurnList({
                 {turn.searchQuery && (
                   <details className="ai-turn__search">
                     <summary className={'ai-turn__search-summary' + (isLastTurn && searchingActive ? ' is-active' : '')}>
-                      🌐 {turn.searchSources ? `Đã tìm: "${turn.searchQuery}"` : `Đang tìm: "${turn.searchQuery}"…`}
+                      🌐 {turn.searchSources ? t('ai.searched', { query: turn.searchQuery }) : t('ai.searching', { query: turn.searchQuery })}
                     </summary>
                     {turn.searchSources && (
                       <div className="ai-cell__search-sources">
@@ -159,7 +161,7 @@ export function AiTurnList({
                     }}
                   >
                     <summary>
-                      💭 Suy nghĩ
+                      💭 {t('ai.thinking')}
                       {isStreamingShared && isLastTurn && !turn.content && (
                         <span className="ai-turn__cursor" style={{ marginLeft: 4 }}>▍</span>
                       )}

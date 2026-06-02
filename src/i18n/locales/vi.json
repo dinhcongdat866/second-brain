@@ -1,0 +1,96 @@
+{
+  "app": {
+    "loading": "Đang tải tài liệu…",
+    "toggleSidebar": "Bật/tắt thanh bên",
+    "history": "Lịch sử",
+    "viewHistory": "Xem lịch sử",
+    "import": "Nhập .md",
+    "importTitle": "Nhập file Markdown thành tài liệu mới",
+    "export": "Xuất .md",
+    "exportTitle": "Xuất ra Markdown"
+  },
+  "cellAdder": {
+    "markdown": "+ Markdown",
+    "ai": "+ AI Cell",
+    "weekly": "+ Lịch tuần"
+  },
+  "sidebar": {
+    "documents": "Tài liệu",
+    "newDocument": "+ Tài liệu mới",
+    "rename": "Đổi tên (hoặc nhấp đúp)",
+    "delete": "Xoá",
+    "cancel": "Huỷ",
+    "deleteConfirm": "Xoá \"{{name}}\"?",
+    "deleted": "Đã xoá \"{{name}}\"",
+    "undo": "Hoàn tác"
+  },
+  "date": {
+    "today": "Hôm nay",
+    "yesterday": "Hôm qua",
+    "daysAgo": "{{count}} ngày trước",
+    "last30Days": "30 ngày qua"
+  },
+  "ai": {
+    "badge": "✦ AI",
+    "sessionCost": "Tổng chi phí hội thoại (đồng bộ mọi người xem)",
+    "maximize": "Xem toàn màn hình",
+    "minimizeModal": "Thu nhỏ (Esc)",
+    "expand": "Mở rộng",
+    "collapse": "Thu gọn",
+    "deleteCell": "Xoá AI cell (Ctrl+Z để khôi phục)",
+    "deleteShort": "Xoá?",
+    "confirmDelete": "Xác nhận xoá",
+    "cancel": "Huỷ",
+    "noConversation": "Chưa có hội thoại",
+    "empty": "Hỏi AI về nội dung phía trên…",
+    "you": "Bạn",
+    "willBeReplaced": "sẽ bị thay",
+    "editMessage": "Sửa tin nhắn này",
+    "searching": "Đang tìm: \"{{query}}\"…",
+    "searched": "Đã tìm: \"{{query}}\"",
+    "thinking": "Suy nghĩ",
+    "promptPlaceholder": "Nhập prompt cho AI…",
+    "editPlaceholder": "Sửa và gửi lại…",
+    "cancelEdit": "Huỷ chỉnh sửa (Esc)",
+    "stop": "Dừng",
+    "stopStream": "Dừng stream",
+    "resend": "Gửi lại",
+    "send": "Gửi (Enter)",
+    "features": "Tính năng",
+    "ollamaNotFound": "Không tìm thấy model — hãy chạy Ollama",
+    "modelDesc": {
+      "haiku": "nhanh & rẻ",
+      "sonnet": "cân bằng",
+      "opus": "thông minh nhất"
+    }
+  },
+  "weekly": {
+    "prevWeek": "Tuần trước",
+    "nextWeek": "Tuần sau",
+    "changeWeek": "Đổi tuần",
+    "deleteCell": "Xoá cell",
+    "add": "Thêm…"
+  },
+  "markdown": {
+    "copy": "Copy nội dung cell"
+  },
+  "slash": {
+    "aiDesc": "Hội thoại với AI về nội dung",
+    "weeklyDesc": "Lịch tuần 7 cột với todo list"
+  },
+  "snapshot": {
+    "title": "Lịch sử",
+    "take": "+ Tạo snapshot",
+    "empty": "Chưa có snapshot.",
+    "emptyHint": "Snapshot được tạo tự động sau mỗi 5 phút hoạt động.",
+    "selectToPreview": "Chọn một snapshot để xem trước",
+    "close": "Đóng",
+    "delete": "Xoá snapshot",
+    "restore": "Khôi phục bản này"
+  },
+  "error": {
+    "title": "Đã xảy ra lỗi giao diện",
+    "body": "Dữ liệu của bạn vẫn an toàn (lưu trong trình duyệt và trên server). Thử tải lại trang.",
+    "reload": "Tải lại"
+  }
+}

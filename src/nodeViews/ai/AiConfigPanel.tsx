@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom';
 import { type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   type ModelConfig,
   type OllamaModel,
@@ -30,6 +31,7 @@ export function AiConfigPanel({
   anchor,
   onClose,
 }: Props) {
+  const { t } = useTranslation();
   const activeModel = isOllamaModel(modelConfig.model)
     ? { supportsThinking: false, supportsWebSearch: false }
     : MODELS.find((m) => m.id === modelConfig.model);
@@ -58,7 +60,7 @@ export function AiConfigPanel({
             }}
           >
             <span>{m.label}</span>
-            <span className="ai-cell__config-desc">{m.desc}</span>
+            <span className="ai-cell__config-desc">{t(`ai.modelDesc.${m.label.toLowerCase()}`)}</span>
           </button>
         ))}
       </div>
@@ -69,7 +71,7 @@ export function AiConfigPanel({
         <span className="ai-cell__config-heading">🏠 Ollama local</span>
         {ollamaModels.length === 0 ? (
           <span className="ai-cell__config-desc" style={{ padding: '4px 8px', display: 'block' }}>
-            Không tìm thấy model — hãy chạy Ollama
+            {t('ai.ollamaNotFound')}
           </span>
         ) : ollamaModels.map((m) => (
           <button
@@ -95,7 +97,7 @@ export function AiConfigPanel({
       <div className="ai-cell__config-divider" />
 
       <div className="ai-cell__config-section">
-        <span className="ai-cell__config-heading">Tính năng</span>
+        <span className="ai-cell__config-heading">{t('ai.features')}</span>
         <label className={'ai-cell__config-toggle' + (activeModel?.supportsThinking ? '' : ' is-disabled')}>
           <input
             type="checkbox"

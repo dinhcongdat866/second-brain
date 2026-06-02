@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import type * as Y from 'yjs';
 import {
   DAY_KEYS,
@@ -270,6 +271,7 @@ interface DayColumnProps {
 }
 
 function DayColumn({ day, todos, isToday, plan }: DayColumnProps) {
+  const { t } = useTranslation();
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -314,7 +316,7 @@ function DayColumn({ day, todos, isToday, plan }: DayColumnProps) {
       <input
         ref={inputRef}
         className="weekly-day__input"
-        placeholder="Add…"
+        placeholder={t('weekly.add')}
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={handleKeyDown}
@@ -334,6 +336,7 @@ interface Props {
 }
 
 export function WeeklyPlannerCell({ plan, onDelete }: Props) {
+  const { t } = useTranslation();
   const [days, setDays] = useState<AllDays>(() => readAllDays(plan));
   const [weekStart, setWeekStartState] = useState<string>(() => plan.get('weekStart') as string);
   const [editingWeek, setEditingWeek] = useState(false);
@@ -368,7 +371,7 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
             type="button"
             className="weekly-cell__weekbtn"
             onClick={() => shiftWeek(plan, -1)}
-            title="Tuần trước"
+            title={t('weekly.prevWeek')}
           >
             ‹
           </button>
@@ -392,7 +395,7 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
               type="button"
               className="weekly-cell__title"
               onClick={() => setEditingWeek(true)}
-              title="Đổi tuần"
+              title={t('weekly.changeWeek')}
             >
               📅 {weekRangeLabel(weekStart)}
             </button>
@@ -401,7 +404,7 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
             type="button"
             className="weekly-cell__weekbtn"
             onClick={() => shiftWeek(plan, 1)}
-            title="Tuần sau"
+            title={t('weekly.nextWeek')}
           >
             ›
           </button>
@@ -410,7 +413,7 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
           type="button"
           className="weekly-cell__delete"
           onClick={onDelete}
-          title="Delete cell"
+          title={t('weekly.deleteCell')}
         >
           ×
         </button>

@@ -1,0 +1,96 @@
+{
+  "app": {
+    "loading": "Loading document…",
+    "toggleSidebar": "Toggle sidebar",
+    "history": "History",
+    "viewHistory": "View history",
+    "import": "Import .md",
+    "importTitle": "Import a Markdown file as a new document",
+    "export": "Export .md",
+    "exportTitle": "Export as Markdown"
+  },
+  "cellAdder": {
+    "markdown": "+ Markdown",
+    "ai": "+ AI Cell",
+    "weekly": "+ Weekly"
+  },
+  "sidebar": {
+    "documents": "Documents",
+    "newDocument": "+ New document",
+    "rename": "Rename (or double-click)",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "deleteConfirm": "Delete \"{{name}}\"?",
+    "deleted": "Deleted \"{{name}}\"",
+    "undo": "Undo"
+  },
+  "date": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{count}} days ago",
+    "last30Days": "Last 30 days"
+  },
+  "ai": {
+    "badge": "✦ AI",
+    "sessionCost": "Total conversation cost (synced for all viewers)",
+    "maximize": "Full screen",
+    "minimizeModal": "Minimize (Esc)",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "deleteCell": "Delete AI cell (Ctrl+Z to restore)",
+    "deleteShort": "Delete?",
+    "confirmDelete": "Confirm delete",
+    "cancel": "Cancel",
+    "noConversation": "No conversation yet",
+    "empty": "Ask the AI about the content above…",
+    "you": "You",
+    "willBeReplaced": "will be replaced",
+    "editMessage": "Edit this message",
+    "searching": "Searching: \"{{query}}\"…",
+    "searched": "Searched: \"{{query}}\"",
+    "thinking": "Thinking",
+    "promptPlaceholder": "Type a prompt for the AI…",
+    "editPlaceholder": "Edit and resend…",
+    "cancelEdit": "Cancel editing (Esc)",
+    "stop": "Stop",
+    "stopStream": "Stop streaming",
+    "resend": "Resend",
+    "send": "Send (Enter)",
+    "features": "Features",
+    "ollamaNotFound": "No model found — start Ollama",
+    "modelDesc": {
+      "haiku": "fast & cheap",
+      "sonnet": "balanced",
+      "opus": "smartest"
+    }
+  },
+  "weekly": {
+    "prevWeek": "Previous week",
+    "nextWeek": "Next week",
+    "changeWeek": "Change week",
+    "deleteCell": "Delete cell",
+    "add": "Add…"
+  },
+  "markdown": {
+    "copy": "Copy cell content"
+  },
+  "slash": {
+    "aiDesc": "Chat with AI about the content",
+    "weeklyDesc": "7-column weekly planner with todos"
+  },
+  "snapshot": {
+    "title": "History",
+    "take": "+ Take snapshot",
+    "empty": "No snapshots yet.",
+    "emptyHint": "Snapshots are taken automatically every 5 minutes of activity.",
+    "selectToPreview": "Select a snapshot to preview",
+    "close": "Close",
+    "delete": "Delete snapshot",
+    "restore": "Restore this version"
+  },
+  "error": {
+    "title": "A UI error occurred",
+    "body": "Your data is safe (stored in the browser and on the server). Try reloading the page.",
+    "reload": "Reload"
+  }
+}

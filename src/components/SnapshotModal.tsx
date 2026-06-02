@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useReducer, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as Y from 'yjs';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
@@ -108,6 +109,7 @@ function restoreSnapshot(
 // ---------------------------------------------------------------------------
 
 export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
+  const { t } = useTranslation();
   const [snapshots, setSnapshots] = useState<SnapshotMeta[]>(() =>
     listSnapshots(ydoc),
   );
@@ -158,8 +160,8 @@ export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
 
         {/* Header */}
         <div className="snap-modal__header">
-          <span className="snap-modal__title">History</span>
-          <button className="snap-modal__close" onClick={onClose} title="Close">✕</button>
+          <span className="snap-modal__title">{t('snapshot.title')}</span>
+          <button className="snap-modal__close" onClick={onClose} title={t('snapshot.close')}>✕</button>
         </div>
 
         {/* Body — two columns */}
@@ -168,13 +170,13 @@ export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
           {/* Left: snapshot list */}
           <div className="snap-list">
             <button className="snap-take-btn" onClick={handleTake}>
-              + Take snapshot
+              {t('snapshot.take')}
             </button>
 
             {snapshots.length === 0 ? (
               <p className="snap-empty">
-                No snapshots yet.<br />
-                Snapshots are taken automatically every 5 minutes of activity.
+                {t('snapshot.empty')}<br />
+                {t('snapshot.emptyHint')}
               </p>
             ) : (
               snapshots.map((s) => (
@@ -187,7 +189,7 @@ export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
                   <button
                     className="snap-item__del"
                     onClick={(e) => handleDelete(e, s.id)}
-                    title="Delete snapshot"
+                    title={t('snapshot.delete')}
                   >
                     ✕
                   </button>
@@ -205,7 +207,7 @@ export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
               />
             ) : (
               <div className="snap-preview__empty">
-                Select a snapshot to preview
+                {t('snapshot.selectToPreview')}
               </div>
             )}
           </div>
@@ -214,14 +216,14 @@ export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
         {/* Footer */}
         <div className="snap-modal__footer">
           <button className="snap-btn snap-btn--ghost" onClick={onClose}>
-            Close
+            {t('snapshot.close')}
           </button>
           <button
             className="snap-btn snap-btn--primary"
             onClick={handleRestore}
             disabled={!selectedId}
           >
-            Restore this version
+            {t('snapshot.restore')}
           </button>
         </div>
 

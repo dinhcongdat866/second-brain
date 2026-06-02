@@ -72,6 +72,37 @@ body {
   position: relative;
 }
 
+/* Language switcher (EN / VI) */
+.lang-switcher {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--nb-border-faint);
+  border-radius: var(--nb-r-sm);
+  background: var(--nb-bg-surface);
+}
+
+.lang-switcher__btn {
+  border: none;
+  background: none;
+  color: var(--nb-text-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  border-radius: var(--nb-r-xs);
+  cursor: pointer;
+}
+
+.lang-switcher__btn:hover {
+  color: var(--nb-text-2);
+}
+
+.lang-switcher__btn.is-active {
+  background: var(--nb-accent-light);
+  color: var(--nb-accent-hover);
+}
+
 /* Loading overlay shown until the Y.Doc has synced and the editor is bound. */
 .notebook-loading {
   position: absolute;

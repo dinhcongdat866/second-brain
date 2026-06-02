@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatSmartDate, formatFullDate } from '../lib/formatDate';
 
 function IconCopy() {
@@ -25,6 +26,7 @@ export function MarkdownCellControls({
   createdAt: string;
   getContent: () => string;
 }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
@@ -51,7 +53,7 @@ export function MarkdownCellControls({
         type="button"
         className="md-cell-controls__btn"
         onClick={copy}
-        title="Copy nội dung cell"
+        title={t('markdown.copy')}
       >
         {copied ? <IconCheck /> : <IconCopy />}
       </button>

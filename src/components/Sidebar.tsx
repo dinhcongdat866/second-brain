@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { DocMeta } from '../collab/registry';
+import i18n, { intlLocale } from '../i18n';
 
 // ---------------------------------------------------------------------------
 // Date grouping helpers
@@ -12,15 +14,15 @@ function getGroupLabel(isoStr: string): string {
   const docDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const diffDays = Math.round((todayStart.getTime() - docDay.getTime()) / 86_400_000);
 
-  if (diffDays === 0) return 'Hôm nay';
-  if (diffDays === 1) return 'Hôm qua';
-  if (diffDays <= 7) return `${diffDays} ngày trước`;
-  if (diffDays <= 30) return '30 ngày qua';
-  return date.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' });
+  if (diffDays === 0) return i18n.t('date.today');
+  if (diffDays === 1) return i18n.t('date.yesterday');
+  if (diffDays <= 7) return i18n.t('date.daysAgo', { count: diffDays });
+  if (diffDays <= 30) return i18n.t('date.last30Days');
+  return date.toLocaleDateString(intlLocale(), { month: 'long', year: 'numeric' });
 }
 
 function getGroupTooltip(isoStr: string): string {
-  return new Date(isoStr).toLocaleDateString('vi-VN', {
+  return new Date(isoStr).toLocaleDateString(intlLocale(), {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -73,6 +75,7 @@ export function Sidebar({
   onRestore,
   style,
 }: Props) {
+  const { t } = useTranslation();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -159,14 +162,14 @@ export function Sidebar({
       ) : confirmDeleteId === doc.id ? (
         <>
           <span className="sidebar__item-name sidebar__item-name--muted">
-            Delete "{doc.name}"?
+            {t('sidebar.deleteConfirm', { name: doc.name })}
           </span>
           <span className="sidebar__del-confirm">
             <button
               className="sidebar__del-yes"
               onClick={(e) => commitDelete(doc, e)}
             >
-              Delete
+              {t('sidebar.delete')}
             </button>
             <button
               className="sidebar__del-cancel"
@@ -175,7 +178,7 @@ export function Sidebar({
                 setConfirmDeleteId(null);
               }}
             >
-              Cancel
+              {t('sidebar.cancel')}
             </button>
           </span>
         </>
@@ -185,7 +188,7 @@ export function Sidebar({
           <span className="sidebar__item-actions">
             <button
               className="sidebar__action-btn"
-              title="Rename (or double-click)"
+              title={t('sidebar.rename')}
               onClick={(e) => startRename(doc, e)}
             >
               ✎
@@ -193,7 +196,7 @@ export function Sidebar({
             {docs.length > 1 && (
               <button
                 className="sidebar__action-btn sidebar__action-btn--delete"
-                title="Delete"
+                title={t('sidebar.delete')}
                 onClick={(e) => {
                   e.stopPropagation();
                   setConfirmDeleteId(doc.id);
@@ -211,7 +214,7 @@ export function Sidebar({
   return (
     <aside className="sidebar" style={style}>
       <div className="sidebar__header">
-        <span className="sidebar__title">Documents</span>
+        <span className="sidebar__title">{t('sidebar.documents')}</span>
       </div>
 
       <nav className="sidebar__list">
@@ -229,15 +232,15 @@ export function Sidebar({
         {recentlyDeleted && (
           <div className="sidebar__undo-bar">
             <span className="sidebar__undo-label">
-              Deleted "{recentlyDeleted.name}"
+              {t('sidebar.deleted', { name: recentlyDeleted.name })}
             </span>
             <button className="sidebar__undo-btn" onClick={handleUndo}>
-              Undo
+              {t('sidebar.undo')}
             </button>
           </div>
         )}
         <button className="sidebar__new-btn" onClick={onCreate}>
-          + New document
+          {t('sidebar.newDocument')}
         </button>
       </div>
     </aside>

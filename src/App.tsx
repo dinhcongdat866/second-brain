@@ -1,9 +1,11 @@
 import { useRef, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import type * as Y from 'yjs';
 import type { EditorView } from 'prosemirror-view';
 
 import { appendMarkdownCell, makeAppendAiCell, makeAppendWeeklyCell } from './commands';
 import { FloatingToolbar } from './components/FloatingToolbar';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
 import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
@@ -21,6 +23,7 @@ function CellAdder({
   view: EditorView | null;
   ydoc: Y.Doc | null;
 }) {
+  const { t } = useTranslation();
   if (!view || !ydoc) return null;
   return (
     <div className="cell-adder">
@@ -32,7 +35,7 @@ function CellAdder({
           view.focus();
         }}
       >
-        + Markdown
+        {t('cellAdder.markdown')}
       </button>
       <button
         type="button"
@@ -42,7 +45,7 @@ function CellAdder({
           view.focus();
         }}
       >
-        + AI Cell
+        {t('cellAdder.ai')}
       </button>
       <button
         type="button"
@@ -52,13 +55,14 @@ function CellAdder({
           view.focus();
         }}
       >
-        + Weekly
+        {t('cellAdder.weekly')}
       </button>
     </div>
   );
 }
 
 function App() {
+  const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const registry = useDocRegistry();
   const { view, ydoc } = useNotebookEditor(editorRef, registry.activeDocId);
@@ -96,7 +100,7 @@ function App() {
         <button
           className="header-sidebar-toggle"
           onClick={() => setSidebarOpen((v) => !v)}
-          title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+          title={t('app.toggleSidebar')}
         >
           ☰
         </button>
@@ -106,19 +110,20 @@ function App() {
             {saveStatus === 'pending' ? 'Saving...' : 'Saved'}
           </span>
         )}
+        <LanguageSwitcher />
         <button
           className="header-history-btn"
           onClick={() => setShowHistory(true)}
-          title="View history"
+          title={t('app.viewHistory')}
         >
-          History
+          {t('app.history')}
         </button>
         <button
           className="header-export-btn"
           onClick={() => importMarkdownAsNewDoc(registry.importDoc)}
-          title="Import a Markdown file as a new document"
+          title={t('app.importTitle')}
         >
-          Import .md
+          {t('app.import')}
         </button>
         <button
           className="header-export-btn"
@@ -132,9 +137,9 @@ function App() {
             );
             await saveMarkdownFile(content, activeDocName);
           }}
-          title="Export as Markdown"
+          title={t('app.exportTitle')}
         >
-          Export .md
+          {t('app.export')}
         </button>
       </header>
 
@@ -165,7 +170,7 @@ function App() {
             {!view && (
               <div className="notebook-loading" role="status">
                 <span className="notebook-loading__spinner" aria-hidden="true" />
-                Đang tải tài liệu…
+                {t('app.loading')}
               </div>
             )}
             <CellAdder view={view} ydoc={ydoc} />

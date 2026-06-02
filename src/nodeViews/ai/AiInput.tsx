@@ -1,4 +1,5 @@
 import { type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { IconSend } from './icons';
 
 interface Props {
@@ -29,13 +30,14 @@ export function AiInput({
   onCancel,
   onAbort,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <div className="ai-cell__input">
       <textarea
         ref={inputRef}
         rows={1}
         value={prompt}
-        placeholder={editing ? 'Sửa và gửi lại…' : 'Nhập prompt cho AI…'}
+        placeholder={editing ? t('ai.editPlaceholder') : t('ai.promptPlaceholder')}
         disabled={streaming}
         onChange={(e) => {
           setPrompt(e.target.value);
@@ -57,9 +59,9 @@ export function AiInput({
           type="button"
           className="ai-cell__cancel-btn"
           onClick={onCancel}
-          title="Huỷ chỉnh sửa (Esc)"
+          title={t('ai.cancelEdit')}
         >
-          Huỷ
+          {t('ai.cancel')}
         </button>
       )}
       {streaming ? (
@@ -67,13 +69,13 @@ export function AiInput({
           type="button"
           className="ai-cell__stop-btn"
           onClick={onAbort}
-          title="Dừng stream"
+          title={t('ai.stopStream')}
         >
-          ■ Dừng
+          ■ {t('ai.stop')}
         </button>
       ) : editing ? (
         <button type="button" onClick={onSubmit} disabled={prompt.trim() === ''}>
-          Gửi lại
+          {t('ai.resend')}
         </button>
       ) : (
         <button
@@ -81,7 +83,7 @@ export function AiInput({
           className="ai-cell__send-btn"
           onClick={onSubmit}
           disabled={prompt.trim() === ''}
-          title="Gửi (Enter)"
+          title={t('ai.send')}
         >
           <IconSend />
         </button>

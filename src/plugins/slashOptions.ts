@@ -159,7 +159,7 @@ export const SLASH_OPTIONS: SlashOption[] = [
   {
     id: 'ai-cell',
     label: 'AI cell',
-    description: 'Hội thoại với AI về nội dung',
+    description: 'Chat with AI about the content',
     icon: '✨',
     group: 'cell',
     keywords: ['ai', 'cell', 'chat', 'assistant', 'hoi', 'prompt'],
@@ -174,7 +174,7 @@ export const SLASH_OPTIONS: SlashOption[] = [
   {
     id: 'weekly-cell',
     label: 'Weekly planner',
-    description: 'Lịch tuần 7 cột với todo list',
+    description: '7-column weekly planner with todos',
     icon: '📅',
     group: 'cell',
     keywords: ['week', 'weekly', 'planner', 'todo', 'lich', 'tuan', 'calendar'],

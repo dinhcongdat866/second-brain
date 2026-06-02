@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { type YThread } from '../collab/aiThreads';
 import {
   type ModelConfig,
@@ -38,6 +39,7 @@ export function AiCell({
   cellId: string;
   docId: string;
 }) {
+  const { t } = useTranslation();
   const turns = useTurns(thread);
   const config = useAiConfig();
   const stream = useAiStream({
@@ -62,7 +64,7 @@ export function AiCell({
     if (turns[i].role === 'user') { lastUserTurnIdx = i; break; }
   }
   const previewText =
-    turns.length > 0 ? turns[0].content.slice(0, 60) : 'Chưa có hội thoại';
+    turns.length > 0 ? turns[0].content.slice(0, 60) : t('ai.noConversation');
 
   // Local UI-only state (not shared).
   const [minimized, setMinimized] = useState(false);
@@ -157,7 +159,7 @@ export function AiCell({
         <div className="ai-cell__header">
           <span className="ai-cell__badge">✦ AI</span>
           {sessionCost > 0 && (
-            <span className="ai-cell__session-cost" title="Tổng chi phí hội thoại (đồng bộ mọi người xem)">
+            <span className="ai-cell__session-cost" title={t('ai.sessionCost')}>
               💸 ${sessionCost.toFixed(4)}
             </span>
           )}
@@ -178,7 +180,7 @@ export function AiCell({
                 type="button"
                 className="ai-cell__icon-btn"
                 onClick={() => setMaximized(true)}
-                title="Xem toàn màn hình"
+                title={t('ai.maximize')}
               >
                 <IconMaximize />
               </button>
@@ -187,19 +189,19 @@ export function AiCell({
                 type="button"
                 className="ai-cell__icon-btn"
                 onClick={() => { setMinimized((v) => !v); setPendingDelete(false); }}
-                title={minimized ? 'Mở rộng' : 'Thu gọn'}
+                title={minimized ? t('ai.expand') : t('ai.collapse')}
               >
                 {minimized ? '▶' : '▼'}
               </button>
 
               {pendingDelete ? (
                 <>
-                  <span className="ai-cell__del-label">Xoá?</span>
+                  <span className="ai-cell__del-label">{t('ai.deleteShort')}</span>
                   <button
                     type="button"
                     className="ai-cell__icon-btn ai-cell__delete--confirm"
                     onClick={onDelete}
-                    title="Xác nhận xoá"
+                    title={t('ai.confirmDelete')}
                   >
                     ✓
                   </button>
@@ -207,7 +209,7 @@ export function AiCell({
                     type="button"
                     className="ai-cell__icon-btn"
                     onClick={() => setPendingDelete(false)}
-                    title="Huỷ"
+                    title={t('ai.cancel')}
                   >
                     ✗
                   </button>
@@ -217,7 +219,7 @@ export function AiCell({
                   type="button"
                   className="ai-cell__icon-btn ai-cell__delete"
                   onClick={() => setPendingDelete(true)}
-                  title="Xoá AI cell (Ctrl+Z để khôi phục)"
+                  title={t('ai.deleteCell')}
                 >
                   ✕
                 </button>
@@ -272,7 +274,7 @@ export function AiCell({
                   type="button"
                   className="ai-cell__icon-btn"
                   onClick={() => setMaximized(false)}
-                  title="Thu nhỏ (Esc)"
+                  title={t('ai.minimizeModal')}
                 >
                   <IconMinimize />
                 </button>
