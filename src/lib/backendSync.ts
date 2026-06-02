@@ -92,6 +92,28 @@ export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
   });
 }
 
+/**
+ * Persist via navigator.sendBeacon — survives page teardown (tab close, app
+ * backgrounded). Use on pagehide/visibilitychange where a normal fetch may be
+ * cancelled. iOS Safari does NOT reliably fire `beforeunload`, so this is the
+ * critical path that keeps data durable before IndexedDB can be evicted.
+ */
+export function saveDocStateBeacon(docId: string, ydoc: Y.Doc): void {
+  const state = Y.encodeStateAsUpdate(ydoc);
+  const url = `${BACKEND_URL}/documents/${encodeURIComponent(docId)}/state`;
+  const blob = new Blob([new Uint8Array(state)], { type: 'application/octet-stream' });
+  if (typeof navigator.sendBeacon === 'function' && navigator.sendBeacon(url, blob)) {
+    return;
+  }
+  // Fallback: keepalive fetch (still allowed during unload in most browsers).
+  fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: blob,
+    keepalive: true,
+  }).catch(() => {});
+}
+
 /** Fire-and-forget: log one AI response turn's token usage to Neon for analytics. */
 export function logUsage(
   docId: string,
@@ -130,7 +152,7 @@ export function deleteDocState(docId: string): void {
  * Wire a debounced Yjs → Neon saver onto a Y.Doc.
  * Also exposes `flush()` for immediate save (use in beforeunload).
  */
-export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = 10_000) {
+export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = 4_000) {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   const persist = () => saveDocState(docId, ydoc).catch(() => {});
@@ -150,6 +172,11 @@ export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = 10_000)
     flush: () => {
       if (timer) { clearTimeout(timer); timer = null; }
       persist();
+    },
+    /** Flush via sendBeacon — for pagehide/visibilitychange (survives teardown). */
+    flushBeacon: () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      saveDocStateBeacon(docId, ydoc);
     },
     stop: () => {
       ydoc.off('update', schedule);

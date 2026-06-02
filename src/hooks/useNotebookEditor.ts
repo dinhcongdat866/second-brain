@@ -109,7 +109,7 @@ export function useNotebookEditor(
     let unwireSaveStatus: (() => void) | undefined;
     let stopAutoSnapshot: (() => void) | undefined;
     let stopYjsSyncer: (() => void) | undefined;
-    let beforeUnloadFlush: (() => void) | undefined;
+    let detachLifecycle: (() => void) | undefined;
     let cancelled = false;
 
     persistence.whenSynced.then(async () => {
@@ -143,8 +143,22 @@ export function useNotebookEditor(
 
       const yjsSyncer = createYjsSyncer(activeDocId, doc);
       stopYjsSyncer = yjsSyncer.stop;
-      beforeUnloadFlush = yjsSyncer.flush;
-      window.addEventListener('beforeunload', beforeUnloadFlush);
+      // Flush to Neon on every teardown signal. iOS Safari is unreliable with
+      // `beforeunload`, so `pagehide` + `visibilitychange→hidden` are the real
+      // safety net; sendBeacon survives the teardown. This keeps the server
+      // copy current before IndexedDB can be evicted.
+      const onHide = () => {
+        if (document.visibilityState === 'hidden') yjsSyncer.flushBeacon();
+      };
+      const onPageHide = () => yjsSyncer.flushBeacon();
+      window.addEventListener('visibilitychange', onHide);
+      window.addEventListener('pagehide', onPageHide);
+      window.addEventListener('beforeunload', onPageHide);
+      detachLifecycle = () => {
+        window.removeEventListener('visibilitychange', onHide);
+        window.removeEventListener('pagehide', onPageHide);
+        window.removeEventListener('beforeunload', onPageHide);
+      };
 
       const { doc: pmDoc, mapping } = initProseMirrorDoc(
         yXmlFragment,
@@ -195,7 +209,7 @@ export function useNotebookEditor(
       unwireSaveStatus?.();
       stopAutoSnapshot?.();
       stopYjsSyncer?.();
-      if (beforeUnloadFlush) window.removeEventListener('beforeunload', beforeUnloadFlush);
+      detachLifecycle?.();
       v?.destroy();
       provider.destroy();
       persistence.destroy();
