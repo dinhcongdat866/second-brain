@@ -27,10 +27,10 @@ const TOKEN_THRESHOLD = 8_000;
 const KEEP_RECENT = 6;
 
 const SUMMARY_SYSTEM =
-  'Tóm tắt ngắn gọn đoạn hội thoại dưới đây (tối đa 3-4 câu). ' +
-  'Giữ lại: chủ đề chính, quyết định đã đưa ra, bối cảnh/tình huống của người dùng, ' +
-  'và các chi tiết cụ thể có thể được nhắc đến về sau. ' +
-  'Trả lời cùng ngôn ngữ với hội thoại.';
+  'Briefly summarize the conversation below (at most 3-4 sentences). ' +
+  'Keep: the main topics, decisions made, the user\'s context/situation, ' +
+  'and specific details that may be referenced later. ' +
+  'Reply in the same language as the conversation.';
 
 async function summarizeWithAnthropic(turns: Turn[], signal?: AbortSignal): Promise<string> {
   const dialogue = turns
@@ -106,8 +106,8 @@ export async function compressHistory(
       : await summarizeWithAnthropic(oldTurns, signal);
 
     return [
-      { role: 'user', content: `[Tóm tắt hội thoại trước]\n${summary}` },
-      { role: 'assistant', content: 'Đã ghi nhận.' },
+      { role: 'user', content: `[Summary of earlier conversation]\n${summary}` },
+      { role: 'assistant', content: 'Understood.' },
       ...recentTurns,
     ];
   } catch {

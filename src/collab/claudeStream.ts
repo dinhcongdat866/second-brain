@@ -44,7 +44,7 @@ export const MODELS = [
   {
     id:                'claude-haiku-4-5-20251001',
     label:             'Haiku',
-    desc:              'nhanh & rẻ',
+    desc:              'fast & cheap',
     supportsThinking:  false,
     supportsWebSearch: true,
     provider:          'anthropic' as const,
@@ -52,7 +52,7 @@ export const MODELS = [
   {
     id:                'claude-sonnet-4-6',
     label:             'Sonnet',
-    desc:              'cân bằng',
+    desc:              'balanced',
     supportsThinking:  true,
     supportsWebSearch: true,
     provider:          'anthropic' as const,
@@ -60,7 +60,7 @@ export const MODELS = [
   {
     id:                'claude-opus-4-8',
     label:             'Opus',
-    desc:              'thông minh nhất',
+    desc:              'smartest',
     supportsThinking:  true,
     supportsWebSearch: true,
     provider:          'anthropic' as const,
