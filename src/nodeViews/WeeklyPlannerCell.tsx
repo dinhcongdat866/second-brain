@@ -30,19 +30,58 @@ import { ColorPalette, SizePicker } from '../components/ToolbarPickers';
 // ---------------------------------------------------------------------------
 // Inline markdown renderer — bold, italic, strikethrough, code, link + style
 // markers ({c=…}/{b=…}/{s=…} → spans, validated in renderStyleMarkers)
+//
+// Output is injected via dangerouslySetInnerHTML, so every interpolation must
+// be safe: text is HTML-escaped up front, and link hrefs are scheme-checked +
+// attribute-escaped (blocking `javascript:` and `"`-breakout attribute
+// injection). Bold/italic/etc. only wrap already-escaped text in tagless marks.
 // ---------------------------------------------------------------------------
+
+/** Allow http(s)/mailto and scheme-less (relative/anchor) URLs; block the rest. */
+function safeHref(url: string): string | null {
+  const trimmed = url.trim();
+  if (/^(https?:|mailto:)/i.test(trimmed)) return trimmed;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return null; // javascript:, data:, vbscript:, …
+  return trimmed; // relative path / #anchor — no scheme
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Bold / italic / strikethrough / inline-code on already-escaped text. */
+function inlineMarks(s: string): string {
+  return s
+    .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>')
+    .replace(/_(.*?)_/gs, '<em>$1</em>')
+    .replace(/~~(.*?)~~/gs, '<s>$1</s>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
 
 function renderMd(raw: string): string {
   const esc = raw
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-  const withMd = esc
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>')
-    .replace(/_(.*?)_/gs, '<em>$1</em>')
-    .replace(/~~(.*?)~~/gs, '<s>$1</s>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  // Pull links out to placeholders BEFORE running inline marks: this keeps mark
+  // syntax inside URLs (e.g. `a_b`) intact and prevents the generated
+  // `target="_blank"` from being mangled by the italic rule. The label is still
+  // mark-rendered; placeholders are NUL-delimited so no mark regex touches them.
+  const links: string[] = [];
+  const withLinks = esc.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text: string, url: string) => {
+    const href = safeHref(url);
+    const label = inlineMarks(text);
+    // Unsafe URL → drop the link, keep the (already-escaped) label.
+    const html = href
+      ? `<a href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`
+      : label;
+    links.push(html);
+    return `@@@${links.length - 1}@@@`;
+  });
+
+  const withMd = inlineMarks(withLinks)
+    .replace(/@@@(\d+)@@@/g, (_m, i: string) => links[Number(i)]);
   return renderStyleMarkers(withMd);
 }
 
