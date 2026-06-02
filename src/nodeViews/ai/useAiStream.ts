@@ -8,6 +8,7 @@ import {
 } from '../../collab/claudeStream';
 import { compressHistory } from '../../collab/historyCompressor';
 import { upsertUserTurn, searchCells, logUsage } from '../../lib/backendSync';
+import { resizeImageToDataUrl } from '../../lib/imageResize';
 
 interface Args {
   thread: YThread;
@@ -41,14 +42,31 @@ export function useAiStream({
   const [error, setError] = useState<string | null>(null);
   const [editFromIdx, setEditFromIdx] = useState<number | null>(null);
   const [searchingActive, setSearchingActive] = useState(false);
+  const [pendingImages, setPendingImages] = useState<{ id: string; dataUrl: string }[]>([]);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const modalInputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  /** Resize + queue image files to attach to the next prompt. */
+  const addImages = async (files: File[] | FileList) => {
+    const imgs = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    for (const file of imgs) {
+      try {
+        const dataUrl = await resizeImageToDataUrl(file);
+        setPendingImages((prev) => [...prev, { id: crypto.randomUUID(), dataUrl }]);
+      } catch {
+        /* skip unreadable image */
+      }
+    }
+  };
+
+  const removeImage = (id: string) =>
+    setPendingImages((prev) => prev.filter((p) => p.id !== id));
+
   const submit = () => {
     const text = prompt.trim();
-    if (!text || streaming) return;
+    if ((!text && pendingImages.length === 0) || streaming) return;
     setError(null);
 
     if (editFromIdx !== null) {
@@ -57,7 +75,10 @@ export function useAiStream({
       setEditFromIdx(null);
     }
 
-    addTurn(thread, 'user', text);
+    const imageUrls = pendingImages.map((p) => p.dataUrl);
+    const userTurn = addTurn(thread, 'user', text);
+    if (imageUrls.length > 0) userTurn.set('images', JSON.stringify(imageUrls));
+    setPendingImages([]);
     upsertUserTurn(cellId, docId, text);
     const assistant = addTurn(thread, 'assistant');
     const yText = assistant.get('content') as Y.Text;
@@ -128,6 +149,7 @@ export function useAiStream({
             signal: ac.signal,
             config: modelConfig,
             thinkingTarget: thinkingText,
+            images: imageUrls,
             onSearching: (q) => {
               assistant.set('search_query', q);
               setSearchingActive(true);
@@ -185,6 +207,9 @@ export function useAiStream({
     setError,
     editFromIdx,
     searchingActive,
+    pendingImages,
+    addImages,
+    removeImage,
     inputRef,
     modalInputRef,
     submit,

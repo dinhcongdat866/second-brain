@@ -57,6 +57,7 @@
     "resend": "Gửi lại",
     "send": "Gửi (Enter)",
     "features": "Tính năng",
+    "removeImage": "Xoá ảnh",
     "ollamaNotFound": "Không tìm thấy model — hãy chạy Ollama",
     "modelDesc": {
       "haiku": "nhanh & rẻ",

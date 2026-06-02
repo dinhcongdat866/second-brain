@@ -94,6 +94,13 @@ export function AiTurnList({
                       <span className="ai-turn__replace-badge">{t('ai.willBeReplaced')}</span>
                     )}
                   </div>
+                  {turn.images && turn.images.length > 0 && (
+                    <div className="ai-turn__images">
+                      {turn.images.map((src, ii) => (
+                        <img key={ii} src={src} alt="" className="ai-turn__image" />
+                      ))}
+                    </div>
+                  )}
                   <TurnContent
                     role={turn.role}
                     content={turn.content}

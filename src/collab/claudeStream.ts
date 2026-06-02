@@ -3,6 +3,7 @@ type ThinkingConfigParam = Anthropic.Messages.ThinkingConfigParam;
 import type * as Y from 'yjs';
 import type { Turn } from './historyCompressor';
 import { BACKEND_URL, OLLAMA_URL } from '../lib/config';
+import { dataUrlToApiImage } from '../lib/imageResize';
 
 // Calls go through the backend reverse proxy (`/anthropic`), which injects the
 // real API key server-side. The key never ships in the browser bundle.
@@ -205,6 +206,8 @@ export type StreamOptions = {
   onSearching?: (query: string) => void;
   /** Called with the list of sources returned by the web search tool. */
   onSearchResults?: (sources: SearchSource[]) => void;
+  /** Data-URL images attached to the current (last) user message. Anthropic only. */
+  images?: string[];
 };
 
 /**
@@ -222,7 +225,7 @@ export async function streamClaudeReply(
   onError: (err: Error) => void,
   options: StreamOptions = {},
 ): Promise<void> {
-  const { ragContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults } = options;
+  const { ragContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults, images = [] } = options;
 
   const baseContext =
     (localContext ? '--- CELLS ABOVE THIS AI CELL ---\n' + localContext + '\n\n' : '') +
@@ -266,10 +269,27 @@ export async function streamClaudeReply(
   // ---------------------------------------------------------------------------
   // Anthropic branch
   // ---------------------------------------------------------------------------
-  const messages: Anthropic.MessageParam[] = turns.map((t) => ({
-    role: t.role,
-    content: t.content,
-  }));
+  const messages: Anthropic.MessageParam[] = turns.map((t, i) => {
+    // Attach images to the current (last) user message only — we do not re-send
+    // them on later turns (cost), so multi-turn follow-ups rely on the model's
+    // first textual description.
+    const isLast = i === turns.length - 1;
+    if (isLast && t.role === 'user' && images.length > 0) {
+      const blocks: Anthropic.ContentBlockParam[] = [];
+      for (const url of images) {
+        const img = dataUrlToApiImage(url);
+        if (img) {
+          blocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: img.media_type as 'image/jpeg', data: img.data },
+          });
+        }
+      }
+      blocks.push({ type: 'text', text: t.content });
+      return { role: 'user', content: blocks };
+    }
+    return { role: t.role, content: t.content };
+  });
 
   const system: Anthropic.TextBlockParam[] = [
     {

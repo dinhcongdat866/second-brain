@@ -139,6 +139,9 @@ export function AiCell({
       setPrompt={stream.setPrompt}
       streaming={stream.streaming}
       editing={stream.editFromIdx !== null}
+      pendingImages={stream.pendingImages}
+      onAddImages={stream.addImages}
+      onRemoveImage={stream.removeImage}
       onSubmit={stream.submit}
       onCancel={stream.cancelEdit}
       onAbort={stream.abort}

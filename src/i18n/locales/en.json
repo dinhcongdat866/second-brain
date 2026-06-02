@@ -57,6 +57,7 @@
     "resend": "Resend",
     "send": "Send (Enter)",
     "features": "Features",
+    "removeImage": "Remove image",
     "ollamaNotFound": "No model found — start Ollama",
     "modelDesc": {
       "haiku": "fast & cheap",

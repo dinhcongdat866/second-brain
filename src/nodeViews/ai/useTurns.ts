@@ -18,6 +18,8 @@ export interface TurnView {
   thinking?: string;
   searchQuery?: string;
   searchSources?: SearchSource[];
+  /** Data-URL images attached to a user turn. */
+  images?: string[];
 }
 
 /**
@@ -35,6 +37,7 @@ export function useTurns(thread: YThread): TurnView[] {
   return thread.toArray().map((turn) => {
     const thinkingYText = turn.get('thinking') as Y.Text | undefined;
     const rawSources = turn.get('search_sources') as string | undefined;
+    const rawImages = turn.get('images') as string | undefined;
     return {
       role: turn.get('role') as TurnRole,
       content: (turn.get('content') as Y.Text).toString(),
@@ -45,6 +48,7 @@ export function useTurns(thread: YThread): TurnView[] {
       thinking: thinkingYText ? thinkingYText.toString() : undefined,
       searchQuery: (turn.get('search_query') as string | undefined) ?? undefined,
       searchSources: rawSources ? (JSON.parse(rawSources) as SearchSource[]) : undefined,
+      images: rawImages ? (JSON.parse(rawImages) as string[]) : undefined,
     };
   });
 }
