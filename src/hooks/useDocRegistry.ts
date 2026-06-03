@@ -14,7 +14,7 @@ import {
   type RegistrySetup,
 } from '../collab/registry';
 import { deleteDocStorage } from '../collab/ydoc';
-import { deleteDocState, deleteDocImages, createYjsSyncer } from '../lib/backendSync';
+import { deleteDocState, deleteDocImages, createYjsSyncer, applyServerState } from '../lib/backendSync';
 
 const ACTIVE_KEY = 'active-doc-id';
 
@@ -44,6 +44,15 @@ export function useDocRegistry() {
     const refresh = () => setDocs(readDocs(setup.docsMap));
     setup.docsMap.observeDeep(refresh);
 
+    // Re-pull the registry from Neon whenever the tab becomes visible so the
+    // doc list reflects documents created on another device without a full reload.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        applyServerState(REGISTRY_DOC_ID, setup.ydoc).catch(() => {});
+      }
+    };
+    window.addEventListener('visibilitychange', onVisible);
+
     let cancelled = false;
     setup.whenReady.then(() => {
       if (cancelled) return;
@@ -59,6 +68,7 @@ export function useDocRegistry() {
     return () => {
       cancelled = true;
       setup.docsMap.unobserveDeep(refresh);
+      window.removeEventListener('visibilitychange', onVisible);
       syncer.stop();
       setup.provider.destroy();
       setup.persistence.destroy();

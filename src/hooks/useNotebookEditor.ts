@@ -173,12 +173,22 @@ export function useNotebookEditor(
       const onHide = () => {
         if (document.visibilityState === 'hidden') yjsSyncer.flushBeacon();
       };
+      // When the tab comes back into focus, pull the latest Neon state so edits
+      // from another device/tab (that saved via HTTP while this tab was hidden)
+      // are merged in without requiring a full page reload.
+      const onVisible = () => {
+        if (document.visibilityState === 'visible') {
+          applyServerState(activeDocId, doc).catch(() => {});
+        }
+      };
       const onPageHide = () => yjsSyncer.flushBeacon();
       window.addEventListener('visibilitychange', onHide);
+      window.addEventListener('visibilitychange', onVisible);
       window.addEventListener('pagehide', onPageHide);
       window.addEventListener('beforeunload', onPageHide);
       detachLifecycle = () => {
         window.removeEventListener('visibilitychange', onHide);
+        window.removeEventListener('visibilitychange', onVisible);
         window.removeEventListener('pagehide', onPageHide);
         window.removeEventListener('beforeunload', onPageHide);
       };
