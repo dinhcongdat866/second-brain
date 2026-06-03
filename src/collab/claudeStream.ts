@@ -5,13 +5,19 @@ import type { Turn } from './historyCompressor';
 import { BACKEND_URL, OLLAMA_URL } from '../lib/config';
 import { dataUrlToApiImage } from '../lib/imageResize';
 
-// Calls go through the backend reverse proxy (`/anthropic`), which injects the
-// real API key server-side. The key never ships in the browser bundle.
-const client = new Anthropic({
-  baseURL: `${BACKEND_URL}/anthropic`,
-  apiKey: 'proxied-by-backend',
-  dangerouslyAllowBrowser: true,
-});
+/**
+ * Create an Anthropic client that routes through the backend proxy.
+ * If a user API key is provided it is forwarded via x-user-api-key so the
+ * proxy uses it instead of the server-side key.
+ */
+function makeClient(userApiKey?: string | null) {
+  return new Anthropic({
+    baseURL: `${BACKEND_URL}/anthropic`,
+    apiKey: 'proxied-by-backend',
+    dangerouslyAllowBrowser: true,
+    ...(userApiKey ? { defaultHeaders: { 'x-user-api-key': userApiKey } } : {}),
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Model config
@@ -208,7 +214,59 @@ export type StreamOptions = {
   onSearchResults?: (sources: SearchSource[]) => void;
   /** Data-URL images attached to the current (last) user message. Anthropic only. */
   images?: string[];
+  /** User's own Anthropic API key (from localStorage). Forwarded to backend proxy. */
+  userApiKey?: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// Demo streaming (no API key configured)
+// ---------------------------------------------------------------------------
+
+const DEMO_TEXT = `## The Second Brain Method
+
+A **second brain** is a personal knowledge management system — a trusted external repository for the ideas, insights, and resources you encounter every day.
+
+### Why it works
+
+Our brains are optimised for *generating* ideas, not *storing* them. By offloading information into an external system, you free up cognitive bandwidth for deeper thinking and unexpected creative connections.
+
+### Core principles
+
+1. **Capture** — Write down anything that resonates, quickly and without judgment
+2. **Organise** — Sort notes into actionable categories (Projects, Areas, Resources, Archives)
+3. **Distil** — Extract key insights and progressively summarise over time
+4. **Express** — Use your notes as raw material to create, share, and build
+
+### Getting started
+
+Start small. Create one note today, then another tomorrow. The system grows naturally as you feed it.
+
+> The goal isn't a perfect system. The goal is to think better.
+
+Each note you write here is a building block. Over time, surprising connections will emerge between ideas you had months apart — that is when the magic happens.
+
+---
+
+*Add your Anthropic API key in the model settings panel to connect to real AI.*`;
+
+/**
+ * Simulates streaming by inserting the demo text character by character.
+ * Used when no Anthropic API key is configured — lets visitors see the UI working.
+ */
+export async function streamDemoReply(
+  target: Y.Text,
+  onDone: (usage: UsageStats) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const CHUNK = 4; // chars per tick
+  const DELAY = 18; // ms between ticks
+  for (let i = 0; i < DEMO_TEXT.length; i += CHUNK) {
+    if (signal?.aborted) break;
+    target.insert(target.length, DEMO_TEXT.slice(i, i + CHUNK));
+    await new Promise((r) => setTimeout(r, DELAY));
+  }
+  onDone({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, costUsd: 0 });
+}
 
 /**
  * Stream an AI response for the given thread history into `target` Y.Text.
@@ -225,7 +283,8 @@ export async function streamClaudeReply(
   onError: (err: Error) => void,
   options: StreamOptions = {},
 ): Promise<void> {
-  const { ragContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults, images = [] } = options;
+  const { ragContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults, images = [], userApiKey } = options;
+  const client = makeClient(userApiKey);
 
   const baseContext =
     (localContext ? '--- CELLS ABOVE THIS AI CELL ---\n' + localContext + '\n\n' : '') +

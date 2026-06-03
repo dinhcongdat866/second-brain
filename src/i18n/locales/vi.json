@@ -25,7 +25,9 @@
     "deleteConfirm": "Xoá \"{{name}}\"?",
     "deleted": "Đã xoá \"{{name}}\"",
     "undo": "Hoàn tác",
-    "activePeers": "{{count}} người đang mở"
+    "activePeers": "{{count}} người đang mở",
+    "language": "Ngôn ngữ",
+    "anonymousUser": "Chưa đăng nhập"
   },
   "date": {
     "today": "Hôm nay",
@@ -62,6 +64,13 @@
     "features": "Tính năng",
     "removeImage": "Xoá ảnh",
     "ollamaNotFound": "Không tìm thấy model — hãy chạy Ollama",
+    "apiKey": {
+      "heading": "API Key",
+      "saved": "Đã lưu key trong trình duyệt",
+      "clear": "Xoá",
+      "save": "Lưu",
+      "hint": "Chỉ lưu trong trình duyệt của bạn."
+    },
     "modelDesc": {
       "haiku": "nhanh & rẻ",
       "sonnet": "cân bằng",

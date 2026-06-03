@@ -27,6 +27,40 @@
   background: var(--nb-border-focus);
 }
 
+/* ── Brand header ── */
+.sidebar__brand {
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--nb-border-faint);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar__brand-icon {
+  font-size: 16px;
+  line-height: 1;
+  color: var(--nb-accent);
+  flex-shrink: 0;
+}
+
+.sidebar__brand-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nb-text);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── New document button row ── */
+.sidebar__new-doc {
+  padding: 8px 8px 4px;
+  flex-shrink: 0;
+}
+
+/* ── Legacy header (kept for peers display) ── */
 .sidebar__header {
   padding: 14px 14px 10px;
   border-bottom: 1px solid var(--nb-border-faint);
@@ -179,6 +213,185 @@
   padding: 8px;
   border-top: 1px solid var(--nb-border-faint);
   flex-shrink: 0;
+}
+
+/* ── User bar ── */
+.sidebar__user-wrap {
+  position: relative;
+}
+
+.sidebar__user-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--nb-r-sm);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: background 0.12s;
+}
+
+.sidebar__user-bar:hover {
+  background: var(--nb-bg-hover);
+}
+
+.sidebar__user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--nb-r-full);
+  background: var(--nb-accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar__user-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sidebar__user-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--nb-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* ── User menu popover ── */
+.sidebar__user-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--nb-bg-surface);
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-r-lg);
+  box-shadow: var(--nb-shadow-lg);
+  overflow: hidden;
+  z-index: var(--z-dropdown);
+}
+
+.sidebar__user-menu-section {
+  padding: 10px 12px;
+}
+
+.sidebar__user-menu-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--nb-text-3);
+  margin-bottom: 8px;
+}
+
+.sidebar__user-menu-langs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar__lang-btn {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--nb-r-sm);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  color: var(--nb-text-2);
+  transition: background 0.1s;
+}
+
+.sidebar__lang-btn:hover {
+  background: var(--nb-bg-hover);
+}
+
+.sidebar__lang-btn.is-active {
+  background: var(--nb-accent-light);
+  color: var(--nb-accent);
+  font-weight: 500;
+}
+
+.sidebar__user-menu-divider {
+  height: 1px;
+  background: var(--nb-border-faint);
+  margin: 0 12px;
+}
+
+/* ── Sidebar API key row ── */
+.sidebar__key-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0 4px;
+}
+
+.sidebar__key-input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font-size: 12px;
+  border: 1px solid var(--nb-border);
+  border-radius: var(--nb-r-sm);
+  background: var(--nb-bg-page);
+  color: inherit;
+  outline: none;
+}
+
+.sidebar__key-input:focus {
+  border-color: var(--nb-border-focus);
+}
+
+.sidebar__key-action {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: var(--nb-r-sm);
+  border: 1px solid var(--nb-border);
+  background: var(--nb-bg-hover);
+  cursor: pointer;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.sidebar__key-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.sidebar__key-action:not(:disabled):hover {
+  background: var(--nb-border-faint);
+}
+
+.sidebar__key-saved {
+  flex: 1;
+  font-size: 12px;
+  color: var(--nb-ai-accent);
+  font-weight: 500;
+}
+
+.sidebar__key-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--nb-text-3);
+  padding: 0 0 4px;
 }
 
 /* =====================================================================

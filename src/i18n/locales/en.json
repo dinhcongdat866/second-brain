@@ -25,7 +25,9 @@
     "deleteConfirm": "Delete \"{{name}}\"?",
     "deleted": "Deleted \"{{name}}\"",
     "undo": "Undo",
-    "activePeers": "{{count}} active peer(s)"
+    "activePeers": "{{count}} active peer(s)",
+    "language": "Language",
+    "anonymousUser": "Not signed in"
   },
   "date": {
     "today": "Today",
@@ -62,6 +64,13 @@
     "features": "Features",
     "removeImage": "Remove image",
     "ollamaNotFound": "No model found — start Ollama",
+    "apiKey": {
+      "heading": "API Key",
+      "saved": "Key saved in browser",
+      "clear": "Clear",
+      "save": "Save",
+      "hint": "Stored locally in your browser only."
+    },
     "modelDesc": {
       "haiku": "fast & cheap",
       "sonnet": "balanced",

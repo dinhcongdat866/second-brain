@@ -3,11 +3,14 @@ import * as Y from 'yjs';
 import { addTurn, type TurnRole, type YThread } from '../../collab/aiThreads';
 import {
   streamClaudeReply,
+  streamDemoReply,
+  isOllamaModel,
   type UsageStats,
   type ModelConfig,
 } from '../../collab/claudeStream';
 import { compressHistory } from '../../collab/historyCompressor';
 import { upsertUserTurn, searchCells, logUsage } from '../../lib/backendSync';
+import { getApiKey } from '../../lib/apiKey';
 import { resizeImageToDataUrl } from '../../lib/imageResize';
 
 interface Args {
@@ -107,6 +110,30 @@ export function useAiStream({
     const ac = new AbortController();
     abortRef.current = ac;
 
+    const userApiKey = getApiKey();
+    const isDemoMode = !userApiKey && !isOllamaModel(modelConfig.model);
+
+    const finishTurn = (usage: UsageStats) => {
+      assistant.set('created_at', new Date().toISOString());
+      if (usage.inputTokens > 0) {
+        assistant.set('tokens_in', usage.inputTokens);
+        assistant.set('tokens_out', usage.outputTokens);
+        assistant.set('cost_usd', usage.costUsd);
+        logUsage(docId, cellId, usage);
+      }
+      abortRef.current = null;
+      setStreaming(false);
+    };
+
+    if (isDemoMode) {
+      streamDemoReply(yText, finishTurn, ac.signal).catch(() => {
+        assistant.set('created_at', new Date().toISOString());
+        abortRef.current = null;
+        setStreaming(false);
+      });
+      return;
+    }
+
     searchCells(text, 3)
       .then(async (results) => {
         if (ac.signal.aborted) return;
@@ -115,7 +142,7 @@ export function useAiStream({
           .map((r) => r.content)
           .join('\n\n');
 
-        const compressed = await compressHistory(history, ac.signal, modelConfig);
+        const compressed = await compressHistory(history, ac.signal, modelConfig, userApiKey);
         if (ac.signal.aborted) return;
 
         return streamClaudeReply(
@@ -123,17 +150,7 @@ export function useAiStream({
           getDocContext(),
           compressed,
           yText,
-          (usage: UsageStats) => {
-            assistant.set('created_at', new Date().toISOString());
-            if (usage.inputTokens > 0) {
-              assistant.set('tokens_in', usage.inputTokens);
-              assistant.set('tokens_out', usage.outputTokens);
-              assistant.set('cost_usd', usage.costUsd);
-              logUsage(docId, cellId, usage);
-            }
-            abortRef.current = null;
-            setStreaming(false);
-          },
+          finishTurn,
           (err) => {
             // Stamp created_at so the streaming aurora resolves for all viewers
             // (isStreamingShared keys off a missing timestamp).
@@ -150,6 +167,7 @@ export function useAiStream({
             config: modelConfig,
             thinkingTarget: thinkingText,
             images: imageUrls,
+            userApiKey,
             onSearching: (q) => {
               assistant.set('search_query', q);
               setSearchingActive(true);

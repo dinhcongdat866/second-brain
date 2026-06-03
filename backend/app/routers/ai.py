@@ -31,7 +31,8 @@ async def proxy(path: str, request: Request):
     headers = {
         k: v for k, v in request.headers.items() if k.lower() in _FORWARD_HEADERS
     }
-    headers["x-api-key"] = settings.anthropic_api_key
+    user_key = request.headers.get("x-user-api-key", "").strip()
+    headers["x-api-key"] = user_key if user_key else settings.anthropic_api_key
     headers.setdefault("anthropic-version", "2023-06-01")
 
     client = httpx.AsyncClient(timeout=None)

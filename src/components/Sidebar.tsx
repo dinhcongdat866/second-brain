@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DocMeta } from '../collab/registry';
 import type { Peer } from '../hooks/usePresence';
+import { SUPPORTED_LANGS, type Lang } from '../i18n';
 import i18n, { intlLocale } from '../i18n';
+import { getApiKey, setApiKey, clearApiKey } from '../lib/apiKey';
 import { Button } from './Button';
 
 // ---------------------------------------------------------------------------
@@ -50,7 +52,6 @@ function formatExactTime(isoStr: string): string {
 }
 
 function groupDocsByDate(docs: DocMeta[]): DocGroup[] {
-  // Sort most-recently-updated first so groups and items appear in descending order.
   const sorted = [...docs].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
@@ -83,6 +84,8 @@ interface Props {
   style?: React.CSSProperties;
 }
 
+const LANG_LABELS: Record<Lang, string> = { en: 'English', vi: 'Tiếng Việt' };
+
 export function Sidebar({
   docs,
   activeId,
@@ -94,13 +97,20 @@ export function Sidebar({
   peers = [],
   style,
 }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n: i18nInstance } = useTranslation();
+  const currentLang = (i18nInstance.language?.startsWith('vi') ? 'vi' : 'en') as Lang;
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [recentlyDeleted, setRecentlyDeleted] = useState<DocMeta | null>(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiKeySet, setApiKeySet] = useState(() => !!getApiKey());
+
   const inputRef = useRef<HTMLInputElement>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userBarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!editingId) return;
@@ -118,7 +128,19 @@ export function Sidebar({
     [],
   );
 
-  // F2 renames the currently active document.
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!userBarRef.current?.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [userMenuOpen]);
+
+  // F2 renames the currently active document
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'F2') return;
@@ -251,8 +273,10 @@ export function Sidebar({
 
   return (
     <aside className="sidebar" style={style}>
-      <div className="sidebar__header">
-        <span className="sidebar__title">{t('sidebar.documents')}</span>
+      {/* ── Brand header ── */}
+      <div className="sidebar__brand">
+        <span className="sidebar__brand-icon">✦</span>
+        <span className="sidebar__brand-name">Second Brain</span>
         {peers.length > 0 && (
           <div className="sidebar__peers" aria-label={t('sidebar.activePeers', { count: peers.length })}>
             {peers.map((peer, i) => (
@@ -269,6 +293,14 @@ export function Sidebar({
         )}
       </div>
 
+      {/* ── New document ── */}
+      <div className="sidebar__new-doc">
+        <Button variant="ghost" fullWidth onClick={onCreate}>
+          {t('sidebar.newDocument')}
+        </Button>
+      </div>
+
+      {/* ── Document list ── */}
       <nav className="sidebar__list">
         {groups.map(({ label, tooltip, docs: groupDocs }) => (
           <div key={label} className="sidebar__group">
@@ -280,6 +312,7 @@ export function Sidebar({
         ))}
       </nav>
 
+      {/* ── Footer: undo + user bar ── */}
       <div className="sidebar__footer">
         {recentlyDeleted && (
           <div className="sidebar__undo-bar">
@@ -291,9 +324,93 @@ export function Sidebar({
             </Button>
           </div>
         )}
-        <Button variant="ghost" fullWidth onClick={onCreate}>
-          {t('sidebar.newDocument')}
-        </Button>
+
+        {/* User bar */}
+        <div className="sidebar__user-wrap" ref={userBarRef}>
+          {userMenuOpen && (
+            <div className="sidebar__user-menu">
+              {/* API Key section */}
+              <div className="sidebar__user-menu-section">
+                <span className="sidebar__user-menu-label">{t('ai.apiKey.heading')}</span>
+                {apiKeySet ? (
+                  <div className="sidebar__key-row">
+                    <span className="sidebar__key-saved">{t('ai.apiKey.saved')}</span>
+                    <button
+                      type="button"
+                      className="sidebar__key-action"
+                      onClick={() => { clearApiKey(); setApiKeySet(false); setApiKeyInput(''); }}
+                    >
+                      {t('ai.apiKey.clear')}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="sidebar__key-row">
+                      <input
+                        type="password"
+                        className="sidebar__key-input"
+                        placeholder="sk-ant-..."
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && apiKeyInput.trim()) {
+                            setApiKey(apiKeyInput.trim());
+                            setApiKeySet(true);
+                            setApiKeyInput('');
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="sidebar__key-action"
+                        disabled={!apiKeyInput.trim()}
+                        onClick={() => {
+                          if (!apiKeyInput.trim()) return;
+                          setApiKey(apiKeyInput.trim());
+                          setApiKeySet(true);
+                          setApiKeyInput('');
+                        }}
+                      >
+                        {t('ai.apiKey.save')}
+                      </button>
+                    </div>
+                    <span className="sidebar__key-hint">{t('ai.apiKey.hint')}</span>
+                  </>
+                )}
+              </div>
+
+              <div className="sidebar__user-menu-divider" />
+
+              {/* Language section */}
+              <div className="sidebar__user-menu-section">
+                <span className="sidebar__user-menu-label">{t('sidebar.language')}</span>
+                <div className="sidebar__user-menu-langs">
+                  {SUPPORTED_LANGS.map((lng) => (
+                    <button
+                      key={lng}
+                      type="button"
+                      className={'sidebar__lang-btn' + (currentLang === lng ? ' is-active' : '')}
+                      onClick={() => { i18nInstance.changeLanguage(lng); setUserMenuOpen(false); }}
+                    >
+                      {LANG_LABELS[lng]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="sidebar__user-bar"
+            onClick={() => setUserMenuOpen((v) => !v)}
+          >
+            <span className="sidebar__user-avatar">?</span>
+            <span className="sidebar__user-info">
+              <span className="sidebar__user-name">{t('sidebar.anonymousUser')}</span>
+            </span>
+          </button>
+        </div>
       </div>
     </aside>
   );

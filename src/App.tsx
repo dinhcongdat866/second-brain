@@ -7,7 +7,6 @@ import { appendMarkdownCell, makeAppendAiCell, makeAppendWeeklyCell } from './co
 import { BackgroundPicker } from './components/BackgroundPicker';
 import { Button } from './components/Button';
 import { FloatingToolbar } from './components/FloatingToolbar';
-import { LanguageSwitcher } from './components/LanguageSwitcher';
 import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
@@ -122,7 +121,6 @@ function App() {
             {saveStatus === 'pending' ? 'Saving...' : 'Saved'}
           </span>
         )}
-        <LanguageSwitcher />
         <Button
           variant="secondary"
           style={{ marginLeft: 'auto' }}

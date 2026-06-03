@@ -3,13 +3,6 @@ import type { TurnRole } from './aiThreads';
 import type { ModelConfig } from './claudeStream';
 import { BACKEND_URL, OLLAMA_URL } from '../lib/config';
 
-// Routed through the backend reverse proxy — see claudeStream.ts.
-const client = new Anthropic({
-  baseURL: `${BACKEND_URL}/anthropic`,
-  apiKey: 'proxied-by-backend',
-  dangerouslyAllowBrowser: true,
-});
-
 /** Plain turn shape sent to the messages API. */
 export type Turn = { role: TurnRole; content: string };
 
@@ -32,7 +25,14 @@ const SUMMARY_SYSTEM =
   'and specific details that may be referenced later. ' +
   'Reply in the same language as the conversation.';
 
-async function summarizeWithAnthropic(turns: Turn[], signal?: AbortSignal): Promise<string> {
+async function summarizeWithAnthropic(turns: Turn[], signal?: AbortSignal, userApiKey?: string | null): Promise<string> {
+  const client = new Anthropic({
+    baseURL: `${BACKEND_URL}/anthropic`,
+    apiKey: 'proxied-by-backend',
+    dangerouslyAllowBrowser: true,
+    ...(userApiKey ? { defaultHeaders: { 'x-user-api-key': userApiKey } } : {}),
+  });
+
   const dialogue = turns
     .map((t) => `${t.role === 'user' ? 'User' : 'Assistant'}: ${t.content}`)
     .join('\n\n');
@@ -86,6 +86,7 @@ export async function compressHistory(
   turns: Turn[],
   signal?: AbortSignal,
   config?: ModelConfig,
+  userApiKey?: string | null,
 ): Promise<Turn[]> {
   if (estimateTokens(turns) <= TOKEN_THRESHOLD || turns.length <= KEEP_RECENT) {
     return turns;
@@ -103,7 +104,7 @@ export async function compressHistory(
     const useOllama = config?.model.startsWith('ollama:');
     const summary = useOllama
       ? await summarizeWithOllama(oldTurns, config!.model.slice('ollama:'.length), signal)
-      : await summarizeWithAnthropic(oldTurns, signal);
+      : await summarizeWithAnthropic(oldTurns, signal, userApiKey);
 
     return [
       { role: 'user', content: `[Summary of earlier conversation]\n${summary}` },

@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { type Dispatch, type RefObject, type SetStateAction, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   type ModelConfig,
@@ -7,6 +7,7 @@ import {
   MODELS,
   isOllamaModel,
 } from '../../collab/claudeStream';
+import { getApiKey, setApiKey, clearApiKey } from '../../lib/apiKey';
 import type { PanelAnchor } from './useAiConfig';
 
 interface Props {
@@ -32,6 +33,8 @@ export function AiConfigPanel({
   onClose,
 }: Props) {
   const { t } = useTranslation();
+  const [keyInput, setKeyInput] = useState('');
+  const [keySet, setKeySet] = useState(() => !!getApiKey());
   const activeModel = isOllamaModel(modelConfig.model)
     ? { supportsThinking: false, supportsWebSearch: false }
     : MODELS.find((m) => m.id === modelConfig.model);
@@ -116,6 +119,60 @@ export function AiConfigPanel({
           />
           🌐 Web Search
         </label>
+      </div>
+      <div className="ai-cell__config-divider" />
+
+      <div className="ai-cell__config-section">
+        <span className="ai-cell__config-heading">🔑 {t('ai.apiKey.heading')}</span>
+        {keySet ? (
+          <div className="ai-cell__config-key-row">
+            <span className="ai-cell__config-desc ai-cell__config-key-saved">
+              {t('ai.apiKey.saved')}
+            </span>
+            <button
+              type="button"
+              className="ai-cell__config-key-clear"
+              onClick={() => { clearApiKey(); setKeySet(false); setKeyInput(''); }}
+            >
+              {t('ai.apiKey.clear')}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="ai-cell__config-key-row">
+              <input
+                type="password"
+                className="ai-cell__config-key-input"
+                placeholder="sk-ant-..."
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && keyInput.trim()) {
+                    setApiKey(keyInput.trim());
+                    setKeySet(true);
+                    setKeyInput('');
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="ai-cell__config-key-save"
+                disabled={!keyInput.trim()}
+                onClick={() => {
+                  if (!keyInput.trim()) return;
+                  setApiKey(keyInput.trim());
+                  setKeySet(true);
+                  setKeyInput('');
+                }}
+              >
+                {t('ai.apiKey.save')}
+              </button>
+            </div>
+            <span className="ai-cell__config-desc" style={{ padding: '2px 8px 6px', display: 'block' }}>
+              {t('ai.apiKey.hint')}
+            </span>
+          </>
+        )}
       </div>
     </div>,
     document.body,
