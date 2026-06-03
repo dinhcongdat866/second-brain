@@ -249,7 +249,6 @@ export function useNotebookEditor(
     // ── Authenticated path ── full persistence + Neon sync
     const { ydoc: doc, persistence, provider, yXmlFragment } = createCollabSetup(activeDocId, userId);
     providerRef.current = provider;
-    let v: EditorView | undefined;
     let editorCleanup: (() => void) | undefined;
     let cancelled = false;
 
