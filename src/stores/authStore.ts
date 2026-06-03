@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '../lib/supabase';
+import { clearUserStorage } from '../collab/ydoc';
 
 export type AuthStatus = 'loading' | 'authenticated' | 'guest' | 'unauthenticated';
 
@@ -44,7 +45,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ status: 'unauthenticated', user: null, session: null });
       return;
     }
+    const userId = get().user?.id;
     await supabase.auth.signOut();
+    // Clear local Yjs caches so the next user starts fresh from the server
+    if (userId) await clearUserStorage(userId);
     set({ status: 'unauthenticated', user: null, session: null });
   },
 }));
