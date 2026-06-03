@@ -294,7 +294,6 @@ export function useNotebookEditor(
         setYdoc,
         false,
       );
-      v = undefined; // v is managed inside bindEditor now
     });
 
     return () => {
