@@ -3,7 +3,6 @@ FROM python:3.12-slim
 
 # HF_HOME must match at build & run so the baked model is found at runtime.
 ENV PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     HF_HOME=/app/.hf
 
 WORKDIR /app
@@ -14,7 +13,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt
 
 COPY app ./app
 

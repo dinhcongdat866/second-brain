@@ -11,6 +11,8 @@ from app.db.models import YjsDocument
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
+REGISTRY_DOC_ID = "__registry__"
+
 
 @router.get("/{doc_id}/state")
 async def get_state(
@@ -51,6 +53,24 @@ async def save_state(
     )
     await db.execute(stmt)
     await db.commit()
+
+
+@router.get("")
+async def list_docs(
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    """Return all doc_ids + updated_at for the current user (excluding registry)."""
+    result = await db.execute(
+        select(YjsDocument.doc_id, YjsDocument.updated_at).where(
+            YjsDocument.user_id == user_id,
+            YjsDocument.doc_id != REGISTRY_DOC_ID,
+        )
+    )
+    return [
+        {"doc_id": row.doc_id, "updated_at": row.updated_at.isoformat()}
+        for row in result.all()
+    ]
 
 
 @router.delete("/{doc_id}/state", status_code=204)

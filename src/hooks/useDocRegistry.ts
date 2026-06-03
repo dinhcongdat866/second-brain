@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import * as Y from 'yjs';
 import {
   createRegistrySetup,
   readDocs,
@@ -16,6 +17,7 @@ import {
 } from '../collab/registry';
 import { deleteDocStorage } from '../collab/ydoc';
 import { deleteDocState, deleteDocImages, createYjsSyncer, applyServerState } from '../lib/backendSync';
+import { apiFetch } from '../lib/http';
 
 const ACTIVE_KEY = 'active-doc-id';
 
@@ -118,9 +120,34 @@ export function useDocRegistry(userId?: string) {
     window.addEventListener('visibilitychange', onVisible);
 
     let cancelled = false;
-    setup.whenReady.then(() => {
+    setup.whenReady.then(async () => {
       if (cancelled) return;
+      const wasEmpty = setup.docsMap.size === 0;
       bootstrapRegistry(setup.docsMap);
+
+      // If registry was empty (just rebuilt or fresh account), scan the server
+      // for orphaned docs and restore them into the registry.
+      if (wasEmpty) {
+        try {
+          const res = await apiFetch('/documents');
+          const serverDocs = await res.json() as { doc_id: string; updated_at: string }[];
+          const known = new Set(readDocs(setup.docsMap).map((d) => d.id));
+          setup.ydoc.transact(() => {
+            for (const { doc_id, updated_at } of serverDocs) {
+              if (!known.has(doc_id)) {
+                const entry = new Y.Map<unknown>();
+                entry.set('name', `Recovered (${updated_at.slice(0, 10)})`);
+                entry.set('createdAt', updated_at);
+                entry.set('updatedAt', updated_at);
+                setup.docsMap.set(doc_id, entry);
+              }
+            }
+          });
+        } catch {
+          // backend unreachable — skip recovery
+        }
+      }
+
       const list = readDocs(setup.docsMap);
       setDocs(list);
       // Active doc may have been deleted on another device — fall back to first.
