@@ -4,6 +4,7 @@ import type * as Y from 'yjs';
 import type { EditorView } from 'prosemirror-view';
 
 import { appendMarkdownCell, makeAppendAiCell, makeAppendWeeklyCell } from './commands';
+import { BackgroundPicker } from './components/BackgroundPicker';
 import { FloatingToolbar } from './components/FloatingToolbar';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
 import { Sidebar } from './components/Sidebar';
@@ -106,8 +107,9 @@ function App() {
     };
   }, [ydoc, registry.activeDocId]); // registry.touchDoc is stable (useCallback)
 
-  const activeDocName =
-    registry.docs.find((d) => d.id === registry.activeDocId)?.name ?? '';
+  const activeDoc = registry.docs.find((d) => d.id === registry.activeDocId);
+  const activeDocName = activeDoc?.name ?? '';
+  const activeDocBg = activeDoc?.bgImage;
 
   return (
     <div className="app">
@@ -156,6 +158,11 @@ function App() {
         >
           {t('app.export')}
         </button>
+        <BackgroundPicker
+          docId={registry.activeDocId}
+          currentBg={activeDocBg}
+          onApply={(url) => registry.setBgImage(registry.activeDocId, url)}
+        />
       </header>
 
       <div className="app-body" style={resizing ? { cursor: 'col-resize', userSelect: 'none' } : undefined}>
@@ -177,7 +184,10 @@ function App() {
             />
           </>
         )}
-        <main className="app-main">
+        <main
+          className={`app-main${activeDocBg ? ' app-main--bg' : ''}`}
+          style={activeDocBg ? { backgroundImage: `url(${activeDocBg})` } : undefined}
+        >
           <div className="notebook-wrap">
             {/* editorRef must stay mounted for the EditorView to attach; the
                 loading overlay sits on top until the doc has synced + bound. */}

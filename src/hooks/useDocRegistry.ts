@@ -7,6 +7,7 @@ import {
   deleteDoc,
   restoreDoc,
   touchDoc,
+  setDocBgImage,
   bootstrapRegistry,
   optimisticDocs,
   REGISTRY_DOC_ID,
@@ -134,6 +135,11 @@ export function useDocRegistry() {
     if (map) touchDoc(map, id);
   }, []);
 
+  const handleSetBgImage = useCallback((id: string, url: string | null) => {
+    const map = setupRef.current?.docsMap;
+    if (map) setDocBgImage(map, id, url);
+  }, []);
+
   return {
     docs,
     activeDocId,
@@ -144,5 +150,6 @@ export function useDocRegistry() {
     deleteDoc: handleDelete,
     restoreDoc: handleRestore,
     touchDoc: handleTouch,
+    setBgImage: handleSetBgImage,
   };
 }

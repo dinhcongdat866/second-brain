@@ -63,6 +63,12 @@ body {
   overflow-y: auto;
 }
 
+.app-main--bg {
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
 /* Wraps editor + cell adder, constrains max-width */
 .notebook-wrap {
   width: 100%;

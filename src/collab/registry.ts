@@ -33,6 +33,7 @@ export interface DocMeta {
   name: string;
   createdAt: string;
   updatedAt: string;
+  bgImage?: string;
 }
 
 type DocsMap = Y.Map<Y.Map<unknown>>;
@@ -66,11 +67,13 @@ export function createRegistrySetup(): RegistrySetup {
 export function readDocs(docsMap: DocsMap): DocMeta[] {
   const out: DocMeta[] = [];
   docsMap.forEach((entry, id) => {
+    const bgImage = entry.get('bgImage') as string | undefined;
     out.push({
       id,
       name: (entry.get('name') as string) ?? 'Untitled',
       createdAt: (entry.get('createdAt') as string) ?? '',
       updatedAt: (entry.get('updatedAt') as string) ?? '',
+      ...(bgImage ? { bgImage } : {}),
     });
   });
   return out;
@@ -115,6 +118,16 @@ export function touchDoc(docsMap: DocsMap, id: string): void {
   const entry = docsMap.get(id);
   if (!entry) return;
   entry.set('updatedAt', new Date().toISOString());
+}
+
+export function setDocBgImage(docsMap: DocsMap, id: string, url: string | null): void {
+  const entry = docsMap.get(id);
+  if (!entry) return;
+  if (url) {
+    entry.set('bgImage', url);
+  } else {
+    entry.delete('bgImage');
+  }
 }
 
 // ---------------------------------------------------------------------------
