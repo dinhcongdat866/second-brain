@@ -4,6 +4,7 @@
  * their relative precedence. */
 
 @import './tokens.css';
+@import './button.css';
 @import './base.css';
 @import './editor.css';
 @import './slash-menu.css';

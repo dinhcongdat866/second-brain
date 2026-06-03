@@ -5,6 +5,7 @@ import type { EditorView } from 'prosemirror-view';
 
 import { appendMarkdownCell, makeAppendAiCell, makeAppendWeeklyCell } from './commands';
 import { BackgroundPicker } from './components/BackgroundPicker';
+import { Button } from './components/Button';
 import { FloatingToolbar } from './components/FloatingToolbar';
 import { LanguageSwitcher } from './components/LanguageSwitcher';
 import { Sidebar } from './components/Sidebar';
@@ -29,36 +30,24 @@ function CellAdder({
   if (!view || !ydoc) return null;
   return (
     <div className="cell-adder">
-      <button
-        type="button"
-        className="cell-adder__btn"
-        onClick={() => {
-          appendMarkdownCell(view.state, view.dispatch.bind(view));
-          view.focus();
-        }}
+      <Button
+        variant="ghost"
+        onClick={() => { appendMarkdownCell(view.state, view.dispatch.bind(view)); view.focus(); }}
       >
         {t('cellAdder.markdown')}
-      </button>
-      <button
-        type="button"
-        className="cell-adder__btn"
-        onClick={() => {
-          makeAppendAiCell(ydoc)(view.state, view.dispatch.bind(view));
-          view.focus();
-        }}
+      </Button>
+      <Button
+        variant="ghost"
+        onClick={() => { makeAppendAiCell(ydoc)(view.state, view.dispatch.bind(view)); view.focus(); }}
       >
         {t('cellAdder.ai')}
-      </button>
-      <button
-        type="button"
-        className="cell-adder__btn"
-        onClick={() => {
-          makeAppendWeeklyCell(ydoc)(view.state, view.dispatch.bind(view));
-          view.focus();
-        }}
+      </Button>
+      <Button
+        variant="ghost"
+        onClick={() => { makeAppendWeeklyCell(ydoc)(view.state, view.dispatch.bind(view)); view.focus(); }}
       >
         {t('cellAdder.weekly')}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -116,13 +105,13 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <button
-          className="header-sidebar-toggle"
+        <Button
+          variant="icon"
           onClick={() => setSidebarOpen((v) => !v)}
           title={t('app.toggleSidebar')}
         >
           ☰
-        </button>
+        </Button>
         <h1>{activeDocName}</h1>
         {saveStatus !== 'idle' && (
           <span className={`save-status save-status--${saveStatus}`}>
@@ -130,36 +119,33 @@ function App() {
           </span>
         )}
         <LanguageSwitcher />
-        <button
-          className="header-history-btn"
+        <Button
+          variant="secondary"
+          style={{ marginLeft: 'auto' }}
           onClick={() => setShowHistory(true)}
           title={t('app.viewHistory')}
         >
           {t('app.history')}
-        </button>
-        <button
-          className="header-export-btn"
+        </Button>
+        <Button
+          variant="secondary"
           onClick={() => importMarkdownAsNewDoc(registry.importDoc)}
           title={t('app.importTitle')}
         >
           {t('app.import')}
-        </button>
-        <button
-          className="header-export-btn"
+        </Button>
+        <Button
+          variant="secondary"
           disabled={!view || !ydoc}
           onClick={async () => {
             if (!view || !ydoc) return;
-            const content = exportDocToMarkdown(
-              view.state.doc,
-              ydoc,
-              activeDocName,
-            );
+            const content = exportDocToMarkdown(view.state.doc, ydoc, activeDocName);
             await saveMarkdownFile(content, activeDocName);
           }}
           title={t('app.exportTitle')}
         >
           {t('app.export')}
-        </button>
+        </Button>
         <BackgroundPicker
           docId={registry.activeDocId}
           currentBg={activeDocBg}

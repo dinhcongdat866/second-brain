@@ -1,0 +1,114 @@
+/* ── Button design system ──────────────────────────────────────────────────
+   5 semantic variants × 2 sizes.
+   Never add margin here — callers own spacing.
+   ──────────────────────────────────────────────────────────────────────── */
+
+.nb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  font-family: inherit;
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
+}
+
+.nb-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Sizes ─────────────────────────────────────────────────────────────── */
+
+.nb-btn--md {
+  font-size: var(--text-md);
+  padding: 5px var(--space-lg);
+  border-radius: var(--nb-r-sm);
+}
+
+.nb-btn--sm {
+  font-size: var(--text-xs);
+  padding: 3px var(--space-md);
+  border-radius: var(--nb-r-xs);
+}
+
+/* ── Variants ──────────────────────────────────────────────────────────── */
+
+/* primary — accent fill */
+.nb-btn--primary {
+  background: var(--nb-accent);
+  color: var(--nb-white);
+  border-color: transparent;
+}
+.nb-btn--primary:hover:not(:disabled) { background: var(--nb-accent-hover); }
+
+/* secondary — outlined, transparent bg */
+.nb-btn--secondary {
+  background: transparent;
+  color: var(--nb-text-2);
+  border-color: var(--nb-border);
+}
+.nb-btn--secondary:hover:not(:disabled) {
+  background: var(--nb-bg-hover);
+  border-color: var(--nb-border-focus);
+}
+
+/* ghost — dashed border, for additive / low-priority actions */
+.nb-btn--ghost {
+  background: transparent;
+  color: var(--nb-text-2);
+  border: 1px dashed var(--nb-border);
+}
+.nb-btn--ghost:hover:not(:disabled) {
+  background: var(--nb-bg-hover);
+  border-color: var(--nb-border-focus);
+  color: var(--nb-text);
+}
+
+/* danger — soft red fill, for destructive actions */
+.nb-btn--danger {
+  background: rgba(192, 48, 48, 0.10);
+  color: var(--nb-danger);
+  border-color: rgba(192, 48, 48, 0.18);
+}
+.nb-btn--danger:hover:not(:disabled) {
+  background: rgba(192, 48, 48, 0.18);
+  border-color: rgba(192, 48, 48, 0.32);
+}
+
+/* icon — transparent, no border, for symbol/icon-only controls */
+.nb-btn--icon {
+  background: transparent;
+  color: var(--nb-text-3);
+  border-color: transparent;
+  /* icon has its own tighter padding regardless of --sm/--md */
+  padding: 4px var(--space-sm);
+  border-radius: var(--nb-r-xs);
+}
+.nb-btn--icon.nb-btn--sm { padding: 2px var(--space-xs); }
+.nb-btn--icon:hover:not(:disabled) {
+  background: var(--nb-bg-hover);
+  color: var(--nb-text-2);
+}
+
+/* icon-danger: icon button whose hover turns red (delete actions) */
+.nb-btn--icon-danger:hover:not(:disabled) {
+  color: var(--nb-danger);
+  background: rgba(200, 50, 50, 0.08);
+}
+
+/* ── Modifiers ─────────────────────────────────────────────────────────── */
+
+/* full-width + left-aligned text — for ghost/secondary spanning a container */
+.nb-btn--full {
+  width: 100%;
+  justify-content: flex-start;
+}

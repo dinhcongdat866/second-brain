@@ -125,28 +125,6 @@
   opacity: 1;
 }
 
-.sidebar__action-btn {
-  border: none;
-  background: transparent;
-  color: var(--nb-text-3);
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 2px 5px;
-  border-radius: var(--nb-r-xs);
-  transition: color 0.1s, background 0.1s;
-}
-
-.sidebar__action-btn:hover {
-  color: var(--nb-text-2);
-  background: var(--nb-bg-hover);
-}
-
-.sidebar__action-btn--delete:hover {
-  color: var(--nb-danger);
-  background: rgba(200, 50, 50, 0.08);
-}
-
 .sidebar__item--confirming {
   background: rgba(200, 50, 50, 0.05);
 }
@@ -162,36 +140,6 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-}
-
-.sidebar__del-yes,
-.sidebar__del-cancel {
-  border: none;
-  font-size: 11px;
-  font-family: inherit;
-  padding: 2px 7px;
-  border-radius: var(--nb-r-xs);
-  cursor: pointer;
-  font-weight: 500;
-  transition: background 0.1s;
-}
-
-.sidebar__del-yes {
-  background: rgba(200, 50, 50, 0.12);
-  color: var(--nb-danger);
-}
-
-.sidebar__del-yes:hover {
-  background: rgba(200, 50, 50, 0.22);
-}
-
-.sidebar__del-cancel {
-  background: var(--nb-bg-hover);
-  color: var(--nb-text-2);
-}
-
-.sidebar__del-cancel:hover {
-  background: var(--nb-border-faint);
 }
 
 .sidebar__undo-bar {
@@ -214,24 +162,6 @@
   white-space: nowrap;
 }
 
-.sidebar__undo-btn {
-  flex-shrink: 0;
-  border: none;
-  background: var(--nb-accent);
-  color: #fff;
-  font-size: 11.5px;
-  font-family: inherit;
-  font-weight: 500;
-  padding: 3px 8px;
-  border-radius: var(--nb-r-xs);
-  cursor: pointer;
-  transition: background 0.1s;
-}
-
-.sidebar__undo-btn:hover {
-  background: var(--nb-accent-hover);
-}
-
 .sidebar__rename-input {
   flex: 1;
   border: 1px solid var(--nb-border-focus);
@@ -250,27 +180,6 @@
   border-top: 1px solid var(--nb-border-faint);
   flex-shrink: 0;
 }
-
-.sidebar__new-btn {
-  width: 100%;
-  padding: 7px 10px;
-  border: 1px dashed var(--nb-border);
-  border-radius: var(--nb-r-sm);
-  background: transparent;
-  color: var(--nb-text-2);
-  font-size: 12.5px;
-  font-family: inherit;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.15s, background 0.12s, color 0.12s;
-}
-
-.sidebar__new-btn:hover {
-  border-color: var(--nb-border-focus);
-  background: var(--nb-bg-hover);
-  color: var(--nb-text);
-}
-
 
 /* =====================================================================
    Sidebar — date groups

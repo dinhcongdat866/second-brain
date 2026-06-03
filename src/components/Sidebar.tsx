@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { DocMeta } from '../collab/registry';
 import type { Peer } from '../hooks/usePresence';
 import i18n, { intlLocale } from '../i18n';
+import { Button } from './Button';
 
 // ---------------------------------------------------------------------------
 // Date grouping helpers
@@ -197,37 +198,42 @@ export function Sidebar({
             {t('sidebar.deleteConfirm', { name: doc.name })}
           </span>
           <span className="sidebar__del-confirm">
-            <button
-              className="sidebar__del-yes"
+            <Button
+              variant="danger"
+              size="sm"
               onClick={(e) => commitDelete(doc, e)}
             >
               {t('sidebar.delete')}
-            </button>
-            <button
-              className="sidebar__del-cancel"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 setConfirmDeleteId(null);
               }}
             >
               {t('sidebar.cancel')}
-            </button>
+            </Button>
           </span>
         </>
       ) : (
         <>
           <span className="sidebar__item-name">{doc.name}</span>
           <span className="sidebar__item-actions">
-            <button
-              className="sidebar__action-btn"
+            <Button
+              variant="icon"
+              size="sm"
               title={t('sidebar.rename')}
               onClick={(e) => startRename(doc, e)}
             >
               ✎
-            </button>
+            </Button>
             {docs.length > 1 && (
-              <button
-                className="sidebar__action-btn sidebar__action-btn--delete"
+              <Button
+                variant="icon"
+                size="sm"
+                className="nb-btn--icon-danger"
                 title={t('sidebar.delete')}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -235,7 +241,7 @@ export function Sidebar({
                 }}
               >
                 ×
-              </button>
+              </Button>
             )}
           </span>
         </>
@@ -280,14 +286,14 @@ export function Sidebar({
             <span className="sidebar__undo-label">
               {t('sidebar.deleted', { name: recentlyDeleted.name })}
             </span>
-            <button className="sidebar__undo-btn" onClick={handleUndo}>
+            <Button variant="primary" size="sm" onClick={handleUndo}>
               {t('sidebar.undo')}
-            </button>
+            </Button>
           </div>
         )}
-        <button className="sidebar__new-btn" onClick={onCreate}>
+        <Button variant="ghost" fullWidth onClick={onCreate}>
           {t('sidebar.newDocument')}
-        </button>
+        </Button>
       </div>
     </aside>
   );

@@ -23,6 +23,7 @@ import type { EditorView as MainView } from 'prosemirror-view';
 
 import { notebookSchema } from '../schema';
 import { XML_FRAGMENT_NAME } from '../collab/ydoc';
+import { Button } from './Button';
 import {
   listSnapshots,
   takeSnapshot,
@@ -161,7 +162,7 @@ export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
         {/* Header */}
         <div className="snap-modal__header">
           <span className="snap-modal__title">{t('snapshot.title')}</span>
-          <button className="snap-modal__close" onClick={onClose} title={t('snapshot.close')}>✕</button>
+          <Button variant="icon" onClick={onClose} title={t('snapshot.close')}>✕</Button>
         </div>
 
         {/* Body — two columns */}
@@ -169,9 +170,9 @@ export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
 
           {/* Left: snapshot list */}
           <div className="snap-list">
-            <button className="snap-take-btn" onClick={handleTake}>
+            <Button variant="ghost" fullWidth className="snap-take-btn" onClick={handleTake}>
               {t('snapshot.take')}
-            </button>
+            </Button>
 
             {snapshots.length === 0 ? (
               <p className="snap-empty">
@@ -186,13 +187,15 @@ export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
                   onClick={() => setSelectedId(s.id)}
                 >
                   <span className="snap-item__label">{s.label}</span>
-                  <button
+                  <Button
+                    variant="icon"
+                    size="sm"
                     className="snap-item__del"
                     onClick={(e) => handleDelete(e, s.id)}
                     title={t('snapshot.delete')}
                   >
                     ✕
-                  </button>
+                  </Button>
                 </div>
               ))
             )}
@@ -215,16 +218,12 @@ export function SnapshotModal({ ydoc, mainView, onClose }: Props) {
 
         {/* Footer */}
         <div className="snap-modal__footer">
-          <button className="snap-btn snap-btn--ghost" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             {t('snapshot.close')}
-          </button>
-          <button
-            className="snap-btn snap-btn--primary"
-            onClick={handleRestore}
-            disabled={!selectedId}
-          >
+          </Button>
+          <Button variant="primary" onClick={handleRestore} disabled={!selectedId}>
             {t('snapshot.restore')}
-          </button>
+          </Button>
         </div>
 
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { uploadImage } from '../lib/backendSync';
+import { Button } from './Button';
 
 interface Props {
   docId: string;
@@ -64,14 +65,15 @@ export function BackgroundPicker({ docId, currentBg, onApply }: Props) {
 
   return (
     <>
-      <button
+      <Button
         ref={btnRef}
-        className={`header-export-btn bg-picker__trigger${currentBg ? ' bg-picker__trigger--active' : ''}`}
+        variant="secondary"
+        className={`bg-picker__trigger${currentBg ? ' bg-picker__trigger--active' : ''}`}
         onClick={() => setOpen((v) => !v)}
         title="Set background image"
       >
         🎨
-      </button>
+      </Button>
 
       {open &&
         createPortal(
@@ -88,13 +90,14 @@ export function BackgroundPicker({ docId, currentBg, onApply }: Props) {
             )}
 
             <div className="bg-picker__section">
-              <button
-                className="bg-picker__upload-btn"
+              <Button
+                variant="ghost"
+                fullWidth
                 disabled={uploading}
                 onClick={() => fileRef.current?.click()}
               >
                 {uploading ? '⏳ Uploading…' : '📁 Upload image'}
-              </button>
+              </Button>
               <input
                 ref={fileRef}
                 type="file"
@@ -117,21 +120,22 @@ export function BackgroundPicker({ docId, currentBg, onApply }: Props) {
                   onChange={(e) => setUrlInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleUrlApply(); }}
                 />
-                <button
-                  className="bg-picker__url-apply"
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={handleUrlApply}
                   disabled={!urlInput.trim()}
                 >
                   Apply
-                </button>
+                </Button>
               </div>
             </div>
 
             {currentBg && (
               <div className="bg-picker__section">
-                <button className="bg-picker__remove-btn" onClick={() => apply(null)}>
+                <Button variant="danger" fullWidth onClick={() => apply(null)}>
                   ✕ Remove background
-                </button>
+                </Button>
               </div>
             )}
           </div>,
