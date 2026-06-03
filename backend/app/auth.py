@@ -52,20 +52,21 @@ def _peek_alg(token: str) -> str:
 def _decode(token: str) -> dict:
     alg = _peek_alg(token)
 
-    if alg == "RS256":
+    if alg in ("RS256", "ES256"):
+        # Asymmetric — verify via Supabase JWKS public key endpoint
         if not settings.supabase_url:
-            raise ValueError("SUPABASE_URL not configured for RS256 validation")
+            raise ValueError("SUPABASE_URL not configured")
         client = _get_jwks_client()
         signing_key = client.get_signing_key_from_jwt(token)
         return jwt.decode(
             token,
             signing_key.key,
-            algorithms=["RS256"],
+            algorithms=["RS256", "ES256"],
             audience="authenticated",
             options={"verify_exp": True},
         )
     else:
-        # HS256 (default for many Supabase projects)
+        # HS256 legacy — verify with shared secret
         if not settings.supabase_jwt_secret:
             raise ValueError("SUPABASE_JWT_SECRET not configured for HS256 validation")
         return jwt.decode(
