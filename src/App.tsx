@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type * as Y from 'yjs';
 import type { EditorView } from 'prosemirror-view';
@@ -90,6 +90,21 @@ function App() {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }, [sidebarWidth]);
+
+  // Bump updatedAt in the registry whenever the active doc's content changes.
+  useEffect(() => {
+    if (!ydoc) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => registry.touchDoc(registry.activeDocId), 2000);
+    };
+    ydoc.on('update', handler);
+    return () => {
+      ydoc.off('update', handler);
+      clearTimeout(timer);
+    };
+  }, [ydoc, registry.activeDocId]); // registry.touchDoc is stable (useCallback)
 
   const activeDocName =
     registry.docs.find((d) => d.id === registry.activeDocId)?.name ?? '';

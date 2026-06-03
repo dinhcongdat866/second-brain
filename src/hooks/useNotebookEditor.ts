@@ -133,9 +133,23 @@ export function useNotebookEditor(
           });
         }
       } else {
-        // Merge server state first so seedIfEmpty sees the real content
-        await applyServerState(activeDocId, doc);
+        // Merge server state first so seedIfEmpty sees the real content.
+        const hadServerState = await applyServerState(activeDocId, doc);
         if (cancelled) return;
+
+        // If the HTTP backend had no saved state (brand-new doc or unreachable),
+        // the WS provider may still be mid-sync with live content from another tab.
+        // Wait briefly for it so we don't seed a blank cell that then conflicts
+        // with the real content arriving over WebSocket.
+        if (!hadServerState && !provider.synced) {
+          await new Promise<void>((resolve) => {
+            const onSync = () => { provider.off('synced', onSync); resolve(); };
+            provider.on('synced', onSync);
+            setTimeout(() => { provider.off('synced', onSync); resolve(); }, 2000);
+          });
+          if (cancelled) return;
+        }
+
         seedIfEmpty(doc, yXmlFragment);
       }
       sweepOrphanThreads(doc, yXmlFragment);

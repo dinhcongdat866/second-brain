@@ -91,10 +91,10 @@ export function SelectionToolbarShell({
         </div>
       ) : (
         <>
-          <button className={`ftb__btn${on('strong')}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onMark('strong')} title="Bold"><b>B</b></button>
-          <button className={`ftb__btn${on('em')}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onMark('em')} title="Italic"><i>I</i></button>
+          <button className={`ftb__btn${on('strong')}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onMark('strong')} title="Bold (Ctrl+B / ⌘B)"><b>B</b></button>
+          <button className={`ftb__btn${on('em')}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onMark('em')} title="Italic (Ctrl+I / ⌘I)"><i>I</i></button>
           <button className={`ftb__btn${on('strikethrough')}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onMark('strikethrough')} title="Strikethrough"><s>S</s></button>
-          <button className={`ftb__btn${on('code')}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onMark('code')} title="Inline code"><code>{`</>`}</code></button>
+          <button className={`ftb__btn${on('code')}`} onMouseDown={(e) => e.preventDefault()} onClick={() => onMark('code')} title="Inline code (Ctrl+E / ⌘E)"><code>{`</>`}</code></button>
           <div className="ftb__sep" />
           <button className={`ftb__btn${on('link')}`} onMouseDown={(e) => e.preventDefault()} onClick={onLinkTrigger} title="Link">⌖</button>
           <div className="ftb__sep" />

@@ -6,6 +6,7 @@ import {
   renameDoc,
   deleteDoc,
   restoreDoc,
+  touchDoc,
   bootstrapRegistry,
   optimisticDocs,
   REGISTRY_DOC_ID,
@@ -118,6 +119,11 @@ export function useDocRegistry() {
     if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
   }, []);
 
+  const handleTouch = useCallback((id: string) => {
+    const map = setupRef.current?.docsMap;
+    if (map) touchDoc(map, id);
+  }, []);
+
   return {
     docs,
     activeDocId,
@@ -127,5 +133,6 @@ export function useDocRegistry() {
     renameDoc: handleRename,
     deleteDoc: handleDelete,
     restoreDoc: handleRestore,
+    touchDoc: handleTouch,
   };
 }

@@ -36,9 +36,24 @@ interface DocGroup {
   docs: DocMeta[];
 }
 
+function formatExactTime(isoStr: string): string {
+  return new Date(isoStr).toLocaleString(intlLocale(), {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 function groupDocsByDate(docs: DocMeta[]): DocGroup[] {
+  // Sort most-recently-updated first so groups and items appear in descending order.
+  const sorted = [...docs].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  );
   const map = new Map<string, DocMeta[]>();
-  for (const doc of docs) {
+  for (const doc of sorted) {
     const label = getGroupLabel(doc.updatedAt);
     if (!map.has(label)) map.set(label, []);
     map.get(label)!.push(doc);
@@ -99,6 +114,20 @@ export function Sidebar({
     [],
   );
 
+  // F2 renames the currently active document.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'F2') return;
+      const activeDoc = docs.find((d) => d.id === activeId);
+      if (!activeDoc || editingId) return;
+      e.preventDefault();
+      setEditingId(activeDoc.id);
+      setEditValue(activeDoc.name);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [docs, activeId, editingId]);
+
   const startRename = (doc: DocMeta, e: React.MouseEvent) => {
     e.stopPropagation();
     setConfirmDeleteId(null);
@@ -147,7 +176,7 @@ export function Sidebar({
         if (doc.id !== activeId) onSelect(doc.id);
       }}
       onDoubleClick={(e) => startRename(doc, e)}
-      title={editingId === doc.id ? undefined : doc.name}
+      title={editingId === doc.id ? undefined : formatExactTime(doc.updatedAt)}
     >
       {editingId === doc.id ? (
         <input
