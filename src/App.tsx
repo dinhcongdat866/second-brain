@@ -84,6 +84,9 @@ function App() {
     window.addEventListener('mouseup', onUp);
   }, [sidebarWidth]);
 
+  // Reset editor visibility when switching documents.
+  useEffect(() => { setEditorHidden(false); }, [registry.activeDocId]);
+
   // Bump updatedAt in the registry whenever the active doc's content changes.
   useEffect(() => {
     if (!ydoc) return;
