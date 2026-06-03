@@ -5,8 +5,11 @@ class Settings(BaseSettings):
     database_url: str
     anthropic_api_key: str
     embedding_model: str = "all-MiniLM-L6-v2"
-    # Comma-separated list of allowed CORS origins (frontend URLs).
+    # Comma-separated list of exact allowed CORS origins (e.g. localhost).
     allowed_origins: str = "http://localhost:5173"
+    # Regex for origins allowed by pattern. Vercel mints a new URL per
+    # deployment/preview, so an exact list always goes stale — match them all.
+    allowed_origin_regex: str = r"https://.*\.vercel\.app"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
