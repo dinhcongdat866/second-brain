@@ -23,6 +23,69 @@ function readActive(): string {
   return localStorage.getItem(ACTIVE_KEY) ?? optimisticDocs()[0].id;
 }
 
+// ---------------------------------------------------------------------------
+// Guest registry — simple React state, no network, no Yjs
+// ---------------------------------------------------------------------------
+
+function makeGuestDoc(): DocMeta {
+  const now = new Date().toISOString();
+  return { id: 'guest-default', name: 'Journal', createdAt: now, updatedAt: now };
+}
+
+export function useGuestDocRegistry() {
+  const [docs, setDocs] = useState<DocMeta[]>(() => [makeGuestDoc()]);
+  const [activeDocId, setActiveDocId] = useState('guest-default');
+
+  const selectDoc = useCallback((id: string) => setActiveDocId(id), []);
+
+  const createNewDoc = useCallback(() => {
+    const now = new Date().toISOString();
+    const doc: DocMeta = { id: crypto.randomUUID(), name: 'New Document', createdAt: now, updatedAt: now };
+    setDocs((prev) => [...prev, doc]);
+    setActiveDocId(doc.id);
+  }, []);
+
+  const importDoc = useCallback((name: string) => {
+    const now = new Date().toISOString();
+    const doc: DocMeta = { id: crypto.randomUUID(), name, createdAt: now, updatedAt: now };
+    setDocs((prev) => [...prev, doc]);
+    setActiveDocId(doc.id);
+  }, []);
+
+  const handleRename = useCallback((id: string, name: string) => {
+    setDocs((prev) => prev.map((d) => d.id === id ? { ...d, name } : d));
+  }, []);
+
+  const handleDelete = useCallback((id: string) => {
+    setDocs((prev) => {
+      const next = prev.filter((d) => d.id !== id);
+      if (id === activeDocId && next.length > 0) setActiveDocId(next[0].id);
+      return next;
+    });
+  }, [activeDocId]);
+
+  const handleRestore = useCallback((meta: DocMeta) => {
+    setDocs((prev) => prev.some((d) => d.id === meta.id) ? prev : [...prev, meta]);
+  }, []);
+
+  return {
+    docs,
+    activeDocId,
+    selectDoc,
+    createNewDoc,
+    importDoc,
+    renameDoc: handleRename,
+    deleteDoc: handleDelete,
+    restoreDoc: handleRestore,
+    touchDoc: () => {},
+    setBgImage: () => {},
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Authenticated registry — Yjs + WebSocket + Neon
+// ---------------------------------------------------------------------------
+
 /**
  * Document registry hook, backed by a shared Y.Doc (synced cross-client +
  * persisted to Neon). `activeDocId` stays per-device in localStorage.

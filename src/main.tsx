@@ -3,7 +3,12 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './i18n'
 import App from './App.tsx'
+import { AuthGate } from './components/AuthGate.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
+import { initAuth } from './stores/authStore.ts'
+
+// Bootstrap Supabase session before first render
+initAuth();
 
 // Ask the browser to make IndexedDB storage persistent (resist eviction).
 // Honored by Chrome/Firefox; Safari ignores it — there the Neon backend is the
@@ -15,7 +20,9 @@ if (navigator.storage?.persist) {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      <AuthGate>
+        <App />
+      </AuthGate>
     </ErrorBoundary>
   </StrictMode>,
 )

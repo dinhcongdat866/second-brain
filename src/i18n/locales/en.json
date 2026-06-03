@@ -27,7 +27,8 @@
     "undo": "Undo",
     "activePeers": "{{count}} active peer(s)",
     "language": "Language",
-    "anonymousUser": "Not signed in"
+    "anonymousUser": "Not signed in",
+    "signOut": "Sign out"
   },
   "date": {
     "today": "Today",
@@ -90,6 +91,21 @@
   "slash": {
     "aiDesc": "Chat with AI about the content",
     "weeklyDesc": "7-column weekly planner with todos"
+  },
+  "login": {
+    "tagline": "Your personal knowledge base",
+    "continueWithGoogle": "Continue with Google",
+    "or": "or",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "emailPlaceholder": "Email",
+    "passwordPlaceholder": "Password (min 6 chars)",
+    "checkEmail": "Check your email to confirm your account, then sign in.",
+    "continueAsGuest": "Continue as guest — data won't be saved"
+  },
+  "guest": {
+    "bannerText": "You're in guest mode — notes won't be saved.",
+    "signIn": "Sign in to save"
   },
   "snapshot": {
     "title": "History",

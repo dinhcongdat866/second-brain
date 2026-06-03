@@ -1,13 +1,14 @@
 /**
  * Thin HTTP helper for the FastAPI backend.
  *
- * Centralises the base URL and turns a non-OK response into a typed error, so
- * call sites stop string-concatenating `BACKEND_URL` and handle failures the
- * same way. Network errors reject as usual — each caller decides whether to
- * swallow them (most backend calls here are best-effort / fire-and-forget).
+ * Injects the Supabase JWT as Authorization: Bearer <token> on every request
+ * so the backend can authenticate the caller. Guest-mode requests carry no
+ * token and will be rejected by auth-gated endpoints — callers in guest mode
+ * should not hit those endpoints anyway.
  */
 
 import { BACKEND_URL } from './config';
+import { supabase } from './supabase';
 
 export class HttpError extends Error {
   readonly status: number;
@@ -23,7 +24,13 @@ export class HttpError extends Error {
 
 /** fetch against the backend base URL; throws HttpError on a non-OK status. */
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(`${BACKEND_URL}${path}`, init);
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+
+  const headers = new Headers(init?.headers);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const res = await fetch(`${BACKEND_URL}${path}`, { ...init, headers });
   if (!res.ok) throw new HttpError(res.status, path);
   return res;
 }

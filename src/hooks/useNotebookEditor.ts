@@ -12,6 +12,7 @@ import {
   initProseMirrorDoc,
 } from 'y-prosemirror';
 import type * as Y from 'yjs';
+import type { Awareness } from 'y-protocols/awareness';
 import { WebsocketProvider } from 'y-websocket';
 
 import { notebookSchema } from '../schema';
@@ -41,7 +42,13 @@ import { AiCellView } from '../nodeViews/aiCellView';
 import { MarkdownCellView } from '../nodeViews/markdownCellView';
 import { WeeklyCellView } from '../nodeViews/weeklyCellView';
 import { startAutoSnapshot } from '../collab/snapshots';
-import { createCollabSetup, seedFromContent, seedIfEmpty, wireSaveStatus } from '../collab/ydoc';
+import {
+  createCollabSetup,
+  createGuestDocSetup,
+  seedFromContent,
+  seedIfEmpty,
+  wireSaveStatus,
+} from '../collab/ydoc';
 import { runMigrations } from '../collab/schemaMigrations';
 import { addTurn, getThread, sweepOrphanThreads } from '../collab/aiThreads';
 import { sweepOrphanWeeklyPlans } from '../collab/weeklyPlans';
@@ -53,7 +60,7 @@ type ProseMirrorMapping = ReturnType<typeof initProseMirrorDoc>['mapping'];
 function createPlugins(
   yXmlFragment: Y.XmlFragment,
   mapping: ProseMirrorMapping,
-  awareness: WebsocketProvider['awareness'],
+  awareness: Awareness | WebsocketProvider['awareness'],
   docId: string,
 ) {
   return [
@@ -96,9 +103,103 @@ function createPlugins(
   ];
 }
 
+// ---------------------------------------------------------------------------
+// Shared editor-binding logic (used by both auth and guest paths)
+// ---------------------------------------------------------------------------
+
+function bindEditor(
+  container: HTMLDivElement,
+  yXmlFragment: Y.XmlFragment,
+  awareness: Awareness | WebsocketProvider['awareness'],
+  doc: Y.Doc,
+  activeDocId: string,
+  setView: (v: EditorView | null) => void,
+  setYdoc: (d: Y.Doc | null) => void,
+  isGuest: boolean,
+): (() => void) | undefined {
+  sweepOrphanThreads(doc, yXmlFragment);
+  sweepOrphanWeeklyPlans(doc, yXmlFragment);
+  runMigrations(doc);
+  bindYDoc(doc);
+  setYdoc(doc);
+
+  let unwireSave: (() => void) | undefined;
+  let stopSnapshot: (() => void) | undefined;
+  let stopSyncer: (() => void) | undefined;
+  let detachLifecycle: (() => void) | undefined;
+
+  if (!isGuest) {
+    unwireSave = wireSaveStatus(doc);
+    stopSnapshot = startAutoSnapshot(doc);
+    const syncer = createYjsSyncer(activeDocId, doc);
+    stopSyncer = syncer.stop;
+    const onHide = () => { if (document.visibilityState === 'hidden') syncer.flushBeacon(); };
+    const onVisible = () => { if (document.visibilityState === 'visible') applyServerState(activeDocId, doc).catch(() => {}); };
+    const onPageHide = () => syncer.flushBeacon();
+    window.addEventListener('visibilitychange', onHide);
+    window.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onPageHide);
+    detachLifecycle = () => {
+      window.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onPageHide);
+    };
+  }
+
+  let v: EditorView | undefined;
+  try {
+    const { doc: pmDoc, mapping } = initProseMirrorDoc(yXmlFragment, notebookSchema);
+    const state = EditorState.create({
+      schema: notebookSchema,
+      doc: pmDoc,
+      plugins: createPlugins(yXmlFragment, mapping, awareness, activeDocId),
+    });
+    const syncDoc = isGuest ? () => {} : createDocSyncer(activeDocId);
+    v = new EditorView(container, {
+      state,
+      nodeViews: {
+        markdown_cell: (node, view, getPos) => new MarkdownCellView(node, view, getPos),
+        ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId),
+        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, doc),
+      },
+      handleDOMEvents: {
+        click(_view, event) {
+          const anchor = (event.target as HTMLElement).closest('a');
+          if (anchor?.href) { event.preventDefault(); window.open(anchor.href, '_blank', 'noopener,noreferrer'); return true; }
+          return false;
+        },
+      },
+      transformPastedHTML,
+      dispatchTransaction(tr) {
+        const next = v!.state.apply(tr);
+        v!.updateState(next);
+        if (tr.docChanged) syncDoc(next.doc);
+      },
+    });
+    setView(v);
+  } catch (err) {
+    console.error('[useNotebookEditor] Schema bind error — data preserved in Yjs.', err);
+  }
+
+  return () => {
+    unwireSave?.();
+    stopSnapshot?.();
+    stopSyncer?.();
+    detachLifecycle?.();
+    v?.destroy();
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
 export function useNotebookEditor(
   editorRef: React.RefObject<HTMLDivElement | null>,
   activeDocId: string,
+  isGuest = false,
 ) {
   const [view, setView] = useState<EditorView | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
@@ -107,14 +208,48 @@ export function useNotebookEditor(
   useEffect(() => {
     if (!editorRef.current) return;
 
-    const { ydoc: doc, persistence, provider, yXmlFragment } =
-      createCollabSetup(activeDocId);
+    // ── Guest path ── no IndexedDB, no WebSocket, no Neon sync
+    if (isGuest) {
+      const { ydoc: doc, yXmlFragment, awareness } = createGuestDocSetup();
+      let cancelled = false;
+      let cleanup: (() => void) | undefined;
+
+      // Seed immediately (no async waiting needed)
+      Promise.resolve().then(() => {
+        if (cancelled) return;
+        const pendingImport = consumePendingImport();
+        if (pendingImport) {
+          seedFromContent(doc, yXmlFragment, pendingImport.pmDoc);
+        } else {
+          seedIfEmpty(doc, yXmlFragment);
+        }
+        cleanup = bindEditor(
+          editorRef.current!,
+          yXmlFragment,
+          awareness,
+          doc,
+          activeDocId,
+          setView,
+          setYdoc,
+          true,
+        );
+      });
+
+      return () => {
+        cancelled = true;
+        cleanup?.();
+        awareness.destroy();
+        doc.destroy();
+        setView(null);
+        setYdoc(null);
+      };
+    }
+
+    // ── Authenticated path ── full persistence + Neon sync
+    const { ydoc: doc, persistence, provider, yXmlFragment } = createCollabSetup(activeDocId);
     providerRef.current = provider;
     let v: EditorView | undefined;
-    let unwireSaveStatus: (() => void) | undefined;
-    let stopAutoSnapshot: (() => void) | undefined;
-    let stopYjsSyncer: (() => void) | undefined;
-    let detachLifecycle: (() => void) | undefined;
+    let editorCleanup: (() => void) | undefined;
     let cancelled = false;
 
     persistence.whenSynced.then(async () => {
@@ -127,21 +262,13 @@ export function useNotebookEditor(
           doc.transact(() => {
             for (const { cellId, turns } of pendingImport.threads) {
               const thread = getThread(doc, cellId);
-              for (const { role, content } of turns) {
-                addTurn(thread, role, content);
-              }
+              for (const { role, content } of turns) addTurn(thread, role, content);
             }
           });
         }
       } else {
-        // Merge server state first so seedIfEmpty sees the real content.
         const hadServerState = await applyServerState(activeDocId, doc);
         if (cancelled) return;
-
-        // If the HTTP backend had no saved state (brand-new doc or unreachable),
-        // the WS provider may still be mid-sync with live content from another tab.
-        // Wait briefly for it so we don't seed a blank cell that then conflicts
-        // with the real content arriving over WebSocket.
         if (!hadServerState && !provider.synced) {
           await new Promise<void>((resolve) => {
             const onSync = (isSynced: boolean) => {
@@ -154,112 +281,25 @@ export function useNotebookEditor(
           });
           if (cancelled) return;
         }
-
         seedIfEmpty(doc, yXmlFragment);
       }
-      sweepOrphanThreads(doc, yXmlFragment);
-      sweepOrphanWeeklyPlans(doc, yXmlFragment);
-      runMigrations(doc); // bring old docs up to the current schema before binding
-      bindYDoc(doc);
-      setYdoc(doc);
-      unwireSaveStatus = wireSaveStatus(doc);
-      stopAutoSnapshot = startAutoSnapshot(doc);
 
-      const yjsSyncer = createYjsSyncer(activeDocId, doc);
-      stopYjsSyncer = yjsSyncer.stop;
-      // Flush to Neon on every teardown signal. iOS Safari is unreliable with
-      // `beforeunload`, so `pagehide` + `visibilitychange→hidden` are the real
-      // safety net; sendBeacon survives the teardown. This keeps the server
-      // copy current before IndexedDB can be evicted.
-      const onHide = () => {
-        if (document.visibilityState === 'hidden') yjsSyncer.flushBeacon();
-      };
-      // When the tab comes back into focus, pull the latest Neon state so edits
-      // from another device/tab (that saved via HTTP while this tab was hidden)
-      // are merged in without requiring a full page reload.
-      const onVisible = () => {
-        if (document.visibilityState === 'visible') {
-          applyServerState(activeDocId, doc).catch(() => {});
-        }
-      };
-      const onPageHide = () => yjsSyncer.flushBeacon();
-      window.addEventListener('visibilitychange', onHide);
-      window.addEventListener('visibilitychange', onVisible);
-      window.addEventListener('pagehide', onPageHide);
-      window.addEventListener('beforeunload', onPageHide);
-      detachLifecycle = () => {
-        window.removeEventListener('visibilitychange', onHide);
-        window.removeEventListener('visibilitychange', onVisible);
-        window.removeEventListener('pagehide', onPageHide);
-        window.removeEventListener('beforeunload', onPageHide);
-      };
-
-      // Binding can throw if the stored content doesn't fit the current schema
-      // (an unhandled incompatible change). Never let that discard data: the
-      // Yjs doc stays intact (recoverable / exportable); we just surface the
-      // failure instead of silently rendering blank. The real fix for any such
-      // case is a registered migration (see collab/schemaMigrations).
-      try {
-        const { doc: pmDoc, mapping } = initProseMirrorDoc(
-          yXmlFragment,
-          notebookSchema,
-        );
-        const state = EditorState.create({
-          schema: notebookSchema,
-          doc: pmDoc,
-          plugins: createPlugins(yXmlFragment, mapping, provider.awareness, activeDocId),
-        });
-
-        const syncDoc = createDocSyncer(activeDocId);
-
-        v = new EditorView(editorRef.current!, {
-          state,
-          nodeViews: {
-            markdown_cell: (node, view, getPos) =>
-              new MarkdownCellView(node, view, getPos),
-            ai_cell: (node, view, getPos) =>
-              new AiCellView(node, view, getPos, doc, activeDocId),
-            weekly_planner_cell: (node, view, getPos) =>
-              new WeeklyCellView(node, view, getPos, doc),
-          },
-          handleDOMEvents: {
-            click(_view, event) {
-              const anchor = (event.target as HTMLElement).closest('a');
-              if (anchor?.href) {
-                event.preventDefault();
-                window.open(anchor.href, '_blank', 'noopener,noreferrer');
-                return true;
-              }
-              return false;
-            },
-          },
-          transformPastedHTML,
-          dispatchTransaction(tr) {
-            const next = v!.state.apply(tr);
-            v!.updateState(next);
-            if (tr.docChanged) syncDoc(next.doc);
-          },
-        });
-
-        setView(v);
-      } catch (err) {
-        console.error(
-          `[useNotebookEditor] Failed to bind doc "${activeDocId}" to the ` +
-            `current schema. Data is preserved in Yjs (export to recover). ` +
-            `An incompatible schema change needs a migration in ` +
-            `collab/schemaMigrations.`,
-          err,
-        );
-      }
+      editorCleanup = bindEditor(
+        editorRef.current!,
+        yXmlFragment,
+        provider.awareness,
+        doc,
+        activeDocId,
+        setView,
+        setYdoc,
+        false,
+      );
+      v = undefined; // v is managed inside bindEditor now
     });
 
     return () => {
       cancelled = true;
-      unwireSaveStatus?.();
-      stopAutoSnapshot?.();
-      stopYjsSyncer?.();
-      detachLifecycle?.();
-      v?.destroy();
+      editorCleanup?.();
       provider.destroy();
       persistence.destroy();
       doc.destroy();
@@ -267,7 +307,7 @@ export function useNotebookEditor(
       setView(null);
       setYdoc(null);
     };
-  }, [activeDocId]); // editorRef is stable (useRef), intentionally omitted
+  }, [activeDocId, isGuest]); // editorRef is stable
 
   return { view, ydoc, providerRef };
 }

@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { Awareness } from 'y-protocols/awareness';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
 import { prosemirrorToYDoc } from 'y-prosemirror';
@@ -56,6 +57,25 @@ export interface CollabSetup {
   persistence: IndexeddbPersistence;
   provider: WebsocketProvider;
   yXmlFragment: Y.XmlFragment;
+}
+
+/**
+ * Lightweight setup for guest mode: no IndexedDB, no WebSocket.
+ * Data lives only in memory for the lifetime of the tab.
+ */
+export interface GuestDocSetup {
+  ydoc: Y.Doc;
+  yXmlFragment: Y.XmlFragment;
+  /** Local-only awareness (no network sync). Required by yCursorPlugin. */
+  awareness: Awareness;
+}
+
+export function createGuestDocSetup(): GuestDocSetup {
+  const ydoc = new Y.Doc({ gc: false });
+  const awareness = new Awareness(ydoc);
+  awareness.setLocalStateField('user', randomUser());
+  const yXmlFragment = ydoc.getXmlFragment(XML_FRAGMENT_NAME);
+  return { ydoc, yXmlFragment, awareness };
 }
 
 export function createCollabSetup(docId: string): CollabSetup {

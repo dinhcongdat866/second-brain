@@ -5,6 +5,7 @@ import type { Peer } from '../hooks/usePresence';
 import { SUPPORTED_LANGS, type Lang } from '../i18n';
 import i18n, { intlLocale } from '../i18n';
 import { getApiKey, setApiKey, clearApiKey } from '../lib/apiKey';
+import { useAuthStore } from '../stores/authStore';
 import { Button } from './Button';
 
 // ---------------------------------------------------------------------------
@@ -99,6 +100,12 @@ export function Sidebar({
 }: Props) {
   const { t, i18n: i18nInstance } = useTranslation();
   const currentLang = (i18nInstance.language?.startsWith('vi') ? 'vi' : 'en') as Lang;
+  const { user, status: authStatus, signOut } = useAuthStore();
+
+  const displayName = user?.user_metadata?.full_name as string | undefined
+    ?? user?.email
+    ?? t('sidebar.anonymousUser');
+  const avatarLetter = (displayName[0] ?? '?').toUpperCase();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -381,6 +388,22 @@ export function Sidebar({
 
               <div className="sidebar__user-menu-divider" />
 
+              {/* Sign out */}
+              {authStatus === 'authenticated' && (
+                <>
+                  <div className="sidebar__user-menu-section">
+                    <button
+                      type="button"
+                      className="sidebar__lang-btn"
+                      onClick={() => { signOut(); setUserMenuOpen(false); }}
+                    >
+                      {t('sidebar.signOut')}
+                    </button>
+                  </div>
+                  <div className="sidebar__user-menu-divider" />
+                </>
+              )}
+
               {/* Language section */}
               <div className="sidebar__user-menu-section">
                 <span className="sidebar__user-menu-label">{t('sidebar.language')}</span>
@@ -405,9 +428,9 @@ export function Sidebar({
             className="sidebar__user-bar"
             onClick={() => setUserMenuOpen((v) => !v)}
           >
-            <span className="sidebar__user-avatar">?</span>
+            <span className="sidebar__user-avatar">{avatarLetter}</span>
             <span className="sidebar__user-info">
-              <span className="sidebar__user-name">{t('sidebar.anonymousUser')}</span>
+              <span className="sidebar__user-name">{displayName}</span>
             </span>
           </button>
         </div>

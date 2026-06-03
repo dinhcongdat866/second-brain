@@ -10,8 +10,10 @@ import { FloatingToolbar } from './components/FloatingToolbar';
 import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
-import { useDocRegistry } from './hooks/useDocRegistry';
+import { useDocRegistry, useGuestDocRegistry } from './hooks/useDocRegistry';
 import { useNotebookEditor } from './hooks/useNotebookEditor';
+import { useAuthStore } from './stores/authStore';
+import { GuestBanner } from './components/GuestBanner';
 import { usePresence } from './hooks/usePresence';
 import { exportDocToMarkdown, saveMarkdownFile } from './lib/exportMarkdown';
 import { importMarkdownAsNewDoc } from './lib/importMarkdown';
@@ -54,8 +56,11 @@ function CellAdder({
 function App() {
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
-  const registry = useDocRegistry();
-  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId);
+  const isGuest = useAuthStore((s) => s.status === 'guest');
+  const authRegistry = useDocRegistry();
+  const guestRegistry = useGuestDocRegistry();
+  const registry = isGuest ? guestRegistry : authRegistry;
+  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest);
   const peers = usePresence(providerRef);
   const [showHistory, setShowHistory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -107,6 +112,7 @@ function App() {
 
   return (
     <div className="app">
+      {isGuest && <GuestBanner />}
       <header className="app-header">
         <Button
           variant="icon"

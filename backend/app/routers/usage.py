@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user
 from app.db.engine import get_db
 from app.db.models import UsageLog
 
@@ -19,8 +20,13 @@ class UsagePayload(BaseModel):
 
 
 @router.post("/log", status_code=201)
-async def log_usage(payload: UsagePayload, db: AsyncSession = Depends(get_db)):
+async def log_usage(
+    payload: UsagePayload,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
     entry = UsageLog(
+        user_id=user_id,
         doc_id=payload.doc_id,
         cell_id=payload.cell_id,
         input_tokens=payload.input_tokens,

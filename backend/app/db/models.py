@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Text, LargeBinary, Integer, Numeric
+from sqlalchemy import String, DateTime, Text, LargeBinary, Integer, Numeric, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from pgvector.sqlalchemy import Vector
 from app.db.engine import Base
@@ -9,8 +9,10 @@ EMBEDDING_DIM = 384  # all-MiniLM-L6-v2 output size
 
 class YjsDocument(Base):
     __tablename__ = "yjs_documents"
+    __table_args__ = (Index("ix_yjs_documents_user_doc", "user_id", "doc_id"),)
 
     doc_id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     state: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -24,6 +26,7 @@ class UsageLog(Base):
     __tablename__ = "usage_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     doc_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     cell_id: Mapped[str] = mapped_column(String, nullable=False)
     input_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -39,16 +42,11 @@ class UsageLog(Base):
 
 
 class Image(Base):
-    """Standalone image blobs referenced by URL from the document.
-
-    Kept out of the Yjs doc on purpose: the doc is loaded fully into memory and
-    re-synced/re-saved on every edit, and with gc:false nothing is ever pruned —
-    so embedding image bytes there would bloat it permanently. As separate rows
-    the doc only stores a short URL; images are served on demand and cached.
-    """
+    """Standalone image blobs referenced by URL from the document."""
     __tablename__ = "images"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)  # server-generated uuid
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     doc_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     content_type: Mapped[str] = mapped_column(String, nullable=False)
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
@@ -62,6 +60,7 @@ class CellEmbedding(Base):
     __tablename__ = "cell_embeddings"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)       # cell UUID from frontend
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
     doc_id: Mapped[str] = mapped_column(String, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))

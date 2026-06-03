@@ -27,7 +27,8 @@
     "undo": "Hoàn tác",
     "activePeers": "{{count}} người đang mở",
     "language": "Ngôn ngữ",
-    "anonymousUser": "Chưa đăng nhập"
+    "anonymousUser": "Chưa đăng nhập",
+    "signOut": "Đăng xuất"
   },
   "date": {
     "today": "Hôm nay",
@@ -90,6 +91,21 @@
   "slash": {
     "aiDesc": "Hội thoại với AI về nội dung",
     "weeklyDesc": "Lịch tuần 7 cột với todo list"
+  },
+  "login": {
+    "tagline": "Bộ não thứ hai của bạn",
+    "continueWithGoogle": "Tiếp tục với Google",
+    "or": "hoặc",
+    "signIn": "Đăng nhập",
+    "signUp": "Đăng ký",
+    "emailPlaceholder": "Email",
+    "passwordPlaceholder": "Mật khẩu (tối thiểu 6 ký tự)",
+    "checkEmail": "Kiểm tra email để xác nhận tài khoản, sau đó đăng nhập.",
+    "continueAsGuest": "Tiếp tục không đăng nhập — dữ liệu sẽ không được lưu"
+  },
+  "guest": {
+    "bannerText": "Bạn đang ở chế độ khách — ghi chú sẽ không được lưu.",
+    "signIn": "Đăng nhập để lưu"
   },
   "snapshot": {
     "title": "Lịch sử",

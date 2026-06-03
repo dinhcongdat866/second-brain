@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 
+from app.auth import get_current_user
 from app.db.engine import get_db
 from app.db.models import CellEmbedding
 from app.embeddings import embed
@@ -22,9 +23,9 @@ async def search(
     q: str = Query(..., min_length=1),
     limit: int = Query(5, ge=1, le=20),
     db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
 ):
     vector = embed(q)
-    # cosine distance via pgvector <=> operator; 1 - distance = similarity
     rows = await db.execute(
         select(
             CellEmbedding.id,
@@ -32,6 +33,7 @@ async def search(
             CellEmbedding.content,
             (1 - CellEmbedding.embedding.cosine_distance(vector)).label("score"),
         )
+        .where(CellEmbedding.user_id == user_id)
         .order_by(text("score DESC"))
         .limit(limit)
     )
