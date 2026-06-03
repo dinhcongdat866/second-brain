@@ -31,6 +31,10 @@
   padding: 14px 14px 10px;
   border-bottom: 1px solid var(--nb-border-faint);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .sidebar__title {
@@ -39,6 +43,25 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--nb-text-3);
+}
+
+.sidebar__peers {
+  display: flex;
+  gap: 4px;
+}
+
+.sidebar__peer-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--nb-r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  cursor: default;
+  flex-shrink: 0;
 }
 
 .sidebar__list {

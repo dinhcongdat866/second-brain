@@ -12,6 +12,7 @@ import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
 import { useDocRegistry } from './hooks/useDocRegistry';
 import { useNotebookEditor } from './hooks/useNotebookEditor';
+import { usePresence } from './hooks/usePresence';
 import { exportDocToMarkdown, saveMarkdownFile } from './lib/exportMarkdown';
 import { importMarkdownAsNewDoc } from './lib/importMarkdown';
 import { useUIStore } from './stores/uiStore';
@@ -66,7 +67,8 @@ function App() {
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const registry = useDocRegistry();
-  const { view, ydoc } = useNotebookEditor(editorRef, registry.activeDocId);
+  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId);
+  const peers = usePresence(providerRef);
   const [showHistory, setShowHistory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(220);
@@ -176,6 +178,7 @@ function App() {
               onRename={registry.renameDoc}
               onDelete={registry.deleteDoc}
               onRestore={registry.restoreDoc}
+              peers={peers}
               style={{ width: sidebarWidth }}
             />
             <div

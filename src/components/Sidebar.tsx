@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DocMeta } from '../collab/registry';
+import type { Peer } from '../hooks/usePresence';
 import i18n, { intlLocale } from '../i18n';
 
 // ---------------------------------------------------------------------------
@@ -77,6 +78,7 @@ interface Props {
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onRestore: (meta: DocMeta) => void;
+  peers?: Peer[];
   style?: React.CSSProperties;
 }
 
@@ -88,6 +90,7 @@ export function Sidebar({
   onRename,
   onDelete,
   onRestore,
+  peers = [],
   style,
 }: Props) {
   const { t } = useTranslation();
@@ -244,6 +247,20 @@ export function Sidebar({
     <aside className="sidebar" style={style}>
       <div className="sidebar__header">
         <span className="sidebar__title">{t('sidebar.documents')}</span>
+        {peers.length > 0 && (
+          <div className="sidebar__peers" aria-label={t('sidebar.activePeers', { count: peers.length })}>
+            {peers.map((peer, i) => (
+              <span
+                key={i}
+                className="sidebar__peer-avatar"
+                style={{ background: peer.color }}
+                title={peer.name}
+              >
+                {peer.name[0].toUpperCase()}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <nav className="sidebar__list">

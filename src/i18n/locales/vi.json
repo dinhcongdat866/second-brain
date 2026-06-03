@@ -22,7 +22,8 @@
     "cancel": "Huỷ",
     "deleteConfirm": "Xoá \"{{name}}\"?",
     "deleted": "Đã xoá \"{{name}}\"",
-    "undo": "Hoàn tác"
+    "undo": "Hoàn tác",
+    "activePeers": "{{count}} người đang mở"
   },
   "date": {
     "today": "Hôm nay",

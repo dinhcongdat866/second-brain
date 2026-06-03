@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { baseKeymap, chainCommands, toggleMark } from 'prosemirror-commands';
@@ -12,7 +12,7 @@ import {
   initProseMirrorDoc,
 } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import type { WebsocketProvider } from 'y-websocket';
+import { WebsocketProvider } from 'y-websocket';
 
 import { notebookSchema } from '../schema';
 import {
@@ -49,12 +49,11 @@ import { consumePendingImport } from '../lib/importState';
 import { createDocSyncer, createYjsSyncer, applyServerState } from '../lib/backendSync';
 
 type ProseMirrorMapping = ReturnType<typeof initProseMirrorDoc>['mapping'];
-type Awareness = WebsocketProvider['awareness'];
 
 function createPlugins(
   yXmlFragment: Y.XmlFragment,
   mapping: ProseMirrorMapping,
-  awareness: Awareness,
+  awareness: WebsocketProvider['awareness'],
   docId: string,
 ) {
   return [
@@ -103,12 +102,14 @@ export function useNotebookEditor(
 ) {
   const [view, setView] = useState<EditorView | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
+  const providerRef = useRef<WebsocketProvider | null>(null);
 
   useEffect(() => {
     if (!editorRef.current) return;
 
     const { ydoc: doc, persistence, provider, yXmlFragment } =
       createCollabSetup(activeDocId);
+    providerRef.current = provider;
     let v: EditorView | undefined;
     let unwireSaveStatus: (() => void) | undefined;
     let stopAutoSnapshot: (() => void) | undefined;
@@ -262,10 +263,11 @@ export function useNotebookEditor(
       provider.destroy();
       persistence.destroy();
       doc.destroy();
+      providerRef.current = null;
       setView(null);
       setYdoc(null);
     };
   }, [activeDocId]); // editorRef is stable (useRef), intentionally omitted
 
-  return { view, ydoc };
+  return { view, ydoc, providerRef };
 }

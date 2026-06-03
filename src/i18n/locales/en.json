@@ -22,7 +22,8 @@
     "cancel": "Cancel",
     "deleteConfirm": "Delete \"{{name}}\"?",
     "deleted": "Deleted \"{{name}}\"",
-    "undo": "Undo"
+    "undo": "Undo",
+    "activePeers": "{{count}} active peer(s)"
   },
   "date": {
     "today": "Today",
