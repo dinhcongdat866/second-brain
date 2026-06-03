@@ -11,9 +11,12 @@ primary_region = 'sin'
 [http_service]
   internal_port = 8080
   force_https = true
+  # Keep one machine always warm so requests never hit a cold-start window
+  # (during which Fly returns 502s without CORS headers → "CORS error" in the
+  # browser and flaky sync). Set back to 0 to save cost when not in use.
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
   [[http_service.checks]]
     interval = '30s'
