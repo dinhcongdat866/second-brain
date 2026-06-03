@@ -138,7 +138,9 @@ export function useDocRegistry(userId?: string) {
       setup.persistence.destroy();
       setup.ydoc.destroy();
     };
-  }, []);
+  // userId in deps: if userId changes (shouldn't normally happen, but guards
+  // against stale room scoping if the user object arrives after first render).
+  }, [userId]);
 
   const setActive = (id: string) => {
     localStorage.setItem(ACTIVE_KEY, id);
