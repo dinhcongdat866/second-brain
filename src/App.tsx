@@ -61,6 +61,7 @@ function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(220);
+  const [editorHidden, setEditorHidden] = useState(false);
   const [resizing, setResizing] = useState(false);
   const saveStatus = useUIStore((s) => s.saveStatus);
 
@@ -151,6 +152,15 @@ function App() {
           currentBg={activeDocBg}
           onApply={(url) => registry.setBgImage(registry.activeDocId, url)}
         />
+        {activeDocBg && (
+          <Button
+            variant="icon"
+            onClick={() => setEditorHidden((v) => !v)}
+            title={editorHidden ? t('app.showEditor') : t('app.hideEditor')}
+          >
+            {editorHidden ? '◻' : '▣'}
+          </Button>
+        )}
       </header>
 
       <div className="app-body" style={resizing ? { cursor: 'col-resize', userSelect: 'none' } : undefined}>
@@ -177,7 +187,7 @@ function App() {
           className={`app-main${activeDocBg ? ' app-main--bg' : ''}`}
           style={activeDocBg ? { backgroundImage: `url(${activeDocBg})` } : undefined}
         >
-          <div className="notebook-wrap">
+          <div className={`notebook-wrap${editorHidden ? ' notebook-wrap--hidden' : ''}`}>
             {/* editorRef must stay mounted for the EditorView to attach; the
                 loading overlay sits on top until the doc has synced + bound. */}
             <div ref={editorRef} className="notebook-editor" />

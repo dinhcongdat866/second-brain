@@ -76,6 +76,12 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
+  transition: opacity var(--dur-base) var(--ease);
+}
+
+.notebook-wrap--hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Language switcher (EN / VI) */

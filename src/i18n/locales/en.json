@@ -7,7 +7,9 @@
     "import": "Import .md",
     "importTitle": "Import a Markdown file as a new document",
     "export": "Export .md",
-    "exportTitle": "Export as Markdown"
+    "exportTitle": "Export as Markdown",
+    "hideEditor": "Hide editor frame",
+    "showEditor": "Show editor frame"
   },
   "cellAdder": {
     "markdown": "+ Markdown",
