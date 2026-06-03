@@ -200,6 +200,7 @@ export function useNotebookEditor(
   editorRef: React.RefObject<HTMLDivElement | null>,
   activeDocId: string,
   isGuest = false,
+  userId?: string,
 ) {
   const [view, setView] = useState<EditorView | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
@@ -246,7 +247,7 @@ export function useNotebookEditor(
     }
 
     // ── Authenticated path ── full persistence + Neon sync
-    const { ydoc: doc, persistence, provider, yXmlFragment } = createCollabSetup(activeDocId);
+    const { ydoc: doc, persistence, provider, yXmlFragment } = createCollabSetup(activeDocId, userId);
     providerRef.current = provider;
     let v: EditorView | undefined;
     let editorCleanup: (() => void) | undefined;
@@ -307,7 +308,7 @@ export function useNotebookEditor(
       setView(null);
       setYdoc(null);
     };
-  }, [activeDocId, isGuest]); // editorRef is stable
+  }, [activeDocId, isGuest, userId]); // editorRef is stable
 
   return { view, ydoc, providerRef };
 }

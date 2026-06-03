@@ -15,19 +15,28 @@ import { NEON_SYNC_ORIGIN } from '../lib/backendSync';
  */
 export const XML_FRAGMENT_NAME = 'prosemirror';
 
-/** IndexedDB key for a given doc. 'default' maps to the original store. */
-export const collabDbName = (docId: string) => `notebook:${docId}`;
+/**
+ * IndexedDB key for a given doc, scoped by userId to prevent cross-user
+ * cache leakage on shared browsers.
+ * Legacy (pre-auth) keys had no userId prefix — kept as-is so existing local
+ * data is still found after migration.
+ */
+export const collabDbName = (docId: string, userId?: string) =>
+  userId ? `notebook:${userId}:${docId}` : `notebook:${docId}`;
 
 /**
  * Permanently remove the Yjs IndexedDB store for a document.
- * Call this only after the undo window has expired so a restore is still possible.
  */
-export function deleteDocStorage(docId: string): void {
-  indexedDB.deleteDatabase(collabDbName(docId));
+export function deleteDocStorage(docId: string, userId?: string): void {
+  indexedDB.deleteDatabase(collabDbName(docId, userId));
 }
 
-/** WebSocket room for a given doc — each doc gets its own collab room. */
-export const collabRoom = (docId: string) => `notebook-${docId}`;
+/**
+ * WebSocket room for a given doc, scoped by userId so different users never
+ * share a room and see each other's content.
+ */
+export const collabRoom = (docId: string, userId?: string) =>
+  userId ? `notebook-${userId}-${docId}` : `notebook-${docId}`;
 
 /** Cursor/selection colors handed out to peers via awareness. */
 const CURSOR_COLORS = [
@@ -78,12 +87,11 @@ export function createGuestDocSetup(): GuestDocSetup {
   return { ydoc, yXmlFragment, awareness };
 }
 
-export function createCollabSetup(docId: string): CollabSetup {
+export function createCollabSetup(docId: string, userId?: string): CollabSetup {
   // gc: false — keep all tombstoned operations so Y.snapshot / time-travel works.
-  // The IndexedDB store grows slowly over time; acceptable for a personal notebook.
   const ydoc = new Y.Doc({ gc: false });
-  const persistence = new IndexeddbPersistence(collabDbName(docId), ydoc);
-  const provider = new WebsocketProvider(WS_URL, collabRoom(docId), ydoc);
+  const persistence = new IndexeddbPersistence(collabDbName(docId, userId), ydoc);
+  const provider = new WebsocketProvider(WS_URL, collabRoom(docId, userId), ydoc);
   provider.awareness.setLocalStateField('user', randomUser());
   const yXmlFragment = ydoc.getXmlFragment(XML_FRAGMENT_NAME);
   return { ydoc, persistence, provider, yXmlFragment };

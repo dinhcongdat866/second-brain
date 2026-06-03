@@ -93,7 +93,7 @@ export function useGuestDocRegistry() {
  * First paint uses an optimistic list (legacy localStorage / default) so the
  * sidebar isn't empty; once the registry Y.Doc syncs, the real list takes over.
  */
-export function useDocRegistry() {
+export function useDocRegistry(userId?: string) {
   const [docs, setDocs] = useState<DocMeta[]>(() => optimisticDocs());
   const [activeDocId, setActiveDocIdState] = useState<string>(() => readActive());
   const setupRef = useRef<RegistrySetup | null>(null);
@@ -101,7 +101,7 @@ export function useDocRegistry() {
 
   // Create the registry Y.Doc once for the whole app session.
   useEffect(() => {
-    const setup = createRegistrySetup();
+    const setup = createRegistrySetup(userId);
     setupRef.current = setup;
     const syncer = createYjsSyncer(REGISTRY_DOC_ID, setup.ydoc);
 
@@ -179,7 +179,7 @@ export function useDocRegistry() {
       // Defer destructive storage cleanup past the undo window.
       if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
       storageCleanupRef.current = setTimeout(() => {
-        deleteDocStorage(id);
+        deleteDocStorage(id, userId);
         deleteDocState(id);
         deleteDocImages(id);
       }, 5500);

@@ -56,11 +56,13 @@ function CellAdder({
 function App() {
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
-  const isGuest = useAuthStore((s) => s.status === 'guest');
-  const authRegistry = useDocRegistry();
+  const { status: authStatus, user } = useAuthStore();
+  const isGuest = authStatus === 'guest';
+  const userId = user?.id;
+  const authRegistry = useDocRegistry(userId);
   const guestRegistry = useGuestDocRegistry();
   const registry = isGuest ? guestRegistry : authRegistry;
-  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest);
+  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId);
   const peers = usePresence(providerRef);
   const [showHistory, setShowHistory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
