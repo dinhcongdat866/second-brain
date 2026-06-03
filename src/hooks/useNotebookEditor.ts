@@ -143,9 +143,13 @@ export function useNotebookEditor(
         // with the real content arriving over WebSocket.
         if (!hadServerState && !provider.synced) {
           await new Promise<void>((resolve) => {
-            const onSync = () => { provider.off('synced', onSync); resolve(); };
-            provider.on('synced', onSync);
-            setTimeout(() => { provider.off('synced', onSync); resolve(); }, 2000);
+            const onSync = (isSynced: boolean) => {
+              if (!isSynced) return;
+              provider.off('sync', onSync);
+              resolve();
+            };
+            provider.on('sync', onSync);
+            setTimeout(() => { provider.off('sync', onSync); resolve(); }, 2000);
           });
           if (cancelled) return;
         }
