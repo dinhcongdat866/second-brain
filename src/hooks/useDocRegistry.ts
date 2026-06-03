@@ -179,7 +179,7 @@ export function useDocRegistry(userId?: string) {
       // Defer destructive storage cleanup past the undo window.
       if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
       storageCleanupRef.current = setTimeout(() => {
-        deleteDocStorage(id, userId);
+        deleteDocStorage(id);
         deleteDocState(id);
         deleteDocImages(id);
       }, 5500);

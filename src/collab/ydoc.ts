@@ -16,19 +16,18 @@ import { NEON_SYNC_ORIGIN } from '../lib/backendSync';
 export const XML_FRAGMENT_NAME = 'prosemirror';
 
 /**
- * IndexedDB key for a given doc, scoped by userId to prevent cross-user
- * cache leakage on shared browsers.
- * Legacy (pre-auth) keys had no userId prefix — kept as-is so existing local
- * data is still found after migration.
+ * IndexedDB key for a given doc.
+ * Not scoped by userId — IndexedDB is local to the browser so cross-user
+ * leakage only happens on a shared machine (acceptable trade-off).
+ * Scoping WebSocket rooms by userId is sufficient to prevent cross-machine leakage.
  */
-export const collabDbName = (docId: string, userId?: string) =>
-  userId ? `notebook:${userId}:${docId}` : `notebook:${docId}`;
+export const collabDbName = (docId: string) => `notebook:${docId}`;
 
 /**
  * Permanently remove the Yjs IndexedDB store for a document.
  */
-export function deleteDocStorage(docId: string, userId?: string): void {
-  indexedDB.deleteDatabase(collabDbName(docId, userId));
+export function deleteDocStorage(docId: string): void {
+  indexedDB.deleteDatabase(collabDbName(docId));
 }
 
 /**
@@ -90,7 +89,7 @@ export function createGuestDocSetup(): GuestDocSetup {
 export function createCollabSetup(docId: string, userId?: string): CollabSetup {
   // gc: false — keep all tombstoned operations so Y.snapshot / time-travel works.
   const ydoc = new Y.Doc({ gc: false });
-  const persistence = new IndexeddbPersistence(collabDbName(docId, userId), ydoc);
+  const persistence = new IndexeddbPersistence(collabDbName(docId), ydoc);
   const provider = new WebsocketProvider(WS_URL, collabRoom(docId, userId), ydoc);
   provider.awareness.setLocalStateField('user', randomUser());
   const yXmlFragment = ydoc.getXmlFragment(XML_FRAGMENT_NAME);

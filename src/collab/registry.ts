@@ -49,7 +49,7 @@ export interface RegistrySetup {
 
 export function createRegistrySetup(userId?: string): RegistrySetup {
   const ydoc = new Y.Doc();
-  const persistence = new IndexeddbPersistence(collabDbName(REGISTRY_DOC_ID, userId), ydoc);
+  const persistence = new IndexeddbPersistence(collabDbName(REGISTRY_DOC_ID), ydoc);
   const provider = new WebsocketProvider(WS_URL, collabRoom(REGISTRY_DOC_ID, userId), ydoc);
   const docsMap = ydoc.getMap<Y.Map<unknown>>(REGISTRY_DOCS_KEY);
 
