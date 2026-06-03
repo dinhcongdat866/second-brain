@@ -6,6 +6,7 @@ import type { Node as PMNode } from 'prosemirror-model';
 import { createInitialDoc } from '../schema';
 import { useUIStore } from '../stores/uiStore';
 import { WS_URL } from '../lib/config';
+import { NEON_SYNC_ORIGIN } from '../lib/backendSync';
 
 /**
  * XML fragment key inside the Y.Doc that ProseMirror binds to.
@@ -104,7 +105,9 @@ export function wireSaveStatus(ydoc: Y.Doc): () => void {
   let pendingTimer: ReturnType<typeof setTimeout> | undefined;
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const onUpdate = () => {
+  const onUpdate = (_update: Uint8Array, origin: unknown) => {
+    // Remote Neon pulls are already persisted — don't show a misleading indicator.
+    if (origin === NEON_SYNC_ORIGIN) return;
     useUIStore.getState().setSaveStatus('pending');
     clearTimeout(pendingTimer);
     clearTimeout(idleTimer);

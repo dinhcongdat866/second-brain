@@ -3,6 +3,13 @@ import type { Node as PMNode } from 'prosemirror-model';
 import { BACKEND_URL, EMBED_DEBOUNCE_MS, YJS_SAVE_DEBOUNCE_MS } from './config';
 import { apiFetch } from './http';
 
+/**
+ * Transaction origin used when applying state fetched from Neon.
+ * createYjsSyncer and wireSaveStatus filter this origin so that pulling
+ * remote state never triggers a re-save or a false "Saving…" indicator.
+ */
+export const NEON_SYNC_ORIGIN = 'neon-sync';
+
 interface CellPayload {
   cell_id: string;
   doc_id: string;
@@ -71,17 +78,31 @@ export async function fetchDocState(docId: string): Promise<Uint8Array | null> {
 
 /**
  * Fetch server state and merge it into the given Y.Doc via CRDT applyUpdate.
+ * Uses NEON_SYNC_ORIGIN so listeners can skip re-saving remote-only updates.
  * Returns true if server had a state to apply, false if first-time or unreachable.
  */
 export async function applyServerState(docId: string, ydoc: Y.Doc): Promise<boolean> {
   const state = await fetchDocState(docId);
   if (!state) return false;
-  Y.applyUpdate(ydoc, state);
+  Y.applyUpdate(ydoc, state, NEON_SYNC_ORIGIN);
   return true;
 }
 
-/** Persist the full Yjs state to Neon (upsert). Silently ignores network errors. */
+/**
+ * Persist the Yjs state to Neon using a read-merge-write cycle.
+ *
+ * A plain overwrite causes data loss when two clients have diverged (e.g. DEV
+ * opened a doc before PROD saved its content, seeded an empty cell, then
+ * overwrote Neon with that empty state). By fetching the current server state
+ * first and merging it (CRDT) before saving, the written blob always contains
+ * the union of all known operations — safe even under concurrent saves.
+ *
+ * The merge is tagged NEON_SYNC_ORIGIN so createYjsSyncer does not treat it as
+ * a local edit and re-schedule another save.
+ */
 export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
+  const remote = await fetchDocState(docId);
+  if (remote) Y.applyUpdate(ydoc, remote, NEON_SYNC_ORIGIN);
   const state = Y.encodeStateAsUpdate(ydoc);
   await apiFetch(`/documents/${encodeURIComponent(docId)}/state`, {
     method: 'POST',
@@ -180,7 +201,10 @@ export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = YJS_SAV
 
   const persist = () => saveDocState(docId, ydoc).catch(() => {});
 
-  const schedule = () => {
+  const schedule = (_update: Uint8Array, origin: unknown) => {
+    // Ignore updates that originated from pulling Neon state — they are already
+    // persisted remotely and scheduling a re-save would create a pointless cycle.
+    if (origin === NEON_SYNC_ORIGIN) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;
@@ -196,7 +220,11 @@ export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = YJS_SAV
       if (timer) { clearTimeout(timer); timer = null; }
       persist();
     },
-    /** Flush via sendBeacon — for pagehide/visibilitychange (survives teardown). */
+    /**
+     * Flush via sendBeacon — for pagehide/visibilitychange (survives teardown).
+     * sendBeacon is fire-and-forget so we skip the merge-read; the next normal
+     * save will merge any concurrent remote writes.
+     */
     flushBeacon: () => {
       if (timer) { clearTimeout(timer); timer = null; }
       saveDocStateBeacon(docId, ydoc);
