@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DocMeta } from '../collab/registry';
+import { MEMORY_DOC_ID } from '../collab/memory';
 import type { Peer } from '../hooks/usePresence';
 import { SUPPORTED_LANGS, type Lang } from '../i18n';
 import i18n, { intlLocale } from '../i18n';
@@ -338,6 +339,18 @@ export function Sidebar({
         <div className="sidebar__user-wrap" ref={userBarRef}>
           {userMenuOpen && (
             <div className="sidebar__user-menu">
+              {/* Memory */}
+              <div className="sidebar__user-menu-section">
+                <button
+                  type="button"
+                  className="sidebar__user-menu-item"
+                  onClick={() => { onSelect(MEMORY_DOC_ID); setUserMenuOpen(false); }}
+                >
+                  🧠 {t('sidebar.memory')}
+                </button>
+              </div>
+              <div className="sidebar__user-menu-divider" />
+
               {/* API Key section */}
               <div className="sidebar__user-menu-section">
                 <span className="sidebar__user-menu-label">{t('ai.apiKey.heading')}</span>

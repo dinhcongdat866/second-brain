@@ -28,6 +28,7 @@ export function AiCell({
   thread,
   getLocalContext,
   getDocContext,
+  getMemoryContext,
   onDelete,
   cellId,
   docId,
@@ -35,6 +36,7 @@ export function AiCell({
   thread: YThread;
   getLocalContext: () => string;
   getDocContext: () => string;
+  getMemoryContext: () => string;
   onDelete: () => void;
   cellId: string;
   docId: string;
@@ -48,6 +50,7 @@ export function AiCell({
     docId,
     getLocalContext,
     getDocContext,
+    getMemoryContext,
     modelConfig: config.modelConfig,
   });
 

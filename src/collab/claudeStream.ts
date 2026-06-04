@@ -206,6 +206,8 @@ export type SearchSource = { url: string; title: string };
 
 export type StreamOptions = {
   ragContext?: string;
+  /** Content from the user's Memory doc — injected as a separate cached system block. */
+  memoryContext?: string;
   signal?: AbortSignal;
   config?: ModelConfig;
   /** Y.Text to stream thinking content into (Anthropic Sonnet/Opus only). */
@@ -285,7 +287,7 @@ export async function streamClaudeReply(
   onError: (err: Error) => void,
   options: StreamOptions = {},
 ): Promise<void> {
-  const { ragContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults, images = [], userApiKey } = options;
+  const { ragContext = '', memoryContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults, images = [], userApiKey } = options;
   const client = makeClient(userApiKey);
 
   const baseContext =
@@ -300,6 +302,11 @@ export async function streamClaudeReply(
     baseContext +
     (ragContext ? '\n\n--- RELATED NOTES FROM OTHER DOCS ---\n' + ragContext : '');
 
+  // Ollama: no cache_control support, just prepend memory to systemText.
+  const ollamaSystemText = memoryContext
+    ? '--- MEMORY ---\n' + memoryContext + '\n\n' + systemText
+    : systemText;
+
   // ---------------------------------------------------------------------------
   // Ollama branch
   // ---------------------------------------------------------------------------
@@ -310,7 +317,7 @@ export async function streamClaudeReply(
 
     try {
       ({ inputTokens, outputTokens } = await streamOllamaReply(
-        systemText,
+        ollamaSystemText,
         messages,
         ollamaModelName(config.model),
         target,
@@ -352,7 +359,14 @@ export async function streamClaudeReply(
     return { role: t.role, content: t.content };
   });
 
+  // Memory block comes first — it changes rarely so its cache slot stays warm
+  // across many conversations, making it nearly free after the first request.
   const system: Anthropic.TextBlockParam[] = [
+    ...(memoryContext ? [{
+      type: 'text' as const,
+      text: '--- MEMORY ---\nThe following was written by you or learned over time. Use it as permanent background context:\n\n' + memoryContext,
+      cache_control: { type: 'ephemeral' as const },
+    }] : []),
     {
       type: 'text',
       text: systemText,

@@ -11,6 +11,7 @@ import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
 import { useDocRegistry, useGuestDocRegistry } from './hooks/useDocRegistry';
+import { useMemory } from './hooks/useMemory';
 import { useNotebookEditor } from './hooks/useNotebookEditor';
 import { useAuthStore } from './stores/authStore';
 import { GuestBanner } from './components/GuestBanner';
@@ -62,7 +63,8 @@ function App() {
   const authRegistry = useDocRegistry(userId);
   const guestRegistry = useGuestDocRegistry();
   const registry = isGuest ? guestRegistry : authRegistry;
-  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId);
+  const { getMemoryContext } = useMemory(isGuest ? undefined : userId);
+  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext);
   const peers = usePresence(providerRef);
   const [showHistory, setShowHistory] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);

@@ -161,7 +161,7 @@ function bindEditor(
       state,
       nodeViews: {
         markdown_cell: (node, view, getPos) => new MarkdownCellView(node, view, getPos),
-        ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId),
+        ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext),
         weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, doc),
       },
       handleDOMEvents: {
@@ -201,6 +201,7 @@ export function useNotebookEditor(
   activeDocId: string,
   isGuest = false,
   userId?: string,
+  getMemoryContext: () => string = () => '',
 ) {
   const [view, setView] = useState<EditorView | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);

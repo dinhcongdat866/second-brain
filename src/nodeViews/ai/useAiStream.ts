@@ -19,6 +19,7 @@ interface Args {
   docId: string;
   getLocalContext: () => string;
   getDocContext: () => string;
+  getMemoryContext: () => string;
   modelConfig: ModelConfig;
 }
 
@@ -38,6 +39,7 @@ export function useAiStream({
   docId,
   getLocalContext,
   getDocContext,
+  getMemoryContext,
   modelConfig,
 }: Args) {
   const [prompt, setPrompt] = useState('');
@@ -163,6 +165,7 @@ export function useAiStream({
           },
           {
             ragContext,
+            memoryContext: getMemoryContext(),
             signal: ac.signal,
             config: modelConfig,
             thinkingTarget: thinkingText,

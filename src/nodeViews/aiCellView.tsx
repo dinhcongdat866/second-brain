@@ -22,6 +22,7 @@ export class AiCellView implements NodeView {
     getPos: () => number | undefined,
     ydoc: Y.Doc,
     docId: string,
+    getMemoryContext: () => string = () => '',
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'ai-cell';
@@ -53,6 +54,7 @@ export class AiCellView implements NodeView {
         thread={thread}
         getLocalContext={getLocalContext}
         getDocContext={getDocContext}
+        getMemoryContext={getMemoryContext}
         onDelete={onDelete}
         cellId={cellId}
         docId={docId}

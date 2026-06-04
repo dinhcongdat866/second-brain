@@ -28,7 +28,8 @@
     "activePeers": "{{count}} người đang mở",
     "language": "Ngôn ngữ",
     "anonymousUser": "Chưa đăng nhập",
-    "signOut": "Đăng xuất"
+    "signOut": "Đăng xuất",
+    "memory": "Bộ nhớ AI"
   },
   "date": {
     "today": "Hôm nay",

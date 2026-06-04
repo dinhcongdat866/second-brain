@@ -28,7 +28,8 @@
     "activePeers": "{{count}} active peer(s)",
     "language": "Language",
     "anonymousUser": "Not signed in",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "memory": "Memory"
   },
   "date": {
     "today": "Today",
