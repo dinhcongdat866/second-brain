@@ -67,10 +67,16 @@ export function AiCell({
   const isStreamingShared =
     !!lastTurn && lastTurn.role === 'assistant' && !lastTurn.createdAt;
 
-  // Emotion is derived from the last *completed* assistant turn so it stays
-  // stable during streaming and only shifts when a new reply finishes.
-  const lastDoneAssistant = [...turns].reverse().find(t => t.role === 'assistant' && t.createdAt);
-  const emotion = lastDoneAssistant ? detectEmotion(lastDoneAssistant.content) : 'neutral';
+  // During streaming, detect emotion from current content once >50 chars are
+  // available (avoids early false positives). Fall back to the last completed
+  // turn so subsequent streams inherit the conversation's established tone.
+  const lastAssistant = [...turns].reverse().find(t => t.role === 'assistant');
+  const lastDoneAssistant = lastAssistant?.createdAt ? lastAssistant
+    : [...turns].reverse().find(t => t.role === 'assistant' && t.createdAt);
+  const emotionSource = (lastAssistant && lastAssistant.content.length > 50)
+    ? lastAssistant.content
+    : (lastDoneAssistant?.content ?? '');
+  const emotion = detectEmotion(emotionSource);
 
   let lastUserTurnIdx = -1;
   for (let i = turns.length - 1; i >= 0; i--) {

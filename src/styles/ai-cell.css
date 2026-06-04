@@ -95,14 +95,15 @@
   --aurora-shadow: rgba( 28, 170, 205, 0.14);
 }
 
-/* Streaming — four blobs drifting at independent rates/directions. */
+/* Streaming — four blobs drifting at independent rates/directions.
+   Kept at 45–55% so blobs stay distinct rather than blending into one flat tone. */
 .ai-cell .ai-cell__inner.is-streaming,
 .ai-cell__modal.is-streaming {
   background:
-    radial-gradient(ellipse 80% 70% at var(--b1x) var(--b1y), var(--aurora-c1), transparent 65%),
-    radial-gradient(ellipse 75% 80% at var(--b2x) var(--b2y), var(--aurora-c2), transparent 65%),
-    radial-gradient(ellipse 65% 90% at var(--b3x) var(--b3y), var(--aurora-c3), transparent 70%),
-    radial-gradient(ellipse 90% 65% at var(--b4x) var(--b4y), var(--aurora-c4), transparent 70%),
+    radial-gradient(ellipse 55% 50% at var(--b1x) var(--b1y), var(--aurora-c1), transparent 70%),
+    radial-gradient(ellipse 48% 55% at var(--b2x) var(--b2y), var(--aurora-c2), transparent 70%),
+    radial-gradient(ellipse 45% 60% at var(--b3x) var(--b3y), var(--aurora-c3), transparent 70%),
+    radial-gradient(ellipse 52% 45% at var(--b4x) var(--b4y), var(--aurora-c4), transparent 70%),
     var(--nb-ai-bg);
   box-shadow: 0 0 18px -6px var(--aurora-shadow);
   animation:
