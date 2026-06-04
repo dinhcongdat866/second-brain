@@ -134,7 +134,7 @@ export function useAiStream({
       if (onMemoryExtracted && !isDemoMode && !isOllamaModel(modelConfig.model)) {
         const assistantContent = (assistant.get('content') as Y.Text).toString();
         if (assistantContent.length > 50) {
-          extractMemorableFacts(text, assistantContent, userApiKey).then((bullets) => {
+          extractMemorableFacts(text, assistantContent, getMemoryContext(), userApiKey).then((bullets) => {
             if (bullets.length > 0) onMemoryExtracted(bullets, cellId, docId);
           });
         }

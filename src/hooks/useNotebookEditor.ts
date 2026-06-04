@@ -116,6 +116,8 @@ function bindEditor(
   setView: (v: EditorView | null) => void,
   setYdoc: (d: Y.Doc | null) => void,
   isGuest: boolean,
+  getMemoryContext: () => string,
+  appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void,
 ): (() => void) | undefined {
   sweepOrphanThreads(doc, yXmlFragment);
   sweepOrphanWeeklyPlans(doc, yXmlFragment);
@@ -235,6 +237,8 @@ export function useNotebookEditor(
           setView,
           setYdoc,
           true,
+          getMemoryContext,
+          appendMemory,
         );
       });
 
@@ -295,6 +299,8 @@ export function useNotebookEditor(
         setView,
         setYdoc,
         false,
+        getMemoryContext,
+        appendMemory,
       );
     });
 

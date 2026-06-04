@@ -484,18 +484,24 @@ export async function streamClaudeReply(
 export async function extractMemorableFacts(
   userMessage: string,
   assistantMessage: string,
+  existingMemory: string,
   userApiKey?: string | null,
 ): Promise<string[]> {
   try {
     const client = makeClient(userApiKey);
+    const memorySection = existingMemory
+      ? `Existing memory about this user:\n${existingMemory}\n\n`
+      : 'Existing memory: (empty)\n\n';
     const prompt =
-      'Review this conversation and extract facts worth remembering long-term about the user.\n' +
-      'Focus on: preferences, personal context, ongoing projects, skills, goals, recurring patterns.\n' +
-      'Ignore: one-off questions, generic knowledge, things that will not matter in future conversations.\n' +
-      'If nothing is worth remembering, respond with exactly: NOTHING\n' +
-      'Otherwise respond with bullet points only, no preamble (- fact):\n\n' +
+      memorySection +
+      'New conversation exchange:\n' +
       `User: ${userMessage.slice(0, 600)}\n` +
-      `Assistant: ${assistantMessage.slice(0, 1200)}`;
+      `Assistant: ${assistantMessage.slice(0, 1200)}\n\n` +
+      'Extract ONLY facts that are genuinely new and not already captured in the existing memory above.\n' +
+      'Focus on: preferences, personal context, ongoing projects, skills, goals, recurring patterns.\n' +
+      'Ignore: one-off questions, generic knowledge, things already known, trivial details.\n' +
+      'If nothing meaningfully new: respond with exactly: NOTHING\n' +
+      'Otherwise respond with bullet points only, no preamble (- fact):';
 
     const msg = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
