@@ -28,14 +28,16 @@ export type ModelId = string;
 
 export type ModelConfig = {
   model: ModelId;
-  thinking: boolean;   // adaptive thinking — Sonnet/Opus only
-  webSearch: boolean;  // Anthropic only
+  thinking: boolean;       // adaptive thinking — Sonnet/Opus only
+  webSearch: boolean;      // Anthropic only
+  contextScope: 'local' | 'doc'; // local = 1 cell above + RAG; doc = full doc + weekly + RAG
 };
 
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   model: 'claude-sonnet-4-6',
   thinking: false,
   webSearch: false,
+  contextScope: 'local',
 };
 
 export function isOllamaModel(id: ModelId): boolean {

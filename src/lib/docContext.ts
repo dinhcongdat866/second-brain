@@ -1,4 +1,6 @@
 import type { Node as PMNode } from 'prosemirror-model';
+import type * as Y from 'yjs';
+import { WEEKLY_PLANS_KEY, serializeWeeklyForAI } from '../collab/weeklyPlans';
 
 /**
  * Tier 1 — local context: text from the N markdown cells immediately before
@@ -36,4 +38,21 @@ export function extractDocContext(doc: PMNode, maxChars = 1500): string {
   });
   const full = lines.join('\n\n');
   return full.length > maxChars ? full.slice(0, maxChars) + '\n…(truncated)' : full;
+}
+
+/**
+ * Weekly planner context: serialize up to `maxWeeks` most-recent non-empty
+ * weeks from every weekly_planner_cell in the current doc.
+ */
+export function extractWeeklyContext(ydoc: Y.Doc, doc: PMNode, maxWeeks = 4): string {
+  const plans = ydoc.getMap(WEEKLY_PLANS_KEY);
+  const parts: string[] = [];
+  doc.forEach((cell) => {
+    if (cell.type.name !== 'weekly_planner_cell') return;
+    const plan = plans.get(cell.attrs.id as string) as Y.Map<unknown> | undefined;
+    if (!plan) return;
+    const serialized = serializeWeeklyForAI(plan, maxWeeks);
+    if (serialized) parts.push(serialized);
+  });
+  return parts.join('\n\n');
 }

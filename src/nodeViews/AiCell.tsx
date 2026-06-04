@@ -21,7 +21,7 @@ function modelLabel(config: ModelConfig): string {
   const base = isOllamaModel(config.model)
     ? ollamaModelName(config.model)
     : (MODELS.find((m) => m.id === config.model)?.label ?? 'Sonnet');
-  return base + (config.thinking ? ' · Think' : '') + (config.webSearch ? ' · 🌐' : '') + ' ▾';
+  return base + (config.thinking ? ' · Think' : '') + (config.webSearch ? ' · 🌐' : '') + (config.contextScope === 'doc' ? ' · 📄' : '') + ' ▾';
 }
 
 export function AiCell({

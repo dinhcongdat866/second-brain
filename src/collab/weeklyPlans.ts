@@ -59,6 +59,39 @@ export function todayDayKey(weekStart: string): DayKey | null {
 }
 
 // ---------------------------------------------------------------------------
+// Migration from flat format → per-week nested format
+// Old: Y.Map { weekStart, mon..sun: Y.Array<YTodo> }
+// New: Y.Map { weekStart, weeks: Y.Map<weekStart, Y.Map { mon..sun: Y.Array<YTodo> }> }
+// ---------------------------------------------------------------------------
+
+function migrateIfNeeded(ydoc: Y.Doc, plan: Y.Map<unknown>): void {
+  if (plan.get('weeks') instanceof Y.Map) return;
+  const weekStart = plan.get('weekStart') as string;
+  ydoc.transact(() => {
+    const weeksMap = new Y.Map<unknown>();
+    const weekData = new Y.Map<unknown>();
+    for (const day of DAY_KEYS) {
+      const oldList = plan.get(day) as YDayList | undefined;
+      const newList = new Y.Array<YTodo>();
+      if (oldList instanceof Y.Array) {
+        for (let i = 0; i < oldList.length; i++) {
+          const old = oldList.get(i);
+          const t: YTodo = new Y.Map();
+          t.set('id',   old.get('id')   as string);
+          t.set('text', old.get('text') as string);
+          t.set('done', old.get('done') as boolean);
+          newList.push([t]);
+        }
+      }
+      weekData.set(day, newList);
+      plan.delete(day);
+    }
+    weeksMap.set(weekStart, weekData);
+    plan.set('weeks', weeksMap);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Yjs CRUD
 // ---------------------------------------------------------------------------
 
@@ -68,12 +101,26 @@ export function getWeeklyPlan(ydoc: Y.Doc, cellId: string): Y.Map<unknown> {
   if (!plan) {
     plan = new Y.Map<unknown>();
     plan.set('weekStart', getMondayOf(new Date()));
-    for (const day of DAY_KEYS) {
-      plan.set(day, new Y.Array<YTodo>());
-    }
+    plan.set('weeks', new Y.Map<unknown>());
     plans.set(cellId, plan);
+  } else {
+    migrateIfNeeded(ydoc, plan);
   }
   return plan;
+}
+
+/** Get or create the data bucket for a specific week. */
+function getWeekData(plan: Y.Map<unknown>, weekStart: string): Y.Map<unknown> {
+  const weeksMap = plan.get('weeks') as Y.Map<unknown>;
+  let weekData = weeksMap.get(weekStart) as Y.Map<unknown> | undefined;
+  if (!weekData) {
+    weekData = new Y.Map<unknown>();
+    for (const day of DAY_KEYS) {
+      weekData.set(day, new Y.Array<YTodo>());
+    }
+    weeksMap.set(weekStart, weekData);
+  }
+  return weekData;
 }
 
 /** Snap an arbitrary 'YYYY-MM-DD' date to the Monday of its week and store it. */
@@ -89,14 +136,15 @@ export function shiftWeek(plan: Y.Map<unknown>, deltaWeeks: number): void {
   plan.set('weekStart', getMondayOf(new Date(y, mo - 1, d + deltaWeeks * 7)));
 }
 
-export function getDayList(plan: Y.Map<unknown>, day: DayKey): YDayList {
-  return plan.get(day) as YDayList;
+export function getDayList(plan: Y.Map<unknown>, weekStart: string, day: DayKey): YDayList {
+  return getWeekData(plan, weekStart).get(day) as YDayList;
 }
 
-export function readAllDays(plan: Y.Map<unknown>): AllDays {
+export function readAllDays(plan: Y.Map<unknown>, weekStart: string): AllDays {
+  const weekData = getWeekData(plan, weekStart);
   const result = {} as AllDays;
   for (const day of DAY_KEYS) {
-    const list = plan.get(day) as YDayList | undefined;
+    const list = weekData.get(day) as YDayList | undefined;
     result[day] = list
       ? list.toArray().map(t => ({
           id:   t.get('id')   as string,
@@ -108,8 +156,8 @@ export function readAllDays(plan: Y.Map<unknown>): AllDays {
   return result;
 }
 
-export function addTodo(plan: Y.Map<unknown>, day: DayKey, text: string): void {
-  const list = getDayList(plan, day);
+export function addTodo(plan: Y.Map<unknown>, weekStart: string, day: DayKey, text: string): void {
+  const list = getDayList(plan, weekStart, day);
   if (!list) return;
   const todo: YTodo = new Y.Map();
   todo.set('id',   crypto.randomUUID());
@@ -118,8 +166,8 @@ export function addTodo(plan: Y.Map<unknown>, day: DayKey, text: string): void {
   list.push([todo]);
 }
 
-export function toggleTodo(plan: Y.Map<unknown>, day: DayKey, todoId: string): void {
-  const list = getDayList(plan, day);
+export function toggleTodo(plan: Y.Map<unknown>, weekStart: string, day: DayKey, todoId: string): void {
+  const list = getDayList(plan, weekStart, day);
   if (!list) return;
   for (let i = 0; i < list.length; i++) {
     const todo = list.get(i);
@@ -129,6 +177,21 @@ export function toggleTodo(plan: Y.Map<unknown>, day: DayKey, todoId: string): v
     }
   }
 }
+
+export function deleteTodo(plan: Y.Map<unknown>, weekStart: string, day: DayKey, todoId: string): void {
+  const list = getDayList(plan, weekStart, day);
+  if (!list) return;
+  for (let i = 0; i < list.length; i++) {
+    if (list.get(i).get('id') === todoId) {
+      list.delete(i, 1);
+      return;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Text formatting helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Maps every *visible* (rendered) character index to its index in the raw
@@ -171,6 +234,7 @@ function visibleToRawMap(raw: string): number[] {
  */
 export function formatTodoText(
   plan: Y.Map<unknown>,
+  weekStart: string,
   day: DayKey,
   todoId: string,
   visStart: number,
@@ -178,7 +242,7 @@ export function formatTodoText(
   open: string,
   close: string,
 ): void {
-  const list = getDayList(plan, day);
+  const list = getDayList(plan, weekStart, day);
   if (!list) return;
   for (let i = 0; i < list.length; i++) {
     const todo = list.get(i);
@@ -206,13 +270,14 @@ const KIND_CHAR: Record<StyleKind, string> = { color: 'c', bg: 'b', size: 's' };
  */
 export function clearTodoStyle(
   plan: Y.Map<unknown>,
+  weekStart: string,
   day: DayKey,
   todoId: string,
   visStart: number,
   visEnd: number,
   kind: StyleKind,
 ): void {
-  const list = getDayList(plan, day);
+  const list = getDayList(plan, weekStart, day);
   if (!list) return;
   const ch = KIND_CHAR[kind];
   for (let i = 0; i < list.length; i++) {
@@ -248,15 +313,46 @@ export function clearTodoStyle(
   }
 }
 
-export function deleteTodo(plan: Y.Map<unknown>, day: DayKey, todoId: string): void {
-  const list = getDayList(plan, day);
-  if (!list) return;
-  for (let i = 0; i < list.length; i++) {
-    if (list.get(i).get('id') === todoId) {
-      list.delete(i, 1);
-      return;
+// ---------------------------------------------------------------------------
+// AI serialization — recent non-empty weeks, newest first
+// ---------------------------------------------------------------------------
+
+/** Strip style markers ({c=…}/{/c} etc.) from todo text before injecting into AI context. */
+function stripStyleMarkers(text: string): string {
+  return text.replace(/\{[^}]*\}/g, '');
+}
+
+/**
+ * Serialize up to `maxWeeks` most-recent non-empty weeks from this plan.
+ * Returns an empty string if the plan has no todos.
+ */
+export function serializeWeeklyForAI(plan: Y.Map<unknown>, maxWeeks = 4): string {
+  const weeksMap = plan.get('weeks') as Y.Map<unknown> | undefined;
+  if (!weeksMap || weeksMap.size === 0) return '';
+
+  const entries: Array<{ weekStart: string; lines: string }> = [];
+
+  weeksMap.forEach((weekData, weekStart) => {
+    const wm = weekData as Y.Map<unknown>;
+    const dayParts: string[] = [];
+    for (const day of DAY_KEYS) {
+      const list = wm.get(day) as YDayList | undefined;
+      if (!list || list.length === 0) continue;
+      const todos = list.toArray().map(t => {
+        const done = t.get('done') as boolean;
+        const text = stripStyleMarkers(t.get('text') as string);
+        return `    ${done ? '[x]' : '[ ]'} ${text}`;
+      });
+      dayParts.push(`  ${DAY_LABELS[day as DayKey]}:\n${todos.join('\n')}`);
     }
-  }
+    if (dayParts.length > 0) {
+      entries.push({ weekStart, lines: `${weekRangeLabel(weekStart)}:\n${dayParts.join('\n')}` });
+    }
+  });
+
+  if (entries.length === 0) return '';
+  entries.sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+  return entries.slice(0, maxWeeks).map(e => e.lines).join('\n\n');
 }
 
 // ---------------------------------------------------------------------------

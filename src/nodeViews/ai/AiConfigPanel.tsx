@@ -119,6 +119,14 @@ export function AiConfigPanel({
           />
           🌐 Web Search
         </label>
+        <label className="ai-cell__config-toggle">
+          <input
+            type="checkbox"
+            checked={modelConfig.contextScope === 'doc'}
+            onChange={(e) => setModelConfig((c) => ({ ...c, contextScope: e.target.checked ? 'doc' : 'local' }))}
+          />
+          📄 Full doc context
+        </label>
       </div>
       <div className="ai-cell__config-divider" />
 

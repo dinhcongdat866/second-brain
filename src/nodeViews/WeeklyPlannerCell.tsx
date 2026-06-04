@@ -112,9 +112,10 @@ function visibleOffsetWithin(span: Element, node: Node, offset: number): number 
 interface WeeklySelectionToolbarProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   plan: Y.Map<unknown>;
+  weekStart: string;
 }
 
-function WeeklySelectionToolbar({ containerRef, plan }: WeeklySelectionToolbarProps) {
+function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelectionToolbarProps) {
   const [toolbarPos, setToolbarPos] = useState<{ left: number; top: number } | null>(null);
   const [flyout, setFlyout] = useState<WeeklyFlyout>(null);
   const [linkMode, setLinkMode] = useState(false);
@@ -183,20 +184,20 @@ function WeeklySelectionToolbar({ containerRef, plan }: WeeklySelectionToolbarPr
   const applyFormat = useCallback((open: string, close: string) => {
     if (!savedFormatRef.current) return;
     const { todoId, day, start, end } = savedFormatRef.current;
-    formatTodoText(plan, day, todoId, start, end, open, close);
+    formatTodoText(plan, weekStart, day, todoId, start, end, open, close);
     savedFormatRef.current = null;
     window.getSelection()?.removeAllRanges();
     setFlyout(null);
     setToolbarPos(null);
-  }, [plan]);
+  }, [plan, weekStart]);
 
   const applyStyle = useCallback((kind: StyleKind, value: string | null) => {
     if (!savedFormatRef.current) return;
     const { todoId, day, start, end } = savedFormatRef.current;
     // Strip any existing marker of this kind first so re-applying replaces it
     // instead of nesting {c=..}{c=..} (which the renderer can't parse).
-    clearTodoStyle(plan, day, todoId, start, end, kind);
-    if (value) formatTodoText(plan, day, todoId, start, end, weeklyOpen(kind, value), weeklyClose(kind));
+    clearTodoStyle(plan, weekStart, day, todoId, start, end, kind);
+    if (value) formatTodoText(plan, weekStart, day, todoId, start, end, weeklyOpen(kind, value), weeklyClose(kind));
     savedFormatRef.current = null;
     window.getSelection()?.removeAllRanges();
     setFlyout(null);
@@ -217,7 +218,7 @@ function WeeklySelectionToolbar({ containerRef, plan }: WeeklySelectionToolbarPr
     if (!raw) return;
     const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
     const { todoId, day, start, end } = savedLink.current;
-    formatTodoText(plan, day, todoId, start, end, '[', `](${href})`);
+    formatTodoText(plan, weekStart, day, todoId, start, end, '[', `](${href})`);
     linkModeRef.current = false;
     setLinkMode(false);
     setLinkUrl('');
@@ -268,9 +269,10 @@ interface DayColumnProps {
   todos: AllDays[DayKey];
   isToday: boolean;
   plan: Y.Map<unknown>;
+  weekStart: string;
 }
 
-function DayColumn({ day, todos, isToday, plan }: DayColumnProps) {
+function DayColumn({ day, todos, isToday, plan, weekStart }: DayColumnProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -278,7 +280,7 @@ function DayColumn({ day, todos, isToday, plan }: DayColumnProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     e.stopPropagation();
     if (e.key === 'Enter' && input.trim()) {
-      addTodo(plan, day, input);
+      addTodo(plan, weekStart, day, input);
       setInput('');
     }
   };
@@ -293,7 +295,7 @@ function DayColumn({ day, todos, isToday, plan }: DayColumnProps) {
               type="checkbox"
               className="weekly-todo__check"
               checked={todo.done}
-              onChange={() => toggleTodo(plan, day, todo.id)}
+              onChange={() => toggleTodo(plan, weekStart, day, todo.id)}
               onKeyDown={(e) => e.stopPropagation()}
             />
             <span
@@ -305,7 +307,7 @@ function DayColumn({ day, todos, isToday, plan }: DayColumnProps) {
             <button
               type="button"
               className="weekly-todo__del"
-              onClick={() => deleteTodo(plan, day, todo.id)}
+              onClick={() => deleteTodo(plan, weekStart, day, todo.id)}
               title="Delete"
             >
               ×
@@ -337,8 +339,8 @@ interface Props {
 
 export function WeeklyPlannerCell({ plan, onDelete }: Props) {
   const { t } = useTranslation();
-  const [days, setDays] = useState<AllDays>(() => readAllDays(plan));
   const [weekStart, setWeekStartState] = useState<string>(() => plan.get('weekStart') as string);
+  const [days, setDays] = useState<AllDays>(() => readAllDays(plan, plan.get('weekStart') as string));
   const [editingWeek, setEditingWeek] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
@@ -346,8 +348,9 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
 
   useEffect(() => {
     const handler = () => {
-      setDays(readAllDays(plan));
-      setWeekStartState(plan.get('weekStart') as string);
+      const ws = plan.get('weekStart') as string;
+      setWeekStartState(ws);
+      setDays(readAllDays(plan, ws));
     };
     plan.observeDeep(handler);
     return () => plan.unobserveDeep(handler);
@@ -426,10 +429,11 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
             todos={days[day]}
             isToday={todayKey === day}
             plan={plan}
+            weekStart={weekStart}
           />
         ))}
       </div>
-      <WeeklySelectionToolbar containerRef={containerRef} plan={plan} />
+      <WeeklySelectionToolbar containerRef={containerRef} plan={plan} weekStart={weekStart} />
     </div>
   );
 }

@@ -147,7 +147,7 @@ export function useAiStream({
 
         return streamClaudeReply(
           getLocalContext(),
-          getDocContext(),
+          modelConfig.contextScope === 'doc' ? getDocContext() : '',
           compressed,
           yText,
           finishTurn,

@@ -3,7 +3,7 @@ import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import type * as Y from 'yjs';
 import { getThread } from '../collab/aiThreads';
-import { extractDocContext, extractLocalContext } from '../lib/docContext';
+import { extractDocContext, extractLocalContext, extractWeeklyContext } from '../lib/docContext';
 import { AiCell } from './AiCell';
 
 // ---------------------------------------------------------------------------
@@ -41,7 +41,11 @@ export class AiCellView implements NodeView {
     };
 
     const getLocalContext = () => extractLocalContext(view.state.doc, cellId);
-    const getDocContext = () => extractDocContext(view.state.doc);
+    const getDocContext = () => {
+      const md = extractDocContext(view.state.doc);
+      const weekly = extractWeeklyContext(ydoc, view.state.doc);
+      return [md, weekly].filter(Boolean).join('\n\n');
+    };
 
     this.root = createRoot(this.dom);
     this.root.render(
