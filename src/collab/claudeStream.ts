@@ -471,3 +471,45 @@ export async function streamClaudeReply(
     onError(err instanceof Error ? err : new Error(String(err)));
   }
 }
+
+// ---------------------------------------------------------------------------
+// Memory extraction — fire-and-forget Haiku call after each assistant turn
+// ---------------------------------------------------------------------------
+
+/**
+ * Ask Claude Haiku to extract memorable long-term facts from one exchange.
+ * Returns bullet strings (without leading "- "), or [] if nothing notable.
+ * Never throws — failures are silently ignored so they don't affect the chat.
+ */
+export async function extractMemorableFacts(
+  userMessage: string,
+  assistantMessage: string,
+  userApiKey?: string | null,
+): Promise<string[]> {
+  try {
+    const client = makeClient(userApiKey);
+    const prompt =
+      'Review this conversation and extract facts worth remembering long-term about the user.\n' +
+      'Focus on: preferences, personal context, ongoing projects, skills, goals, recurring patterns.\n' +
+      'Ignore: one-off questions, generic knowledge, things that will not matter in future conversations.\n' +
+      'If nothing is worth remembering, respond with exactly: NOTHING\n' +
+      'Otherwise respond with bullet points only, no preamble (- fact):\n\n' +
+      `User: ${userMessage.slice(0, 600)}\n` +
+      `Assistant: ${assistantMessage.slice(0, 1200)}`;
+
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const text = msg.content[0]?.type === 'text' ? msg.content[0].text.trim() : '';
+    if (!text || text === 'NOTHING') return [];
+    return text
+      .split('\n')
+      .map((l) => l.replace(/^[-•*]\s*/, '').trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}

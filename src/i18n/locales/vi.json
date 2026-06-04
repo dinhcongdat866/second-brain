@@ -29,7 +29,8 @@
     "language": "Ngôn ngữ",
     "anonymousUser": "Chưa đăng nhập",
     "signOut": "Đăng xuất",
-    "memory": "Bộ nhớ AI"
+    "memory": "Bộ nhớ AI",
+    "memoryDelete": "Xoá khỏi bộ nhớ"
   },
   "date": {
     "today": "Hôm nay",

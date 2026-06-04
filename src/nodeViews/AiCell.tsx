@@ -29,6 +29,7 @@ export function AiCell({
   getLocalContext,
   getDocContext,
   getMemoryContext,
+  appendMemory,
   onDelete,
   cellId,
   docId,
@@ -37,6 +38,7 @@ export function AiCell({
   getLocalContext: () => string;
   getDocContext: () => string;
   getMemoryContext: () => string;
+  appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void;
   onDelete: () => void;
   cellId: string;
   docId: string;
@@ -51,6 +53,8 @@ export function AiCell({
     getLocalContext,
     getDocContext,
     getMemoryContext,
+    onMemoryExtracted: (bullets, srcCellId, srcDocId) =>
+      appendMemory(bullets, { sourceCellId: srcCellId, sourceDocId: srcDocId }),
     modelConfig: config.modelConfig,
   });
 

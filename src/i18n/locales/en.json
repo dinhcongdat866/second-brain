@@ -29,7 +29,8 @@
     "language": "Language",
     "anonymousUser": "Not signed in",
     "signOut": "Sign out",
-    "memory": "Memory"
+    "memory": "Memory",
+    "memoryDelete": "Remove from memory"
   },
   "date": {
     "today": "Today",

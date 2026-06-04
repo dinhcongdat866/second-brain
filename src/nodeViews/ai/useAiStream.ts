@@ -4,6 +4,7 @@ import { addTurn, type TurnRole, type YThread } from '../../collab/aiThreads';
 import {
   streamClaudeReply,
   streamDemoReply,
+  extractMemorableFacts,
   isOllamaModel,
   type UsageStats,
   type ModelConfig,
@@ -20,6 +21,7 @@ interface Args {
   getLocalContext: () => string;
   getDocContext: () => string;
   getMemoryContext: () => string;
+  onMemoryExtracted?: (bullets: string[], cellId: string, docId: string) => void;
   modelConfig: ModelConfig;
 }
 
@@ -40,6 +42,7 @@ export function useAiStream({
   getLocalContext,
   getDocContext,
   getMemoryContext,
+  onMemoryExtracted,
   modelConfig,
 }: Args) {
   const [prompt, setPrompt] = useState('');
@@ -125,6 +128,17 @@ export function useAiStream({
       }
       abortRef.current = null;
       setStreaming(false);
+
+      // Fire-and-forget: extract memorable facts from this exchange.
+      // Skipped for Ollama (no Anthropic API), demo mode, and short replies.
+      if (onMemoryExtracted && !isDemoMode && !isOllamaModel(modelConfig.model)) {
+        const assistantContent = (assistant.get('content') as Y.Text).toString();
+        if (assistantContent.length > 50) {
+          extractMemorableFacts(text, assistantContent, userApiKey).then((bullets) => {
+            if (bullets.length > 0) onMemoryExtracted(bullets, cellId, docId);
+          });
+        }
+      }
     };
 
     if (isDemoMode) {

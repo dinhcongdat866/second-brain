@@ -414,3 +414,59 @@
 }
 
 
+
+/* Memory log in user menu */
+.sidebar__memory-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar__memory-badge {
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--nb-accent);
+  color: #fff;
+  border-radius: var(--radius-full);
+  padding: 1px 6px;
+  line-height: 16px;
+}
+
+.sidebar__memory-log {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar__memory-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  background: var(--nb-surface-2, rgba(255,255,255,0.04));
+}
+
+.sidebar__memory-entry-text {
+  flex: 1;
+  font-size: 11px;
+  color: var(--nb-text-2);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sidebar__memory-entry-del {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--nb-text-3);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.6;
+}
+
+.sidebar__memory-entry-del:hover { opacity: 1; color: var(--nb-danger); }
