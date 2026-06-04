@@ -63,7 +63,7 @@ function App() {
   const authRegistry = useDocRegistry(userId);
   const guestRegistry = useGuestDocRegistry();
   const registry = isGuest ? guestRegistry : authRegistry;
-  const { getMemoryContext, appendMemory, memoryLog, deleteLogEntry } = useMemory(isGuest ? undefined : userId);
+  const { getMemoryContext, appendMemory } = useMemory(isGuest ? undefined : userId);
   const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory);
   const peers = usePresence(providerRef);
   const [showHistory, setShowHistory] = useState(false);
