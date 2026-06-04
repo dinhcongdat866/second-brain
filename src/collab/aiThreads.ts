@@ -39,12 +39,19 @@ export function getThread(ydoc: Y.Doc, cellId: string): YThread {
  * Append a turn to a thread. `content` is a Y.Text so an assistant reply can
  * be streamed token-by-token after creation. The turn is attached to the doc
  * (via push) before its text is filled — Yjs requires integration first.
+ *
+ * User turns get `created_at` immediately (they are complete on creation).
+ * Assistant turns intentionally omit it until the stream finishes — the
+ * absence of `created_at` is how `isStreamingShared` in AiCell detects that
+ * an assistant reply is still in-flight (triggering the aurora animation).
  */
 export function addTurn(thread: YThread, role: TurnRole, text = ''): YTurn {
   const turn: YTurn = new Y.Map();
   turn.set('role', role);
   turn.set('content', new Y.Text());
-  turn.set('created_at', new Date().toISOString());
+  if (role === 'user') {
+    turn.set('created_at', new Date().toISOString());
+  }
   thread.push([turn]);
   if (text) (turn.get('content') as Y.Text).insert(0, text);
   return turn;
