@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { DocMeta } from '../collab/registry';
 import { MEMORY_DOC_ID } from '../collab/memory';
-import type { MemoryLogEntry } from '../hooks/useMemory';
 import type { Peer } from '../hooks/usePresence';
 import { SUPPORTED_LANGS, type Lang } from '../i18n';
 import i18n, { intlLocale } from '../i18n';
@@ -86,8 +85,6 @@ interface Props {
   peers?: Peer[];
   style?: React.CSSProperties;
   onBeforeSignOut?: () => void | Promise<void>;
-  memoryLog?: MemoryLogEntry[];
-  onDeleteMemoryEntry?: (id: string) => void;
 }
 
 const LANG_LABELS: Record<Lang, string> = { en: 'English', vi: 'Tiếng Việt' };
@@ -103,8 +100,6 @@ export function Sidebar({
   peers = [],
   style,
   onBeforeSignOut,
-  memoryLog = [],
-  onDeleteMemoryEntry,
 }: Props) {
   const { t, i18n: i18nInstance } = useTranslation();
   const currentLang = (i18nInstance.language?.startsWith('vi') ? 'vi' : 'en') as Lang;
@@ -346,35 +341,13 @@ export function Sidebar({
             <div className="sidebar__user-menu">
               {/* Memory */}
               <div className="sidebar__user-menu-section">
-                <div className="sidebar__memory-header">
-                  <button
-                    type="button"
-                    className="sidebar__user-menu-item"
-                    onClick={() => { onSelect(MEMORY_DOC_ID); setUserMenuOpen(false); }}
-                  >
-                    🧠 {t('sidebar.memory')}
-                  </button>
-                  {memoryLog.length > 0 && (
-                    <span className="sidebar__memory-badge">{memoryLog.length}</span>
-                  )}
-                </div>
-                {memoryLog.length > 0 && (
-                  <div className="sidebar__memory-log">
-                    {memoryLog.slice(0, 5).map((entry) => (
-                      <div key={entry.id} className="sidebar__memory-entry">
-                        <span className="sidebar__memory-entry-text">{entry.content}</span>
-                        <button
-                          type="button"
-                          className="sidebar__memory-entry-del"
-                          onClick={() => onDeleteMemoryEntry?.(entry.id)}
-                          title={t('sidebar.memoryDelete')}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  className="sidebar__lang-btn"
+                  onClick={() => { onSelect(MEMORY_DOC_ID); setUserMenuOpen(false); }}
+                >
+                  🧠 {t('sidebar.memory')}
+                </button>
               </div>
               <div className="sidebar__user-menu-divider" />
 

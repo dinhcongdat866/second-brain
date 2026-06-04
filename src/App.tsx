@@ -188,8 +188,6 @@ function App() {
               peers={peers}
               style={{ width: sidebarWidth }}
               onBeforeSignOut={'flushRegistry' in registry ? registry.flushRegistry : undefined}
-              memoryLog={memoryLog}
-              onDeleteMemoryEntry={deleteLogEntry}
             />
             <div
               className={`sidebar-resize-handle${resizing ? ' sidebar-resize-handle--dragging' : ''}`}
