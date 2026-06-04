@@ -18,61 +18,141 @@
   box-shadow: 0 0 0 2px rgba(126, 200, 160, 0.22);
 }
 
-/* Wind sweep while AI is streaming — four oversized soft green/mint radials
-   sweep LEFT → RIGHT giving an "aurora over meadow" feel.
-   Colors updated to match the sage-green AI cell theme. */
+/* Aurora streaming — four soft radial blobs drift independently, like fog or
+   northern lights. Each blob has its own x/y position animated at a different
+   rate and direction; overlapping soft gradients blend into an organic glow.
+   Colors are driven by CSS custom properties so emotion palettes swap in without
+   duplicating the gradient math. */
+
+/* Independent blob positions — each element gets its own copy (inherits:false). */
+@property --b1x { syntax: '<percentage>'; initial-value: 15%; inherits: false; }
+@property --b1y { syntax: '<percentage>'; initial-value: 25%; inherits: false; }
+@property --b2x { syntax: '<percentage>'; initial-value: 78%; inherits: false; }
+@property --b2y { syntax: '<percentage>'; initial-value: 62%; inherits: false; }
+@property --b3x { syntax: '<percentage>'; initial-value: 50%; inherits: false; }
+@property --b3y { syntax: '<percentage>'; initial-value: 50%; inherits: false; }
+@property --b4x { syntax: '<percentage>'; initial-value: 85%; inherits: false; }
+@property --b4y { syntax: '<percentage>'; initial-value: 18%; inherits: false; }
+
+/* Keep --aurora for the finishing-gust sweep. */
 @property --aurora {
   syntax: '<percentage>';
   initial-value: 0%;
   inherits: false;
 }
 
+/* Emotion palettes — c1 is dominant (highest opacity), c2/c3 are complementary
+   secondary tones, c4 is a subtle accent hue. When blobs overlap they mix
+   naturally producing aurora-like hue shifts across the cell. */
+
+/* neutral — sage green lead, teal secondary, violet accent */
+.ai-cell__inner,
+.ai-cell__modal {
+  --aurora-c1:     rgba( 75, 190, 128, 0.16);  /* sage green — dominant   */
+  --aurora-c2:     rgba( 50, 160, 190, 0.12);  /* teal-blue  — secondary  */
+  --aurora-c3:     rgba(130, 210, 150, 0.10);  /* mint-warm  — secondary  */
+  --aurora-c4:     rgba(110, 130, 210, 0.07);  /* blue-violet — accent    */
+  --aurora-shadow: rgba( 70, 175, 120, 0.14);
+}
+
+/* excited — amber lead, orange-red secondary, warm pink accent */
+.ai-cell__inner[data-emotion="excited"],
+.ai-cell__modal[data-emotion="excited"] {
+  --aurora-c1:     rgba(240, 165,  40, 0.18);  /* warm gold   — dominant  */
+  --aurora-c2:     rgba(220,  95,  55, 0.12);  /* orange-red  — secondary */
+  --aurora-c3:     rgba(255, 215,  75, 0.11);  /* bright gold — secondary */
+  --aurora-c4:     rgba(230, 120,  90, 0.07);  /* coral       — accent    */
+  --aurora-shadow: rgba(225, 145,  30, 0.16);
+}
+
+/* reflective — indigo lead, violet secondary, teal accent */
+.ai-cell__inner[data-emotion="reflective"],
+.ai-cell__modal[data-emotion="reflective"] {
+  --aurora-c1:     rgba(100,  88, 200, 0.16);  /* indigo  — dominant      */
+  --aurora-c2:     rgba(155,  75, 195, 0.11);  /* violet  — secondary     */
+  --aurora-c3:     rgba( 55, 115, 210, 0.10);  /* blue    — secondary     */
+  --aurora-c4:     rgba( 55, 165, 180, 0.07);  /* teal    — accent        */
+  --aurora-shadow: rgba( 90,  80, 190, 0.15);
+}
+
+/* personal — rose lead, warm red secondary, lavender accent */
+.ai-cell__inner[data-emotion="personal"],
+.ai-cell__modal[data-emotion="personal"] {
+  --aurora-c1:     rgba(220,  88, 118, 0.16);  /* rose    — dominant      */
+  --aurora-c2:     rgba(220, 118,  75, 0.11);  /* amber   — secondary     */
+  --aurora-c3:     rgba(165,  92, 200, 0.10);  /* lavender — secondary    */
+  --aurora-c4:     rgba(240, 155, 125, 0.07);  /* peach   — accent        */
+  --aurora-shadow: rgba(205,  78, 110, 0.15);
+}
+
+/* technical — cyan lead, electric blue secondary, teal-green accent */
+.ai-cell__inner[data-emotion="technical"],
+.ai-cell__modal[data-emotion="technical"] {
+  --aurora-c1:     rgba( 35, 185, 215, 0.16);  /* cyan          — dominant   */
+  --aurora-c2:     rgba( 55, 115, 215, 0.12);  /* electric blue — secondary  */
+  --aurora-c3:     rgba( 35, 190, 158, 0.10);  /* teal-green    — secondary  */
+  --aurora-c4:     rgba(115,  95, 215, 0.07);  /* indigo        — accent     */
+  --aurora-shadow: rgba( 28, 170, 205, 0.14);
+}
+
+/* Streaming — four blobs drifting at independent rates/directions. */
 .ai-cell .ai-cell__inner.is-streaming,
-.ai-cell .ai-cell__inner.is-finishing {
+.ai-cell__modal.is-streaming {
   background:
-    radial-gradient(
-      ellipse 130% 100%
-      at calc(-30% + var(--aurora) * 1.6) 25%,
-      rgba(80, 190, 130, 0.18),
-      transparent 75%
-    ),
-    radial-gradient(
-      ellipse 110% 100%
-      at calc(-50% + var(--aurora) * 1.7) 65%,
-      rgba(120, 210, 170, 0.16),
-      transparent 78%
-    ),
-    radial-gradient(
-      ellipse 120% 95%
-      at calc(-25% + var(--aurora) * 1.5) 75%,
-      rgba(160, 220, 190, 0.14),
-      transparent 78%
-    ),
-    radial-gradient(
-      ellipse 100% 90%
-      at calc(-40% + var(--aurora) * 1.65) 35%,
-      rgba(200, 235, 210, 0.12),
-      transparent 80%
-    ),
+    radial-gradient(ellipse 80% 70% at var(--b1x) var(--b1y), var(--aurora-c1), transparent 65%),
+    radial-gradient(ellipse 75% 80% at var(--b2x) var(--b2y), var(--aurora-c2), transparent 65%),
+    radial-gradient(ellipse 65% 90% at var(--b3x) var(--b3y), var(--aurora-c3), transparent 70%),
+    radial-gradient(ellipse 90% 65% at var(--b4x) var(--b4y), var(--aurora-c4), transparent 70%),
     var(--nb-ai-bg);
-  box-shadow: 0 0 18px -6px rgba(80, 180, 130, 0.16);
+  box-shadow: 0 0 18px -6px var(--aurora-shadow);
+  animation:
+    ai-aurora-b1 14s ease-in-out infinite,
+    ai-aurora-b2 11s ease-in-out infinite reverse,
+    ai-aurora-b3 17s ease-in-out infinite 2s,
+    ai-aurora-b4  9s ease-in-out infinite 5s;
 }
 
-.ai-cell .ai-cell__inner.is-streaming {
-  animation: ai-aurora 8s linear infinite;
-}
-
-.ai-cell .ai-cell__inner.is-finishing {
+/* Finishing gust — quick sweep to signal completion. */
+.ai-cell .ai-cell__inner.is-finishing,
+.ai-cell__modal.is-finishing {
+  background:
+    radial-gradient(ellipse 130% 100% at calc(-30% + var(--aurora) * 1.6) 25%, var(--aurora-c1), transparent 75%),
+    radial-gradient(ellipse 110% 100% at calc(-50% + var(--aurora) * 1.7) 65%, var(--aurora-c2), transparent 78%),
+    radial-gradient(ellipse 120%  95% at calc(-25% + var(--aurora) * 1.5) 75%, var(--aurora-c3), transparent 78%),
+    radial-gradient(ellipse 100%  90% at calc(-40% + var(--aurora) * 1.65) 35%, var(--aurora-c4), transparent 80%),
+    var(--nb-ai-bg);
+  box-shadow: 0 0 18px -6px var(--aurora-shadow);
   animation: ai-aurora 0.9s cubic-bezier(0.15, 0.55, 0.2, 1);
 }
 
 .ai-cell .ai-cell__inner.is-minimized {
-  /* No animation when collapsed */
   animation: none !important;
   background: var(--nb-ai-bg) !important;
   box-shadow: none !important;
 }
 
+/* Blob float paths — each visits 3 distinct positions per cycle. */
+@keyframes ai-aurora-b1 {
+  0%, 100% { --b1x: 15%; --b1y: 25%; }
+  33%       { --b1x: 55%; --b1y: 42%; }
+  66%       { --b1x: 30%; --b1y: 68%; }
+}
+@keyframes ai-aurora-b2 {
+  0%, 100% { --b2x: 78%; --b2y: 62%; }
+  33%       { --b2x: 42%; --b2y: 35%; }
+  66%       { --b2x: 82%; --b2y: 48%; }
+}
+@keyframes ai-aurora-b3 {
+  0%, 100% { --b3x: 50%; --b3y: 50%; }
+  50%       { --b3x: 22%; --b3y: 28%; }
+}
+@keyframes ai-aurora-b4 {
+  0%, 100% { --b4x: 85%; --b4y: 18%; }
+  40%       { --b4x: 62%; --b4y: 58%; }
+  70%       { --b4x: 90%; --b4y: 35%; }
+}
+
+/* Finishing sweep. */
 @keyframes ai-aurora {
   to { --aurora: 100%; }
 }
@@ -857,19 +937,6 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-/* Aurora streaming — same as .ai-cell__inner but scoped to modal */
-.ai-cell__modal.is-streaming,
-.ai-cell__modal.is-finishing {
-  background:
-    radial-gradient(ellipse 130% 100% at calc(-30% + var(--aurora) * 1.6) 25%, rgba(80, 190, 130, 0.18), transparent 75%),
-    radial-gradient(ellipse 110% 100% at calc(-50% + var(--aurora) * 1.7) 65%, rgba(120, 210, 170, 0.16), transparent 78%),
-    radial-gradient(ellipse 120% 95% at calc(-25% + var(--aurora) * 1.5) 75%, rgba(160, 220, 190, 0.14), transparent 78%),
-    radial-gradient(ellipse 100% 90% at calc(-40% + var(--aurora) * 1.65) 35%, rgba(200, 235, 210, 0.12), transparent 80%),
-    var(--nb-ai-bg);
-}
-
-.ai-cell__modal.is-streaming  { animation: ai-aurora 8s linear infinite; }
-.ai-cell__modal.is-finishing  { animation: ai-aurora 0.9s cubic-bezier(0.15, 0.55, 0.2, 1); }
 
 .ai-cell__modal-header {
   display: flex;

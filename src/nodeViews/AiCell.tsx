@@ -9,6 +9,7 @@ import {
   ollamaModelName,
 } from '../collab/claudeStream';
 import { IconMaximize, IconMinimize } from './ai/icons';
+import { detectEmotion } from './ai/detectEmotion';
 import { useTurns } from './ai/useTurns';
 import { useAiConfig } from './ai/useAiConfig';
 import { useAiStream } from './ai/useAiStream';
@@ -65,6 +66,11 @@ export function AiCell({
   const lastTurn = turns[turns.length - 1];
   const isStreamingShared =
     !!lastTurn && lastTurn.role === 'assistant' && !lastTurn.createdAt;
+
+  // Emotion is derived from the last *completed* assistant turn so it stays
+  // stable during streaming and only shifts when a new reply finishes.
+  const lastDoneAssistant = [...turns].reverse().find(t => t.role === 'assistant' && t.createdAt);
+  const emotion = lastDoneAssistant ? detectEmotion(lastDoneAssistant.content) : 'neutral';
 
   let lastUserTurnIdx = -1;
   for (let i = turns.length - 1; i >= 0; i--) {
@@ -164,6 +170,7 @@ export function AiCell({
           (finishing ? ' is-finishing' : '') +
           (minimized ? ' is-minimized' : '')
         }
+        data-emotion={emotion}
       >
         {/* Header */}
         <div className="ai-cell__header">
@@ -267,6 +274,7 @@ export function AiCell({
               (isStreamingShared ? ' is-streaming' : '') +
               (finishing ? ' is-finishing' : '')
             }
+            data-emotion={emotion}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="ai-cell__modal-header">
