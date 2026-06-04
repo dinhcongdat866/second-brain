@@ -160,11 +160,20 @@ export function logUsage(
   }).catch(() => {});
 }
 
-/** Delete the persisted state from Neon (call when a doc is permanently deleted). */
-export function deleteDocState(docId: string): void {
-  apiFetch(`/documents/${encodeURIComponent(docId)}/state`, {
-    method: 'DELETE',
-  }).catch(() => {});
+/**
+ * Fire-and-forget DELETE using a pre-captured token.
+ * Used for cleanup that may run after sign-out, so we can't rely on
+ * supabase.auth.getSession() returning a valid session at call time.
+ */
+function deleteWithToken(path: string, token?: string | null): void {
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  fetch(`${BACKEND_URL}${path}`, { method: 'DELETE', headers }).catch(() => {});
+}
+
+/** Delete the persisted Yjs state (call when a doc is permanently deleted). */
+export function deleteDocState(docId: string, token?: string | null): void {
+  deleteWithToken(`/documents/${encodeURIComponent(docId)}/state`, token);
 }
 
 /**
@@ -186,10 +195,8 @@ export async function uploadImage(blob: Blob, docId: string): Promise<string | n
 }
 
 /** Remove all images belonging to a deleted document. */
-export function deleteDocImages(docId: string): void {
-  apiFetch(`/images/by-doc/${encodeURIComponent(docId)}`, {
-    method: 'DELETE',
-  }).catch(() => {});
+export function deleteDocImages(docId: string, token?: string | null): void {
+  deleteWithToken(`/images/by-doc/${encodeURIComponent(docId)}`, token);
 }
 
 /**

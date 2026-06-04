@@ -83,6 +83,7 @@ interface Props {
   onRestore: (meta: DocMeta) => void;
   peers?: Peer[];
   style?: React.CSSProperties;
+  onBeforeSignOut?: () => void | Promise<void>;
 }
 
 const LANG_LABELS: Record<Lang, string> = { en: 'English', vi: 'Tiếng Việt' };
@@ -97,6 +98,7 @@ export function Sidebar({
   onRestore,
   peers = [],
   style,
+  onBeforeSignOut,
 }: Props) {
   const { t, i18n: i18nInstance } = useTranslation();
   const currentLang = (i18nInstance.language?.startsWith('vi') ? 'vi' : 'en') as Lang;
@@ -395,7 +397,11 @@ export function Sidebar({
                     <button
                       type="button"
                       className="sidebar__lang-btn"
-                      onClick={() => { signOut(); setUserMenuOpen(false); }}
+                      onClick={async () => {
+                        setUserMenuOpen(false);
+                        await onBeforeSignOut?.();
+                        signOut();
+                      }}
                     >
                       {t('sidebar.signOut')}
                     </button>

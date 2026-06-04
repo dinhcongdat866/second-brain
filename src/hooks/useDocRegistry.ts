@@ -18,6 +18,7 @@ import {
 import { deleteDocStorage } from '../collab/ydoc';
 import { deleteDocState, deleteDocImages, createYjsSyncer, applyServerState } from '../lib/backendSync';
 import { apiFetch } from '../lib/http';
+import { supabase } from '../lib/supabase';
 
 const ACTIVE_KEY = 'active-doc-id';
 
@@ -99,6 +100,7 @@ export function useDocRegistry(userId?: string) {
   const [docs, setDocs] = useState<DocMeta[]>(() => optimisticDocs());
   const [activeDocId, setActiveDocIdState] = useState<string>(() => readActive());
   const setupRef = useRef<RegistrySetup | null>(null);
+  const syncerRef = useRef<ReturnType<typeof createYjsSyncer> | null>(null);
   const storageCleanupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Create the registry Y.Doc once for the whole app session.
@@ -106,6 +108,7 @@ export function useDocRegistry(userId?: string) {
     const setup = createRegistrySetup(userId);
     setupRef.current = setup;
     const syncer = createYjsSyncer(REGISTRY_DOC_ID, setup.ydoc);
+    syncerRef.current = syncer;
 
     const refresh = () => setDocs(readDocs(setup.docsMap));
     setup.docsMap.observeDeep(refresh);
@@ -161,6 +164,7 @@ export function useDocRegistry(userId?: string) {
       setup.docsMap.unobserveDeep(refresh);
       window.removeEventListener('visibilitychange', onVisible);
       syncer.stop();
+      syncerRef.current = null;
       setup.provider.destroy();
       setup.persistence.destroy();
       setup.ydoc.destroy();
@@ -201,19 +205,27 @@ export function useDocRegistry(userId?: string) {
       const map = setupRef.current?.docsMap;
       if (!map) return;
       deleteDoc(map, id);
+      // Flush the registry to Supabase immediately so the deletion is durable
+      // even if the user signs out before the debounce timer fires.
+      syncerRef.current?.flush();
       if (id === activeDocId) {
         const next = readDocs(map)[0]?.id;
         if (next) setActive(next);
       }
-      // Defer destructive storage cleanup past the undo window.
-      if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
-      storageCleanupRef.current = setTimeout(() => {
-        deleteDocStorage(id, userId);
-        deleteDocState(id);
-        deleteDocImages(id);
-      }, 5500);
+      // Capture the auth token now while the session is still valid.
+      // The cleanup timer may fire after sign-out, at which point
+      // supabase.auth.getSession() returns null and the DELETEs would 401.
+      supabase.auth.getSession().then(({ data }) => {
+        const token = data.session?.access_token ?? null;
+        if (storageCleanupRef.current) clearTimeout(storageCleanupRef.current);
+        storageCleanupRef.current = setTimeout(() => {
+          deleteDocStorage(id, userId);
+          deleteDocState(id, token);
+          deleteDocImages(id, token);
+        }, 5500);
+      });
     },
-    [activeDocId],
+    [activeDocId, userId],
   );
 
   const handleRestore = useCallback((meta: DocMeta) => {
@@ -232,6 +244,10 @@ export function useDocRegistry(userId?: string) {
     if (map) setDocBgImage(map, id, url);
   }, []);
 
+  const flushRegistry = useCallback(() => {
+    syncerRef.current?.flush();
+  }, []);
+
   return {
     docs,
     activeDocId,
@@ -243,5 +259,6 @@ export function useDocRegistry(userId?: string) {
     restoreDoc: handleRestore,
     touchDoc: handleTouch,
     setBgImage: handleSetBgImage,
+    flushRegistry,
   };
 }

@@ -185,6 +185,7 @@ function App() {
               onRestore={registry.restoreDoc}
               peers={peers}
               style={{ width: sidebarWidth }}
+              onBeforeSignOut={'flushRegistry' in registry ? registry.flushRegistry : undefined}
             />
             <div
               className={`sidebar-resize-handle${resizing ? ' sidebar-resize-handle--dragging' : ''}`}
