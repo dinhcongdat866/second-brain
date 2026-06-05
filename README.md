@@ -16,6 +16,7 @@ planner. Everything syncs across tabs and devices and keeps working offline.
 > CRDT collaboration + AI integration**. See [`documents/`](documents/) for the architecture.
 
 <!-- TODO: add a screenshot or short demo gif here -->
+<img width="3835" height="2017" alt="image" src="https://github.com/user-attachments/assets/7f997b5f-139f-4b18-a8a6-c83cd083c176" />
 
 ## Why it's interesting
 
