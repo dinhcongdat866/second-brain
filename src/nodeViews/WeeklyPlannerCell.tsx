@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type * as Y from 'yjs';
 import {
@@ -6,16 +7,20 @@ import {
   DAY_LABELS,
   type DayKey,
   type AllDays,
+  type MoodEntry,
   addTodo,
   toggleTodo,
   deleteTodo,
   formatTodoText,
   clearTodoStyle,
   readAllDays,
+  readMoodLog,
   weekRangeLabel,
   todayDayKey,
   setWeekStart,
   shiftWeek,
+  dayToDate,
+  setMoodForDate,
 } from '../collab/weeklyPlans';
 import {
   weeklyOpen,
@@ -261,18 +266,125 @@ function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelecti
   );
 }
 // ---------------------------------------------------------------------------
+// Mood picker
+// ---------------------------------------------------------------------------
+
+const MOOD_EMOJIS: Record<number, string> = { 1: '😴', 2: '😞', 3: '😐', 4: '🙂', 5: '🔥' };
+
+interface MoodPickerProps {
+  date: string;
+  entry: MoodEntry | null;
+  plan: Y.Map<unknown>;
+}
+
+function MoodPicker({ date, entry, plan }: MoodPickerProps) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const [note, setNote] = useState(entry?.note ?? '');
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click (popover is in portal, so check both refs)
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const inBtn     = btnRef.current?.contains(target);
+      const inPopover = popoverRef.current?.contains(target);
+      if (!inBtn && !inPopover) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Sync note if entry changes externally
+  useEffect(() => { setNote(entry?.note ?? ''); }, [entry?.note]);
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      // Anchor to bottom-right of the button, fixed to viewport
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setOpen((o) => !o);
+  };
+
+  const handleSelect = useCallback((score: MoodEntry['energy']) => {
+    setMoodForDate(plan, date, score, note.trim() || undefined);
+    setOpen(false);
+  }, [plan, date, note]);
+
+  const popover = open && pos && createPortal(
+    <div
+      ref={popoverRef}
+      className="mood-picker__popover"
+      style={{ top: pos.top, right: pos.right }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="mood-picker__emojis">
+        {([1, 2, 3, 4, 5] as const).map((score) => (
+          <button
+            key={score}
+            type="button"
+            className={`mood-picker__emoji-btn${entry?.energy === score ? ' mood-picker__emoji-btn--active' : ''}`}
+            onClick={() => handleSelect(score)}
+            title={`${score}/5`}
+          >
+            {MOOD_EMOJIS[score]}
+          </button>
+        ))}
+      </div>
+      <input
+        className="mood-picker__note"
+        placeholder="Note (optional)"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter' && entry) {
+            setMoodForDate(plan, date, entry.energy, note.trim() || undefined);
+            setOpen(false);
+          }
+          if (e.key === 'Escape') setOpen(false);
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>,
+    document.body,
+  );
+
+  return (
+    <div className="mood-picker">
+      <button
+        ref={btnRef}
+        type="button"
+        className={`mood-picker__icon${entry ? ' mood-picker__icon--set' : ''}`}
+        onClick={handleToggle}
+        title={entry ? `Mood: ${entry.energy}/5${entry.note ? ` — ${entry.note}` : ''}` : 'Log mood'}
+      >
+        {entry ? MOOD_EMOJIS[entry.energy] : '○'}
+      </button>
+      {popover}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Day column
 // ---------------------------------------------------------------------------
 
 interface DayColumnProps {
   day: DayKey;
+  date: string;
   todos: AllDays[DayKey];
   isToday: boolean;
   plan: Y.Map<unknown>;
   weekStart: string;
+  moodEntry: MoodEntry | null;
 }
 
-function DayColumn({ day, todos, isToday, plan, weekStart }: DayColumnProps) {
+function DayColumn({ day, date, todos, isToday, plan, weekStart, moodEntry }: DayColumnProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -287,7 +399,10 @@ function DayColumn({ day, todos, isToday, plan, weekStart }: DayColumnProps) {
 
   return (
     <div className={`weekly-day${isToday ? ' weekly-day--today' : ''}`}>
-      <div className="weekly-day__header">{DAY_LABELS[day]}</div>
+      <div className="weekly-day__header">
+        <span>{DAY_LABELS[day]}</span>
+        <MoodPicker date={date} entry={moodEntry} plan={plan} />
+      </div>
       <div className="weekly-day__todos">
         {todos.map((todo) => (
           <div key={todo.id} className="weekly-todo">
@@ -341,6 +456,7 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
   const { t } = useTranslation();
   const [weekStart, setWeekStartState] = useState<string>(() => plan.get('weekStart') as string);
   const [days, setDays] = useState<AllDays>(() => readAllDays(plan, plan.get('weekStart') as string));
+  const [moodLog, setMoodLog] = useState<Record<string, MoodEntry>>(() => readMoodLog(plan));
   const [editingWeek, setEditingWeek] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
@@ -351,6 +467,7 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
       const ws = plan.get('weekStart') as string;
       setWeekStartState(ws);
       setDays(readAllDays(plan, ws));
+      setMoodLog(readMoodLog(plan));
     };
     plan.observeDeep(handler);
     return () => plan.unobserveDeep(handler);
@@ -422,16 +539,21 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
         </button>
       </div>
       <div className="weekly-cell__grid">
-        {DAY_KEYS.map((day) => (
-          <DayColumn
-            key={day}
-            day={day}
-            todos={days[day]}
-            isToday={todayKey === day}
-            plan={plan}
-            weekStart={weekStart}
-          />
-        ))}
+        {DAY_KEYS.map((day) => {
+          const date = dayToDate(weekStart, day);
+          return (
+            <DayColumn
+              key={day}
+              day={day}
+              date={date}
+              todos={days[day]}
+              isToday={todayKey === day}
+              plan={plan}
+              weekStart={weekStart}
+              moodEntry={moodLog[date] ?? null}
+            />
+          );
+        })}
       </div>
       <WeeklySelectionToolbar containerRef={containerRef} plan={plan} weekStart={weekStart} />
     </div>

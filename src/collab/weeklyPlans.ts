@@ -356,6 +356,75 @@ export function serializeWeeklyForAI(plan: Y.Map<unknown>, maxWeeks = 4): string
 }
 
 // ---------------------------------------------------------------------------
+// Mood log — keyed by ISO date string ('YYYY-MM-DD')
+// Stored as plan.get('moodLog') → Y.Map<date, Y.Map{energy, note?}>
+// ---------------------------------------------------------------------------
+
+export interface MoodEntry {
+  energy: 1 | 2 | 3 | 4 | 5;
+  note?: string;
+}
+
+const MOOD_LOG_KEY = 'moodLog';
+
+/** Convert weekStart + DayKey → ISO date string for that column. */
+export function dayToDate(weekStart: string, day: DayKey): string {
+  const [y, mo, d] = weekStart.split('-').map(Number);
+  const offset = DAY_KEYS.indexOf(day);
+  const date = new Date(y, mo - 1, d + offset);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+export function getMoodForDate(plan: Y.Map<unknown>, date: string): MoodEntry | null {
+  const moodLog = plan.get(MOOD_LOG_KEY) as Y.Map<unknown> | undefined;
+  if (!moodLog) return null;
+  const entry = moodLog.get(date) as Y.Map<unknown> | undefined;
+  if (!entry) return null;
+  return {
+    energy: entry.get('energy') as MoodEntry['energy'],
+    note:   (entry.get('note') as string | undefined) || undefined,
+  };
+}
+
+export function setMoodForDate(
+  plan: Y.Map<unknown>,
+  date: string,
+  energy: MoodEntry['energy'],
+  note?: string,
+): void {
+  let moodLog = plan.get(MOOD_LOG_KEY) as Y.Map<unknown> | undefined;
+  if (!moodLog) {
+    moodLog = new Y.Map<unknown>();
+    plan.set(MOOD_LOG_KEY, moodLog);
+  }
+  let entry = moodLog.get(date) as Y.Map<unknown> | undefined;
+  if (!entry) {
+    entry = new Y.Map<unknown>();
+    moodLog.set(date, entry);
+  }
+  entry.set('energy', energy);
+  if (note) { entry.set('note', note); } else { entry.delete('note'); }
+}
+
+/** Read all mood entries for a plan (for analytics). */
+export function readMoodLog(plan: Y.Map<unknown>): Record<string, MoodEntry> {
+  const result: Record<string, MoodEntry> = {};
+  const moodLog = plan.get(MOOD_LOG_KEY) as Y.Map<unknown> | undefined;
+  if (!moodLog) return result;
+  moodLog.forEach((raw, date) => {
+    const e = raw as Y.Map<unknown>;
+    result[date] = {
+      energy: e.get('energy') as MoodEntry['energy'],
+      note:   (e.get('note') as string | undefined) || undefined,
+    };
+  });
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Orphan sweep (called at load time, mirrors sweepOrphanThreads)
 // ---------------------------------------------------------------------------
 

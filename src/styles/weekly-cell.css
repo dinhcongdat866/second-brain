@@ -134,6 +134,9 @@
   letter-spacing: 0.06em;
   margin-bottom: 6px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .weekly-day--today .weekly-day__header {
@@ -235,5 +238,92 @@
 .weekly-cell-wrapper.ProseMirror-selectednode .weekly-cell {
   outline: 2px solid var(--nb-weekly-accent);
   outline-offset: 1px;
+}
+
+/* ---- Mood picker ---- */
+
+.mood-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.mood-picker__icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 1px 2px;
+  border-radius: 3px;
+  color: var(--nb-text-3);
+  opacity: 0;
+  transition: opacity 0.15s;
+  font-family: inherit;
+}
+
+/* show when hovered or already set */
+.weekly-day:hover .mood-picker__icon,
+.mood-picker__icon--set {
+  opacity: 1;
+}
+
+.mood-picker__icon:hover {
+  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+}
+
+.mood-picker__popover {
+  position: fixed; /* portal-rendered → escapes overflow ancestors */
+  background: var(--nb-bg-surface);
+  border: 1px solid var(--nb-border-faint);
+  border-radius: var(--nb-r-sm);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  z-index: 9999;
+  min-width: 158px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mood-picker__emojis {
+  display: flex;
+  gap: 2px;
+  justify-content: space-between;
+}
+
+.mood-picker__emoji-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--nb-r-xs);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 3px 4px;
+  line-height: 1;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.mood-picker__emoji-btn:hover {
+  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+}
+
+.mood-picker__emoji-btn--active {
+  border-color: var(--nb-weekly-accent);
+  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+}
+
+.mood-picker__note {
+  font-size: 11px;
+  font-family: inherit;
+  border: none;
+  border-top: 1px solid var(--nb-border-faint);
+  background: transparent;
+  color: var(--nb-text);
+  padding: 5px 0 0;
+  width: 100%;
+  outline: none;
+}
+
+.mood-picker__note::placeholder {
+  color: var(--nb-text-3);
 }
 
