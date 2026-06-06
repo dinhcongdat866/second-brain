@@ -29,6 +29,7 @@ import {
   type StyleKind,
 } from '../lib/toolbarStyles';
 import { SelectionToolbarShell } from '../components/SelectionToolbarShell';
+import { apiFetch } from '../lib/http';
 
 // ---------------------------------------------------------------------------
 // Inline markdown renderer — bold, italic, strikethrough, code, link + style
@@ -310,10 +311,30 @@ function MoodPicker({ date, entry, plan }: MoodPickerProps) {
     setOpen((o) => !o);
   };
 
+  /**
+   * Mirror mood to backend SQL (fire-and-forget).
+   * Yjs is source of truth for UI; SQL is the analytics store for range queries.
+   * The backend upserts by (user_id, date) — the id field is used only on insert.
+   */
+  const syncMood = useCallback((energy: MoodEntry['energy'], noteText: string | undefined) => {
+    void apiFetch('/analytics/mood', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: crypto.randomUUID(),
+        date,
+        energy,
+        note: noteText ?? null,
+      }),
+    }).catch(() => { /* offline — Yjs copy survives; will sync next time */ });
+  }, [date]);
+
   const handleSelect = useCallback((score: MoodEntry['energy']) => {
-    setMoodForDate(plan, date, score, note.trim() || undefined);
+    const noteText = note.trim() || undefined;
+    setMoodForDate(plan, date, score, noteText);
+    syncMood(score, noteText);
     setOpen(false);
-  }, [plan, date, note]);
+  }, [plan, date, note, syncMood]);
 
   const popover = open && pos && createPortal(
     <div
@@ -343,7 +364,9 @@ function MoodPicker({ date, entry, plan }: MoodPickerProps) {
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === 'Enter' && entry) {
-            setMoodForDate(plan, date, entry.energy, note.trim() || undefined);
+            const noteText = note.trim() || undefined;
+            setMoodForDate(plan, date, entry.energy, noteText);
+            syncMood(entry.energy, noteText);
             setOpen(false);
           }
           if (e.key === 'Escape') setOpen(false);
