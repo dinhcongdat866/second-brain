@@ -69,3 +69,40 @@ class CellEmbedding(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+
+class TodoClassification(Base):
+    """AI-assigned categories for weekly planner todos (personal analytics)."""
+    __tablename__ = "todo_classifications"
+
+    todo_id: Mapped[str] = mapped_column(String, primary_key=True)   # YTodo id from frontend
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    week_start: Mapped[str] = mapped_column(String, nullable=False)  # 'YYYY-MM-DD', indexed for range queries
+    todo_text: Mapped[str] = mapped_column(Text, nullable=False)      # snapshot at classification time
+    categories: Mapped[str] = mapped_column(Text, nullable=False)     # JSON array: '["Personal Project","Rest"]'
+    taxonomy_version: Mapped[int] = mapped_column(Integer, default=1)
+    classified_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (Index("ix_todo_classifications_user_week", "user_id", "week_start"),)
+
+
+class MoodLog(Base):
+    """Daily mood/energy log for personal analytics pattern detection."""
+    __tablename__ = "mood_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)        # UUID from frontend
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    date: Mapped[str] = mapped_column(String, nullable=False)        # 'YYYY-MM-DD'
+    energy: Mapped[int] = mapped_column(Integer, nullable=False)     # 1-5
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        Index("ix_mood_logs_user_date", "user_id", "date", unique=True),
+    )

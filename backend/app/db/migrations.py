@@ -17,3 +17,14 @@ async def run_migrations() -> None:
             "ALTER TABLE cell_embeddings ADD COLUMN IF NOT EXISTS user_id VARCHAR NOT NULL DEFAULT ''",
         ]:
             await conn.execute(text(stmt))
+
+        # Phase 3: analytics tables (idempotent — create_all already handles new tables,
+        # but the indexes below are explicit in case the table existed without them).
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_todo_classifications_user_week "
+            "ON todo_classifications (user_id, week_start)"
+        ))
+        await conn.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_mood_logs_user_date "
+            "ON mood_logs (user_id, date)"
+        ))
