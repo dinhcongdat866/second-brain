@@ -31,7 +31,7 @@ const BATCH_SIZE    = 50;  // backend max per request
  * sending to the classifier.
  *
  * Weekly planner stores raw strings that may contain:
- *   - Color marks:      {c=#rrggbb}text{/c}
+ *   - Color/bold tags:  {c=#rrggbb}text{/c}  or  {b=#rrggbb}text{/b}
  *   - Bold markdown:    **text**
  *   - Strikethrough:    ~~text~~
  *   - Italic markdown:  _text_ or *text*
@@ -40,12 +40,12 @@ const BATCH_SIZE    = 50;  // backend max per request
  */
 function stripMarkup(raw: string): string {
   return raw
-    .replace(/\{c=[^}]*\}/g, '')   // opening color tag  {c=#rrggbb}
-    .replace(/\{\/c\}/g, '')        // closing color tag  {/c}
-    .replace(/\*\*(.+?)\*\*/g, '$1') // **bold**
-    .replace(/~~(.+?)~~/g, '$1')    // ~~strikethrough~~
-    .replace(/\*(.+?)\*/g, '$1')    // *italic*
-    .replace(/_(.+?)_/g, '$1')      // _italic_
+    .replace(/\{[a-z]=[^}]*\}/g, '')    // opening tags: {c=#rrggbb}, {b=#rrggbb}, …
+    .replace(/\{\/[a-z]\}/g, '')          // closing tags: {/c}, {/b}, …
+    .replace(/\*\*(.+?)\*\*/gs, '$1')    // **bold**
+    .replace(/~~(.+?)~~/gs, '$1')         // ~~strikethrough~~
+    .replace(/\*(.+?)\*/gs, '$1')         // *italic*
+    .replace(/_(.+?)_/gs, '$1')           // _italic_
     .trim();
 }
 
@@ -63,10 +63,14 @@ interface TodoItem {
   text: string;
 }
 
+/** Must stay in sync with TAXONOMY_VERSION in backend/app/routers/analytics.py */
+const CURRENT_TAXONOMY_VERSION = 3;
+
 interface ClassifyRecord {
   todo_id: string;
   categories: string[];
   todo_text: string | null;
+  taxonomy_version: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,17 +125,16 @@ async function syncClassifications(ydoc: Y.Doc): Promise<void> {
       const res = await apiFetch(`/analytics/classifications?week_start=${weekStart}`);
       const existing: ClassifyRecord[] = await res.json();
 
-      // Map todo_id → stored text snapshot
-      const storedText = new Map(
-        existing.map((r) => [r.todo_id, r.todo_text ?? '']),
-      );
+      // Map todo_id → stored record
+      const storedMap = new Map(existing.map((r) => [r.todo_id, r]));
 
       for (const todo of todos) {
-        const stored = storedText.get(todo.todo_id);
-        // New todo (not in DB) or text has changed since last classification
-        if (stored === undefined || stored !== todo.text) {
-          dirty.push(todo);
-        }
+        const stored = storedMap.get(todo.todo_id);
+        const stale =
+          stored === undefined ||                                          // new todo
+          stored.todo_text !== todo.text ||                               // text changed
+          (stored.taxonomy_version ?? 0) < CURRENT_TAXONOMY_VERSION;     // old taxonomy
+        if (stale) dirty.push(todo);
       }
     }),
   );

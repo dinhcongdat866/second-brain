@@ -20,7 +20,7 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 # Category taxonomy v1 — must match PERSONAL-ANALYTICS.md
 # ---------------------------------------------------------------------------
 
-TAXONOMY_VERSION = 2  # v1→v2: renamed "Tìm việc"→"Job Search", "Công việc"→"Work", "Tài chính"→"Finance"
+TAXONOMY_VERSION = 3  # v2→v3: fixed case-insensitive validation (all-Chores bug)
 
 CATEGORIES: dict[str, str] = {
     "Mental Work":        "Journaling, reflection, trauma processing, metacognition, therapy sessions",
@@ -37,6 +37,9 @@ CATEGORIES: dict[str, str] = {
 }
 
 _CATEGORY_LIST = "\n".join(f"- {name}: {desc}" for name, desc in CATEGORIES.items())
+
+# Case-insensitive lookup so the validator accepts "leisure" == "Leisure" etc.
+_CATEGORY_LOWER: dict[str, str] = {k.lower(): k for k in CATEGORIES}
 
 _CLASSIFY_SYSTEM = f"""You are a classifier for a personal analytics system.
 Given a todo item, assign 1–3 categories from the list below that best describe it.
@@ -66,7 +69,8 @@ class ClassifyRequest(BaseModel):
 class ClassifyResult(BaseModel):
     todo_id: str
     categories: list[str]
-    todo_text: str | None = None   # populated by GET endpoint for frontend dirty-check
+    todo_text: str | None = None          # populated by GET endpoint for frontend dirty-check
+    taxonomy_version: int | None = None   # populated by GET; frontend re-classifies if stale
 
 class ClassifyResponse(BaseModel):
     results: list[ClassifyResult]
@@ -88,21 +92,31 @@ class MoodEntry(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _classify_one(text: str, client: anthropic.Anthropic) -> list[str]:
-    """Call Claude to classify a single todo. Returns list of category names."""
+    """Call Claude to classify a single todo. Returns list of canonical category names."""
     resp = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=64,
+        max_tokens=128,   # 64 was tight; longer category lists can push past it
         system=_CLASSIFY_SYSTEM,
         messages=[{"role": "user", "content": f'Todo: "{text}"'}],
     )
     raw = resp.content[0].text.strip() if resp.content else "{}"
+
+    # Extract the first {...} block in case the model adds surrounding prose
+    import re as _re
+    m = _re.search(r'\{[^{}]*\}', raw, _re.DOTALL)
+    raw = m.group(0) if m else raw
+
     try:
         data = json.loads(raw)
         cats = data.get("categories", [])
-        # Validate — only accept known categories
-        valid = [c for c in cats if c in CATEGORIES]
-        return valid[:3] if valid else ["Chores"]   # fallback if nothing valid
-    except (json.JSONDecodeError, AttributeError):
+        # Case-insensitive match → return canonical casing from CATEGORIES dict
+        valid = [
+            _CATEGORY_LOWER[c.lower()]
+            for c in cats
+            if isinstance(c, str) and c.lower() in _CATEGORY_LOWER
+        ]
+        return valid[:3] if valid else ["Chores"]
+    except (json.JSONDecodeError, AttributeError, KeyError):
         return ["Chores"]
 
 
@@ -164,6 +178,7 @@ async def get_classifications(
             todo_id=r.todo_id,
             categories=json.loads(r.categories),
             todo_text=r.todo_text,
+            taxonomy_version=r.taxonomy_version,
         )
         for r in rows.scalars().all()
     ]
