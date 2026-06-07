@@ -7,6 +7,10 @@ on:
       - 'backend/**'
   workflow_dispatch:   # allow manual trigger from GitHub UI
 
+concurrency:
+  group: fly-deploy-backend
+  cancel-in-progress: true   # new push cancels the in-flight deploy, not the other way
+
 jobs:
   deploy:
     name: Deploy
