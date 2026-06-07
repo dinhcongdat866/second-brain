@@ -66,6 +66,7 @@ class ClassifyRequest(BaseModel):
 class ClassifyResult(BaseModel):
     todo_id: str
     categories: list[str]
+    todo_text: str | None = None   # populated by GET endpoint for frontend dirty-check
 
 class ClassifyResponse(BaseModel):
     results: list[ClassifyResult]
@@ -162,6 +163,7 @@ async def get_classifications(
         ClassifyResult(
             todo_id=r.todo_id,
             categories=json.loads(r.categories),
+            todo_text=r.todo_text,
         )
         for r in rows.scalars().all()
     ]

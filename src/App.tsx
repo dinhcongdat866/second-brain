@@ -21,6 +21,7 @@ import { importMarkdownAsNewDoc } from './lib/importMarkdown';
 import { useUIStore } from './stores/uiStore';
 import { AiReportPage } from './components/AiReportPage';
 import { useAnalyticsContext } from './hooks/useAnalyticsContext';
+import { useClassificationSync } from './hooks/useClassificationSync';
 import './styles/main.css';
 
 function CellAdder({
@@ -69,6 +70,7 @@ function App() {
   const { getAnalyticsContext } = useAnalyticsContext(!isGuest);
   const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory, getAnalyticsContext);
   const peers = usePresence(providerRef);
+  useClassificationSync(ydoc, !isGuest);
   const [showHistory, setShowHistory] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
