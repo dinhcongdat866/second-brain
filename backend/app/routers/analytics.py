@@ -385,21 +385,23 @@ async def get_report_data(
 _REPORT_SYSTEM = """You are a personal life analytics assistant.
 You receive structured data from someone's week/month/quarter and generate a concise, honest report.
 
-Return ONLY valid JSON matching this exact schema — no preamble, no markdown fences:
-{
-  "narrative": "3-4 sentences summarising the period. Reference actual numbers and categories. Acknowledge data gaps honestly.",
-  "prediction": {
-    "text": "One sentence about what the next period likely holds, based on current trends.",
-    "confidence": "low | medium | high",
-    "reasoning": "One sentence explaining the confidence level."
-  },
-  "proactiveQuestions": ["up to 2 short, specific questions tied to gaps or anomalies in THIS data — not generic wellness questions"]
-}
+Respond with ONLY a raw JSON object — no markdown fences, no explanation, nothing else.
 
-Confidence rules:
-- low: fewer than 7 mood logs OR fewer than 10 classified todos
-- high: clear multi-week patterns with sufficient mood data
-- medium: everything in between"""
+JSON fields:
+- "narrative": string — 3-4 sentences summarising the period. Reference actual numbers. Acknowledge data gaps honestly.
+- "prediction": object with three string fields:
+    - "text": one sentence about what the next period likely holds
+    - "confidence": exactly one of these three words: low   medium   high
+    - "reasoning": one sentence explaining the confidence level
+- "proactiveQuestions": array of up to 2 short questions tied to gaps or anomalies in THIS data
+
+Confidence selection rules:
+- "low"    — fewer than 7 mood logs OR fewer than 10 classified todos
+- "high"   — clear multi-week patterns with sufficient mood data
+- "medium" — everything in between
+
+Example of the exact output format (replace all values with real content):
+{"narrative":"...","prediction":{"text":"...","confidence":"medium","reasoning":"..."},"proactiveQuestions":["...","..."]}"""
 
 
 def _format_report_context(
@@ -508,17 +510,30 @@ async def generate_report(
     raw = resp.content[0].text.strip() if resp.content else "{}"
     log.warning("[report-generate] context sent:\n%s", context)
     log.warning("[report-generate] raw AI response:\n%s", raw)
+
+    # Strip markdown fences that Haiku sometimes adds despite instructions
+    import re as _re
+    raw = _re.sub(r'^```(?:json)?\s*', '', raw).rstrip('`').strip()
+
     try:
         data = json.loads(raw)
         prediction_raw = data.get("prediction", {})
+
+        # Normalise confidence — guard against "low | medium | high" literal etc.
+        raw_conf = str(prediction_raw.get("confidence", "low")).lower().strip()
+        confidence: Literal["low", "medium", "high"] = (
+            raw_conf if raw_conf in {"low", "medium", "high"} else "low"  # type: ignore[assignment]
+        )
+
         return GenerateResponse(
             narrative=data.get("narrative", ""),
             prediction=PredictionResult(
                 text=prediction_raw.get("text", ""),
-                confidence=prediction_raw.get("confidence", "low"),
+                confidence=confidence,
                 reasoning=prediction_raw.get("reasoning", ""),
             ),
             proactiveQuestions=data.get("proactiveQuestions", [])[:2],
         )
-    except (json.JSONDecodeError, KeyError, ValueError):
+    except Exception as exc:
+        log.error("[report-generate] parse error: %s | raw: %s", exc, raw)
         raise HTTPException(status_code=502, detail="AI returned malformed JSON.")
