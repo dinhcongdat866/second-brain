@@ -1,9 +1,11 @@
 /**
- * /ai-report page — Personal analytics report.
+ * Analytics Report overlay.
  *
- * Rendered as a full-screen overlay in App.tsx.
- * Phase 2: SQL data + pattern rules.
- * Phase 3 will add AI narrative (POST /ai-report/generate).
+ * Phase 2: SQL data (category breakdown + mood timeline) + client-side pattern rules.
+ * Phase 3: AI narrative, prediction, and proactive questions via POST /analytics/report-generate.
+ *
+ * Two-phase loading: SQL data appears immediately, AI section streams in after.
+ * PDF export via window.print() — @media print CSS in ai-report.css.
  */
 import { useState, useCallback } from 'react';
 import { apiFetch } from '../lib/http';
@@ -24,6 +26,18 @@ type PeriodType = '7' | '30' | '90';
 interface ReportData {
   categoryBreakdown: CategoryBreakdown[];
   moodTimeline: MoodPoint[];
+}
+
+interface AiPrediction {
+  text: string;
+  confidence: 'low' | 'medium' | 'high';
+  reasoning: string;
+}
+
+interface AiInsights {
+  narrative: string;
+  prediction: AiPrediction;
+  proactiveQuestions: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -60,9 +74,12 @@ const SEVERITY_ICON: Record<DetectedPattern['severity'], string> = {
   alert: '🔴', notice: '🟡', info: 'ℹ️',
 };
 
+const CONFIDENCE_LABEL: Record<AiPrediction['confidence'], string> = {
+  low: 'Low confidence', medium: 'Medium confidence', high: 'High confidence',
+};
+
 function shortDate(iso: string): string {
-  const d = new Date(iso + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 // ---------------------------------------------------------------------------
@@ -79,16 +96,13 @@ function CategoryBar({ item, maxPct }: { item: CategoryBreakdown; maxPct: number
       </div>
       <span className="ar-bar-meta">
         {item.pct}%
-        <span className={`ar-trend ar-trend--${item.trend}`}>
-          {TREND_ICON[item.trend]}
-        </span>
+        <span className={`ar-trend ar-trend--${item.trend}`}>{TREND_ICON[item.trend]}</span>
       </span>
     </div>
   );
 }
 
 function MoodTimeline({ timeline }: { timeline: MoodPoint[] }) {
-  // Show compact squares — scales from 7 to 90 days without wrapping.
   return (
     <div className="ar-mood-grid">
       {timeline.map((p) => {
@@ -113,14 +127,63 @@ function MoodTimeline({ timeline }: { timeline: MoodPoint[] }) {
 function PatternCard({ pattern }: { pattern: DetectedPattern }) {
   return (
     <div className={`ar-pattern ar-pattern--${pattern.severity}`}>
-      <span className="ar-pattern__icon" aria-hidden="true">
-        {SEVERITY_ICON[pattern.severity]}
-      </span>
+      <span className="ar-pattern__icon" aria-hidden="true">{SEVERITY_ICON[pattern.severity]}</span>
       <div className="ar-pattern__body">
         <span className="ar-pattern__rule">{pattern.rule}</span>
         <p className="ar-pattern__desc">{pattern.description}</p>
       </div>
     </div>
+  );
+}
+
+function AiSection({ insights, loading }: { insights: AiInsights | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <section className="ar-section">
+        <h3 className="ar-section-title">AI Insights</h3>
+        <div className="ar-ai-loading">
+          <span className="ar-ai-loading__spinner" />
+          Analysing patterns…
+        </div>
+      </section>
+    );
+  }
+
+  if (!insights) return null;
+
+  const { narrative, prediction, proactiveQuestions } = insights;
+
+  return (
+    <section className="ar-section">
+      <h3 className="ar-section-title">AI Insights</h3>
+
+      {/* Narrative */}
+      <p className="ar-narrative">{narrative}</p>
+
+      {/* Prediction */}
+      <div className={`ar-prediction ar-prediction--${prediction.confidence}`}>
+        <div className="ar-prediction__header">
+          <span className="ar-prediction__label">Prediction</span>
+          <span className={`ar-prediction__confidence ar-prediction__confidence--${prediction.confidence}`}>
+            {CONFIDENCE_LABEL[prediction.confidence]}
+          </span>
+        </div>
+        <p className="ar-prediction__text">{prediction.text}</p>
+        <p className="ar-prediction__reasoning">Reasoning: {prediction.reasoning}</p>
+      </div>
+
+      {/* Proactive questions */}
+      {proactiveQuestions.length > 0 && (
+        <div className="ar-questions">
+          <span className="ar-questions__label">💬 Questions to consider</span>
+          <ul className="ar-questions__list">
+            {proactiveQuestions.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -133,35 +196,63 @@ interface Props {
 }
 
 export function AiReportPage({ onClose }: Props) {
-  const [period, setPeriod] = useState<PeriodType>('30');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<ReportData | null>(null);
-  const [patterns, setPatterns] = useState<DetectedPattern[]>([]);
+  const [period, setPeriod]           = useState<PeriodType>('30');
+  const [dataLoading, setDataLoading] = useState(false);
+  const [aiLoading, setAiLoading]     = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const [data, setData]               = useState<ReportData | null>(null);
+  const [patterns, setPatterns]       = useState<DetectedPattern[]>([]);
+  const [aiInsights, setAiInsights]   = useState<AiInsights | null>(null);
   const [generatedFor, setGeneratedFor] = useState<string | null>(null);
 
   const handleGenerate = useCallback(async () => {
-    setLoading(true);
+    // Reset everything
+    setDataLoading(true);
+    setAiLoading(false);
     setError(null);
     setData(null);
     setPatterns([]);
+    setAiInsights(null);
+
+    const { from, to } = getPeriodDates(period);
+    const periodMeta = { type: PERIOD_LABELS[period], start: from, end: to };
 
     try {
-      const { from, to } = getPeriodDates(period);
+      // ── Phase 1: SQL aggregates (fast) ──────────────────────────────────
       const res = await apiFetch(`/analytics/report-data?from_date=${from}&to_date=${to}`);
       const json: ReportData = await res.json();
       const detected = evaluatePatterns(json.categoryBreakdown, json.moodTimeline);
+
       setData(json);
       setPatterns(detected);
       setGeneratedFor(`${PERIOD_LABELS[period]} · ${from} → ${to}`);
+      setDataLoading(false);
+
+      // ── Phase 2: AI narrative (slower — show spinner while waiting) ─────
+      setAiLoading(true);
+      const aiRes = await apiFetch('/analytics/report-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          period: periodMeta,
+          categoryBreakdown: json.categoryBreakdown,
+          moodTimeline: json.moodTimeline,
+          detectedPatterns: detected,
+        }),
+      });
+      const aiJson: AiInsights = await aiRes.json();
+      setAiInsights(aiJson);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load analytics data.');
+      setError(e instanceof Error ? e.message : 'Failed to generate report.');
+      setDataLoading(false);
     } finally {
-      setLoading(false);
+      setAiLoading(false);
     }
   }, [period]);
 
+  const isAnyLoading = dataLoading || aiLoading;
   const maxPct = data ? Math.max(...data.categoryBreakdown.map((b) => b.pct), 1) : 1;
+  const showExport = !!data && !!aiInsights;
 
   return (
     <div className="ar-overlay" onClick={onClose}>
@@ -170,7 +261,18 @@ export function AiReportPage({ onClose }: Props) {
         {/* Header */}
         <div className="ar-header">
           <h2 className="ar-title">📊 Analytics Report</h2>
-          <button className="ar-close" onClick={onClose} title="Close">×</button>
+          <div className="ar-header-actions">
+            {showExport && (
+              <button
+                className="ar-export-btn"
+                onClick={() => window.print()}
+                title="Export as PDF"
+              >
+                ⬇ Export PDF
+              </button>
+            )}
+            <button className="ar-close" onClick={onClose} title="Close">×</button>
+          </div>
         </div>
 
         {/* Controls */}
@@ -179,6 +281,7 @@ export function AiReportPage({ onClose }: Props) {
             className="ar-period-select"
             value={period}
             onChange={(e) => setPeriod(e.target.value as PeriodType)}
+            disabled={isAnyLoading}
           >
             {(Object.entries(PERIOD_LABELS) as [PeriodType, string][]).map(([v, label]) => (
               <option key={v} value={v}>{label}</option>
@@ -187,9 +290,9 @@ export function AiReportPage({ onClose }: Props) {
           <button
             className="ar-generate-btn"
             onClick={handleGenerate}
-            disabled={loading}
+            disabled={isAnyLoading}
           >
-            {loading ? 'Generating…' : 'Generate'}
+            {dataLoading ? 'Loading data…' : aiLoading ? 'Asking AI…' : 'Generate'}
           </button>
         </div>
 
@@ -197,7 +300,7 @@ export function AiReportPage({ onClose }: Props) {
         {error && <div className="ar-error">{error}</div>}
 
         {/* Empty state */}
-        {!data && !loading && !error && (
+        {!data && !isAnyLoading && !error && (
           <div className="ar-empty">
             Select a period and click Generate to analyse your weekly planner data.
           </div>
@@ -212,7 +315,7 @@ export function AiReportPage({ onClose }: Props) {
             <section className="ar-section">
               <h3 className="ar-section-title">Category Breakdown</h3>
               {data.categoryBreakdown.length === 0 ? (
-                <p className="ar-no-data">No classified todos for this period. Make sure to run classification first.</p>
+                <p className="ar-no-data">No classified todos for this period. Run classification first.</p>
               ) : (
                 <div className="ar-bar-list">
                   {data.categoryBreakdown.map((item) => (
@@ -232,10 +335,7 @@ export function AiReportPage({ onClose }: Props) {
                   <div className="ar-mood-legend">
                     {([1, 2, 3, 4, 5] as const).map((n) => (
                       <span key={n} className="ar-mood-legend-item">
-                        <span
-                          className="ar-mood-legend-dot"
-                          style={{ background: ENERGY_COLOR[n] }}
-                        />
+                        <span className="ar-mood-legend-dot" style={{ background: ENERGY_COLOR[n] }} />
                         {MOOD_EMOJI[n]}
                       </span>
                     ))}
@@ -256,19 +356,14 @@ export function AiReportPage({ onClose }: Props) {
                 <p className="ar-no-data">No patterns detected for this period.</p>
               ) : (
                 <div className="ar-pattern-list">
-                  {patterns.map((p) => (
-                    <PatternCard key={p.rule} pattern={p} />
-                  ))}
+                  {patterns.map((p) => <PatternCard key={p.rule} pattern={p} />)}
                 </div>
               )}
             </section>
 
-            {/* Phase 3 placeholder */}
-            <section className="ar-section ar-section--future">
-              <p className="ar-future-hint">
-                💡 <strong>Coming in Phase 3:</strong> AI-generated narrative, prediction, and proactive questions based on the data above.
-              </p>
-            </section>
+            {/* AI Insights (phase 3) */}
+            <AiSection insights={aiInsights} loading={aiLoading} />
+
           </div>
         )}
 

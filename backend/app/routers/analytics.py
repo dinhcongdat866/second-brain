@@ -356,3 +356,147 @@ async def get_report_data(
         cur += timedelta(days=1)
 
     return ReportDataResponse(categoryBreakdown=breakdown, moodTimeline=timeline)
+
+
+# ---------------------------------------------------------------------------
+# AI report generation — Phase 3
+# ---------------------------------------------------------------------------
+
+_REPORT_SYSTEM = """You are a personal life analytics assistant.
+You receive structured data from someone's week/month/quarter and generate a concise, honest report.
+
+Return ONLY valid JSON matching this exact schema — no preamble, no markdown fences:
+{
+  "narrative": "3-4 sentences summarising the period. Reference actual numbers and categories. Acknowledge data gaps honestly.",
+  "prediction": {
+    "text": "One sentence about what the next period likely holds, based on current trends.",
+    "confidence": "low | medium | high",
+    "reasoning": "One sentence explaining the confidence level."
+  },
+  "proactiveQuestions": ["up to 2 short, specific questions tied to gaps or anomalies in THIS data — not generic wellness questions"]
+}
+
+Confidence rules:
+- low: fewer than 7 mood logs OR fewer than 10 classified todos
+- high: clear multi-week patterns with sufficient mood data
+- medium: everything in between"""
+
+
+def _format_report_context(
+    period: dict,
+    breakdown: list[dict],
+    timeline: list[dict],
+    patterns: list[dict],
+) -> str:
+    """Render the analytics data as a compact plaintext summary for the AI prompt."""
+    lines: list[str] = []
+    trend_sym = {"up": "↑", "down": "↓", "stable": "→"}
+
+    # Period header
+    start = period.get("start", "")
+    end   = period.get("end", "")
+    ptype = period.get("type", "custom")
+    lines.append(f"Period: {ptype} ({start} → {end})\n")
+
+    # Category breakdown
+    total = sum(b.get("count", 0) for b in breakdown)
+    if total > 0:
+        lines.append(f"Category breakdown ({total} todos classified):")
+        for b in breakdown[:10]:
+            sym = trend_sym.get(b.get("trend", "stable"), "")
+            lines.append(f"  {b['category']:<22} {b['pct']:>5.1f}% {sym}")
+    else:
+        lines.append("Category breakdown: no classified todos for this period.")
+    lines.append("")
+
+    # Mood stats
+    logged = [p for p in timeline if p.get("energy") is not None]
+    total_days = len(timeline)
+    if logged:
+        avg    = sum(p["energy"] for p in logged) / len(logged)
+        low_d  = sum(1 for p in logged if p["energy"] <= 2)
+        high_d = sum(1 for p in logged if p["energy"] >= 4)
+        lines.append(f"Mood log ({len(logged)}/{total_days} days logged):")
+        lines.append(f"  Average energy : {avg:.1f}/5")
+        lines.append(f"  Low days  (≤2) : {low_d}")
+        lines.append(f"  High days (≥4) : {high_d}")
+    else:
+        lines.append(f"Mood log: 0/{total_days} days — no mood data.")
+    lines.append("")
+
+    # Detected patterns
+    if patterns:
+        lines.append("Detected patterns:")
+        for p in patterns:
+            sev  = p.get("severity", "info").upper()
+            rule = p.get("rule", "")
+            desc = p.get("description", "")
+            lines.append(f"  [{sev}] {rule} — {desc}")
+    else:
+        lines.append("Detected patterns: none.")
+
+    return "\n".join(lines)
+
+
+class PatternItem(BaseModel):
+    rule: str
+    description: str
+    severity: str
+
+class GenerateRequest(BaseModel):
+    period: dict
+    categoryBreakdown: list[dict]
+    moodTimeline: list[dict]
+    detectedPatterns: list[PatternItem]
+
+class PredictionResult(BaseModel):
+    text: str
+    confidence: Literal["low", "medium", "high"]
+    reasoning: str
+
+class GenerateResponse(BaseModel):
+    narrative: str
+    prediction: PredictionResult
+    proactiveQuestions: list[str]
+
+
+@router.post("/report-generate", response_model=GenerateResponse)
+async def generate_report(
+    body: GenerateRequest,
+    user_id: str = Depends(get_current_user),
+):
+    """
+    Generate AI narrative, prediction, and proactive questions from pre-computed
+    analytics data. The frontend passes SQL aggregates + evaluated pattern rules;
+    the AI only does qualitative interpretation — no DB access.
+    """
+    context = _format_report_context(
+        period=body.period,
+        breakdown=body.categoryBreakdown,
+        timeline=body.moodTimeline,
+        patterns=[p.model_dump() for p in body.detectedPatterns],
+    )
+
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    resp = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=512,
+        system=_REPORT_SYSTEM,
+        messages=[{"role": "user", "content": context}],
+    )
+
+    raw = resp.content[0].text.strip() if resp.content else "{}"
+    try:
+        data = json.loads(raw)
+        prediction_raw = data.get("prediction", {})
+        return GenerateResponse(
+            narrative=data.get("narrative", ""),
+            prediction=PredictionResult(
+                text=prediction_raw.get("text", ""),
+                confidence=prediction_raw.get("confidence", "low"),
+                reasoning=prediction_raw.get("reasoning", ""),
+            ),
+            proactiveQuestions=data.get("proactiveQuestions", [])[:2],
+        )
+    except (json.JSONDecodeError, KeyError, ValueError):
+        raise HTTPException(status_code=502, detail="AI returned malformed JSON.")

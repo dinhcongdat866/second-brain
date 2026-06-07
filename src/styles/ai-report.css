@@ -308,16 +308,176 @@
   line-height: 1.5;
 }
 
-/* ── Phase 3 placeholder ──────────────────────────────────────────────────── */
+/* ── Header actions (export + close) ─────────────────────────────────────── */
 
-.ar-section--future {
-  border-top: 1px dashed var(--nb-border-faint, #e5e7eb);
-  padding-top: 16px;
+.ar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.ar-future-hint {
+.ar-export-btn {
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 4px 12px;
+  border: 1px solid var(--nb-border-faint, #e5e7eb);
+  border-radius: var(--nb-r-xs, 4px);
+  background: var(--nb-bg-surface, #f9fafb);
+  color: var(--nb-text-2, #374151);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.ar-export-btn:hover {
+  background: var(--nb-bg, #fff);
+}
+
+/* ── AI Insights section ──────────────────────────────────────────────────── */
+
+.ar-ai-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 13px;
   color: var(--nb-text-3, #9ca3af);
+  padding: 8px 0;
+}
+
+.ar-ai-loading__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--nb-border-faint, #e5e7eb);
+  border-top-color: var(--nb-weekly-accent, #5046a6);
+  border-radius: 50%;
+  animation: ar-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ar-spin { to { transform: rotate(360deg); } }
+
+/* Narrative */
+.ar-narrative {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--nb-text, #111);
+  margin: 0 0 16px;
+}
+
+/* Prediction card */
+.ar-prediction {
+  border-radius: var(--nb-r-sm, 6px);
+  border: 1px solid var(--nb-border-faint, #e5e7eb);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.ar-prediction--high   { border-color: #86efac; background: #f0fdf4; }
+.ar-prediction--medium { border-color: #fde68a; background: #fffbeb; }
+.ar-prediction--low    { background: var(--nb-bg-surface, #f9fafb); }
+
+.ar-prediction__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ar-prediction__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--nb-text-2, #374151);
+}
+
+.ar-prediction__confidence {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+
+.ar-prediction__confidence--high   { background: #dcfce7; color: #16a34a; }
+.ar-prediction__confidence--medium { background: #fef9c3; color: #a16207; }
+.ar-prediction__confidence--low    { background: var(--nb-bg-surface, #f3f4f6); color: var(--nb-text-3, #9ca3af); }
+
+.ar-prediction__text {
+  font-size: 13px;
+  color: var(--nb-text, #111);
   margin: 0;
-  line-height: 1.6;
+  line-height: 1.5;
+}
+
+.ar-prediction__reasoning {
+  font-size: 12px;
+  color: var(--nb-text-3, #9ca3af);
+  margin: 0;
+  font-style: italic;
+}
+
+/* Proactive questions */
+.ar-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ar-questions__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nb-text-2, #374151);
+}
+
+.ar-questions__list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ar-questions__list li {
+  font-size: 13px;
+  color: var(--nb-text, #111);
+  line-height: 1.5;
+}
+
+/* ── Print / PDF export ───────────────────────────────────────────────────── */
+
+@media print {
+  /* Reset overlay so it prints like a normal page */
+  .ar-overlay {
+    position: static;
+    background: none;
+    padding: 0;
+    display: block;
+  }
+
+  .ar-panel {
+    box-shadow: none;
+    border: none;
+    max-width: 100%;
+    padding: 0;
+  }
+
+  /* Hide interactive controls */
+  .ar-controls,
+  .ar-header-actions,
+  .ar-close {
+    display: none !important;
+  }
+
+  /* Ensure all sections visible */
+  .ar-results {
+    gap: 16px;
+  }
+
+  /* Bars don't need transition in print */
+  .ar-bar-fill {
+    transition: none;
+  }
 }
