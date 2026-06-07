@@ -26,6 +26,29 @@ const BATCH_SIZE    = 50;  // backend max per request
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Strip inline formatting markup from weekly planner todo text before
+ * sending to the classifier.
+ *
+ * Weekly planner stores raw strings that may contain:
+ *   - Color marks:      {c=#rrggbb}text{/c}
+ *   - Bold markdown:    **text**
+ *   - Strikethrough:    ~~text~~
+ *   - Italic markdown:  _text_ or *text*
+ *
+ * Claude sees the markup as garbage → falls back to "Chores" for everything.
+ */
+function stripMarkup(raw: string): string {
+  return raw
+    .replace(/\{c=[^}]*\}/g, '')   // opening color tag  {c=#rrggbb}
+    .replace(/\{\/c\}/g, '')        // closing color tag  {/c}
+    .replace(/\*\*(.+?)\*\*/g, '$1') // **bold**
+    .replace(/~~(.+?)~~/g, '$1')    // ~~strikethrough~~
+    .replace(/\*(.+?)\*/g, '$1')    // *italic*
+    .replace(/_(.+?)_/g, '$1')      // _italic_
+    .trim();
+}
+
 /** Monday of the week containing `date`, as 'YYYY-MM-DD'. */
 function mondayOf(date: Date): string {
   const d = new Date(date);
@@ -75,12 +98,13 @@ async function syncClassifications(ydoc: Y.Doc): Promise<void> {
 
         for (let j = 0; j < dayList.length; j++) {
           const todo = dayList.get(j) as Y.Map<unknown>;
-          const id   = todo.get('id')   as string | undefined;
-          const text = todo.get('text') as string | undefined;
-          if (!id || !text?.trim()) continue;
+          const id      = todo.get('id')   as string | undefined;
+          const rawText = todo.get('text') as string | undefined;
+          const text    = rawText ? stripMarkup(rawText) : '';
+          if (!id || !text) continue;
 
           const bucket = byWeek.get(weekStart) ?? [];
-          bucket.push({ todo_id: id, week_start: weekStart, text: text.trim() });
+          bucket.push({ todo_id: id, week_start: weekStart, text });
           byWeek.set(weekStart, bucket);
         }
       }
