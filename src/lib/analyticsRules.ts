@@ -31,9 +31,9 @@ export interface DetectedPattern {
 // ---------------------------------------------------------------------------
 
 /** Activities that indicate high cognitive/work load. */
-const DEMANDING = new Set([CAT.WORK, CAT.JOB_SEARCH, CAT.PERSONAL_PROJECT]);
+const DEMANDING = new Set<string>([CAT.WORK, CAT.JOB_SEARCH, CAT.PERSONAL_PROJECT]);
 /** Activities that indicate recovery. */
-const RESTORATIVE = new Set([CAT.REST, CAT.LEISURE]);
+const RESTORATIVE = new Set<string>([CAT.REST, CAT.LEISURE]);
 
 /** Returns the longest consecutive streak where `pred` is true, plus its date range. */
 function maxStreak(
