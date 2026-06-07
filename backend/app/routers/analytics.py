@@ -1,7 +1,10 @@
 """Personal analytics — todo classification and mood log endpoints."""
 import json
+import logging
 from datetime import datetime, timezone, date as dt_date, timedelta
 from typing import Literal
+
+log = logging.getLogger(__name__)
 
 import anthropic
 from fastapi import APIRouter, Depends, HTTPException
@@ -503,6 +506,8 @@ async def generate_report(
     )
 
     raw = resp.content[0].text.strip() if resp.content else "{}"
+    log.warning("[report-generate] context sent:\n%s", context)
+    log.warning("[report-generate] raw AI response:\n%s", raw)
     try:
         data = json.loads(raw)
         prediction_raw = data.get("prediction", {})
