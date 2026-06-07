@@ -142,23 +142,29 @@ export function FloatingToolbar({ view }: { view: EditorView | null }) {
         }
       }
 
-      const startCoords = v.coordsAtPos(selection.from);
-      const endCoords   = v.coordsAtPos(selection.to);
-      const left = (startCoords.left + endCoords.right) / 2;
-      const top  = startCoords.top;
-
-      const marks = new Set<string>();
-      for (const name of ['strong', 'em', 'strikethrough', 'code', 'link']) {
-        if (isMarkActive(v, name)) marks.add(name);
-      }
-      const styles: ActiveStyles = {
-        color: getMarkAttr(v, 'text_color', 'color'),
-        bg: getMarkAttr(v, 'bg_color', 'color'),
-        size: getMarkAttr(v, 'font_size', 'size'),
-      };
-
+      // Defer all DOM-querying work into the debounce window so that rapid
+      // drag-selection doesn't block the main thread with layout reflows.
       clearTimeout(showTimer.current);
       showTimer.current = setTimeout(() => {
+        if (dismissedRef.current) return;
+        const { selection: currentSel } = v.state;
+        if (!(currentSel instanceof TextSelection) || currentSel.empty) return;
+
+        const startCoords = v.coordsAtPos(currentSel.from);
+        const endCoords   = v.coordsAtPos(currentSel.to);
+        const left = (startCoords.left + endCoords.right) / 2;
+        const top  = startCoords.top;
+
+        const marks = new Set<string>();
+        for (const name of ['strong', 'em', 'strikethrough', 'code', 'link']) {
+          if (isMarkActive(v, name)) marks.add(name);
+        }
+        const styles: ActiveStyles = {
+          color: getMarkAttr(v, 'text_color', 'color'),
+          bg: getMarkAttr(v, 'bg_color', 'color'),
+          size: getMarkAttr(v, 'font_size', 'size'),
+        };
+
         setPos({ left, top });
         setActiveMarks(marks);
         setActiveStyles(styles);
