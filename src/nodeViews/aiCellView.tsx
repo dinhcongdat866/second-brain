@@ -24,6 +24,7 @@ export class AiCellView implements NodeView {
     docId: string,
     getMemoryContext: () => string = () => '',
     appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void = () => {},
+    getAnalyticsContext: () => string = () => '',
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'ai-cell';
@@ -56,6 +57,7 @@ export class AiCellView implements NodeView {
         getLocalContext={getLocalContext}
         getDocContext={getDocContext}
         getMemoryContext={getMemoryContext}
+        getAnalyticsContext={getAnalyticsContext}
         appendMemory={appendMemory}
         onDelete={onDelete}
         cellId={cellId}

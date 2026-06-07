@@ -20,6 +20,7 @@ import { exportDocToMarkdown, saveMarkdownFile } from './lib/exportMarkdown';
 import { importMarkdownAsNewDoc } from './lib/importMarkdown';
 import { useUIStore } from './stores/uiStore';
 import { AiReportPage } from './components/AiReportPage';
+import { useAnalyticsContext } from './hooks/useAnalyticsContext';
 import './styles/main.css';
 
 function CellAdder({
@@ -65,7 +66,8 @@ function App() {
   const guestRegistry = useGuestDocRegistry();
   const registry = isGuest ? guestRegistry : authRegistry;
   const { getMemoryContext, appendMemory } = useMemory(isGuest ? undefined : userId);
-  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory);
+  const { getAnalyticsContext } = useAnalyticsContext(!isGuest);
+  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory, getAnalyticsContext);
   const peers = usePresence(providerRef);
   const [showHistory, setShowHistory] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);

@@ -208,6 +208,8 @@ export type StreamOptions = {
   ragContext?: string;
   /** Content from the user's Memory doc — injected as a separate cached system block. */
   memoryContext?: string;
+  /** Personal analytics summary (last 30 days) — injected as a separate cached system block. */
+  analyticsContext?: string;
   signal?: AbortSignal;
   config?: ModelConfig;
   /** Y.Text to stream thinking content into (Anthropic Sonnet/Opus only). */
@@ -287,7 +289,7 @@ export async function streamClaudeReply(
   onError: (err: Error) => void,
   options: StreamOptions = {},
 ): Promise<void> {
-  const { ragContext = '', memoryContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults, images = [], userApiKey } = options;
+  const { ragContext = '', memoryContext = '', analyticsContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults, images = [], userApiKey } = options;
   const client = makeClient(userApiKey);
 
   const baseContext =
@@ -302,10 +304,12 @@ export async function streamClaudeReply(
     baseContext +
     (ragContext ? '\n\n--- RELATED NOTES FROM OTHER DOCS ---\n' + ragContext : '');
 
-  // Ollama: no cache_control support, just prepend memory to systemText.
-  const ollamaSystemText = memoryContext
-    ? '--- MEMORY ---\n' + memoryContext + '\n\n' + systemText
-    : systemText;
+  // Ollama: no cache_control support, prepend memory + analytics to systemText.
+  const ollamaSystemText = [
+    memoryContext   ? '--- MEMORY ---\n'   + memoryContext   : '',
+    analyticsContext                        ? analyticsContext : '',
+    systemText,
+  ].filter(Boolean).join('\n\n');
 
   // ---------------------------------------------------------------------------
   // Ollama branch
@@ -359,12 +363,19 @@ export async function streamClaudeReply(
     return { role: t.role, content: t.content };
   });
 
-  // Memory block comes first — it changes rarely so its cache slot stays warm
-  // across many conversations, making it nearly free after the first request.
+  // System block order (most stable → least stable for optimal cache hit rate):
+  //   1. Memory   — changes rarely; cache stays warm across many conversations
+  //   2. Analytics — changes at most daily; cached separately from memory
+  //   3. Main     — contains local/doc/RAG context; changes every message
   const system: Anthropic.TextBlockParam[] = [
     ...(memoryContext ? [{
       type: 'text' as const,
       text: '--- MEMORY ---\nThe following was written by you or learned over time. Use it as permanent background context:\n\n' + memoryContext,
+      cache_control: { type: 'ephemeral' as const },
+    }] : []),
+    ...(analyticsContext ? [{
+      type: 'text' as const,
+      text: analyticsContext,
       cache_control: { type: 'ephemeral' as const },
     }] : []),
     {

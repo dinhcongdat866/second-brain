@@ -21,6 +21,7 @@ interface Args {
   getLocalContext: () => string;
   getDocContext: () => string;
   getMemoryContext: () => string;
+  getAnalyticsContext: () => string;
   onMemoryExtracted?: (bullets: string[], cellId: string, docId: string) => void;
   modelConfig: ModelConfig;
 }
@@ -42,6 +43,7 @@ export function useAiStream({
   getLocalContext,
   getDocContext,
   getMemoryContext,
+  getAnalyticsContext,
   onMemoryExtracted,
   modelConfig,
 }: Args) {
@@ -180,6 +182,7 @@ export function useAiStream({
           {
             ragContext,
             memoryContext: getMemoryContext(),
+            analyticsContext: getAnalyticsContext(),
             signal: ac.signal,
             config: modelConfig,
             thinkingTarget: thinkingText,
