@@ -1,11 +1,12 @@
 """Personal analytics — todo classification and mood log endpoints."""
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date as dt_date, timedelta
+from typing import Literal
 
 import anthropic
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
@@ -233,3 +234,125 @@ async def delete_mood(
         delete(MoodLog).where(MoodLog.user_id == user_id, MoodLog.date == date)
     )
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Report data — SQL aggregates for /ai-report page
+# ---------------------------------------------------------------------------
+
+class CategoryCount(BaseModel):
+    category: str
+    count: int
+    pct: float
+    trend: Literal["up", "down", "stable"]
+
+class MoodPoint(BaseModel):
+    date: str
+    energy: int | None = None
+    note: str | None = None
+
+class ReportDataResponse(BaseModel):
+    categoryBreakdown: list[CategoryCount]
+    moodTimeline: list[MoodPoint]
+
+
+@router.get("/report-data", response_model=ReportDataResponse)
+async def get_report_data(
+    from_date: str,
+    to_date: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    """
+    Aggregate category breakdown + mood timeline for a date range.
+    Dates are inclusive ISO strings ('YYYY-MM-DD').
+    Also computes the previous period of equal length for trend arrows.
+    """
+    # ── Current period: unnest JSON category arrays and count ─────────────
+    cats_q = await db.execute(
+        text("""
+            SELECT
+                cat_val  AS category,
+                COUNT(*) AS cnt
+            FROM todo_classifications,
+                 jsonb_array_elements_text(categories::jsonb) AS cat_val
+            WHERE user_id   = :uid
+              AND week_start >= :fd
+              AND week_start <= :td
+            GROUP BY cat_val
+            ORDER BY cnt DESC
+        """),
+        {"uid": user_id, "fd": from_date, "td": to_date},
+    )
+    curr_rows = cats_q.fetchall()
+    total = sum(r.cnt for r in curr_rows) or 1
+
+    # ── Previous period (same duration) for trend comparison ──────────────
+    fd = dt_date.fromisoformat(from_date)
+    td = dt_date.fromisoformat(to_date)
+    period_days = (td - fd).days + 1
+    prev_fd = (fd - timedelta(days=period_days)).isoformat()
+    prev_td = (fd - timedelta(days=1)).isoformat()
+
+    prev_q = await db.execute(
+        text("""
+            SELECT
+                cat_val  AS category,
+                COUNT(*) AS cnt
+            FROM todo_classifications,
+                 jsonb_array_elements_text(categories::jsonb) AS cat_val
+            WHERE user_id   = :uid
+              AND week_start >= :fd
+              AND week_start <= :td
+            GROUP BY cat_val
+        """),
+        {"uid": user_id, "fd": prev_fd, "td": prev_td},
+    )
+    prev_counts: dict[str, int] = {r.category: r.cnt for r in prev_q.fetchall()}
+
+    def _trend(curr: int, cat: str) -> str:
+        prev = prev_counts.get(cat, 0)
+        if prev == 0:
+            return "stable"
+        ratio = curr / prev
+        if ratio > 1.15:
+            return "up"
+        if ratio < 0.85:
+            return "down"
+        return "stable"
+
+    breakdown = [
+        CategoryCount(
+            category=r.category,
+            count=r.cnt,
+            pct=round(r.cnt / total * 100, 1),
+            trend=_trend(r.cnt, r.category),
+        )
+        for r in curr_rows
+    ]
+
+    # ── Mood timeline (every day in range, None for unlogged days) ─────────
+    mood_q = await db.execute(
+        select(MoodLog)
+        .where(
+            MoodLog.user_id == user_id,
+            MoodLog.date >= from_date,
+            MoodLog.date <= to_date,
+        )
+        .order_by(MoodLog.date),
+    )
+    mood_by_date = {r.date: r for r in mood_q.scalars().all()}
+
+    timeline: list[MoodPoint] = []
+    cur = fd
+    while cur <= td:
+        ds = cur.isoformat()
+        r = mood_by_date.get(ds)
+        timeline.append(MoodPoint(
+            date=ds,
+            energy=r.energy if r else None,
+            note=r.note if r else None,
+        ))
+        cur += timedelta(days=1)
+
+    return ReportDataResponse(categoryBreakdown=breakdown, moodTimeline=timeline)

@@ -19,6 +19,7 @@ import { usePresence } from './hooks/usePresence';
 import { exportDocToMarkdown, saveMarkdownFile } from './lib/exportMarkdown';
 import { importMarkdownAsNewDoc } from './lib/importMarkdown';
 import { useUIStore } from './stores/uiStore';
+import { AiReportPage } from './components/AiReportPage';
 import './styles/main.css';
 
 function CellAdder({
@@ -67,6 +68,7 @@ function App() {
   const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory);
   const peers = usePresence(providerRef);
   const [showHistory, setShowHistory] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(220);
   const [editorHidden, setEditorHidden] = useState(false);
@@ -139,6 +141,15 @@ function App() {
         >
           {t('app.history')}
         </Button>
+        {!isGuest && (
+          <Button
+            variant="secondary"
+            onClick={() => setShowAnalytics(true)}
+            title="Personal analytics report"
+          >
+            📊
+          </Button>
+        )}
         <Button
           variant="secondary"
           onClick={() => importMarkdownAsNewDoc(registry.importDoc)}
@@ -222,6 +233,9 @@ function App() {
           mainView={view}
           onClose={() => setShowHistory(false)}
         />
+      )}
+      {showAnalytics && (
+        <AiReportPage onClose={() => setShowAnalytics(false)} />
       )}
     </div>
   );

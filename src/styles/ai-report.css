@@ -1,0 +1,323 @@
+/* ── Analytics Report overlay ─────────────────────────────────────────── */
+
+.ar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+
+.ar-panel {
+  background: var(--nb-bg, #fff);
+  border: 1px solid var(--nb-border-faint, #e5e7eb);
+  border-radius: var(--nb-r-lg, 10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  width: 100%;
+  max-width: 760px;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.ar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ar-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--nb-text, #111);
+  margin: 0;
+}
+
+.ar-close {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--nb-text-3, #9ca3af);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--nb-r-xs, 4px);
+}
+
+.ar-close:hover {
+  background: var(--nb-bg-surface, #f3f4f6);
+  color: var(--nb-text, #111);
+}
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+
+.ar-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ar-period-select {
+  font-size: 13px;
+  font-family: inherit;
+  border: 1px solid var(--nb-border-faint, #e5e7eb);
+  border-radius: var(--nb-r-xs, 4px);
+  padding: 6px 10px;
+  background: var(--nb-bg, #fff);
+  color: var(--nb-text, #111);
+  cursor: pointer;
+}
+
+.ar-generate-btn {
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 600;
+  padding: 6px 18px;
+  border: none;
+  border-radius: var(--nb-r-xs, 4px);
+  background: var(--nb-weekly-accent, #5046a6);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.ar-generate-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.ar-generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+
+.ar-empty,
+.ar-no-data {
+  font-size: 13px;
+  color: var(--nb-text-3, #9ca3af);
+  padding: 12px 0;
+}
+
+.ar-error {
+  font-size: 13px;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--nb-r-xs, 4px);
+  padding: 8px 12px;
+}
+
+.ar-generated-label {
+  font-size: 11px;
+  color: var(--nb-text-3, #9ca3af);
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
+
+.ar-results {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.ar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ar-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--nb-text-2, #374151);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--nb-border-faint, #e5e7eb);
+}
+
+/* ── Category bar chart ─────────────────────────────────────────────────── */
+
+.ar-bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ar-bar-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 80px;
+  align-items: center;
+  gap: 10px;
+}
+
+.ar-bar-label {
+  font-size: 12px;
+  color: var(--nb-text, #111);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ar-bar-track {
+  height: 10px;
+  background: var(--nb-bg-surface, #f3f4f6);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.ar-bar-fill {
+  height: 100%;
+  background: var(--nb-weekly-accent, #5046a6);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+.ar-bar-meta {
+  font-size: 12px;
+  color: var(--nb-text-2, #374151);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.ar-trend {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ar-trend--up    { color: #16a34a; }
+.ar-trend--down  { color: #dc2626; }
+.ar-trend--stable { color: var(--nb-text-3, #9ca3af); }
+
+/* ── Mood timeline ───────────────────────────────────────────────────────── */
+
+.ar-mood-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--nb-text-3, #9ca3af);
+}
+
+.ar-mood-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.ar-mood-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.ar-mood-legend-dot--empty {
+  background: var(--nb-bg-surface, #f3f4f6);
+  border: 1px solid var(--nb-border-faint, #e5e7eb);
+}
+
+.ar-mood-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.ar-mood-square {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: default;
+  flex-shrink: 0;
+  transition: transform 0.1s;
+}
+
+.ar-mood-square:hover {
+  transform: scale(1.25);
+  z-index: 1;
+  position: relative;
+}
+
+.ar-mood-square--empty {
+  background: var(--nb-bg-surface, #f3f4f6);
+  border: 1px solid var(--nb-border-faint, #e5e7eb);
+}
+
+/* ── Detected patterns ───────────────────────────────────────────────────── */
+
+.ar-pattern-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ar-pattern {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--nb-r-sm, 6px);
+  border: 1px solid transparent;
+}
+
+.ar-pattern--alert  { background: #fef2f2; border-color: #fecaca; }
+.ar-pattern--notice { background: #fffbeb; border-color: #fde68a; }
+.ar-pattern--info   { background: var(--nb-bg-surface, #f9fafb); border-color: var(--nb-border-faint, #e5e7eb); }
+
+.ar-pattern__icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ar-pattern__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ar-pattern__rule {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: monospace;
+  color: var(--nb-text-2, #374151);
+  letter-spacing: 0.04em;
+}
+
+.ar-pattern__desc {
+  font-size: 13px;
+  color: var(--nb-text, #111);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Phase 3 placeholder ──────────────────────────────────────────────────── */
+
+.ar-section--future {
+  border-top: 1px dashed var(--nb-border-faint, #e5e7eb);
+  padding-top: 16px;
+}
+
+.ar-future-hint {
+  font-size: 13px;
+  color: var(--nb-text-3, #9ca3af);
+  margin: 0;
+  line-height: 1.6;
+}
