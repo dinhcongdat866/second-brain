@@ -5,6 +5,7 @@
  *
  * Rules are defined in localdoc/PERSONAL-ANALYTICS.md §5.
  */
+import { CAT } from './taxonomy';
 
 export interface CategoryBreakdown {
   category: string;
@@ -30,9 +31,9 @@ export interface DetectedPattern {
 // ---------------------------------------------------------------------------
 
 /** Activities that indicate high cognitive/work load. */
-const DEMANDING = new Set(['Công việc', 'Tìm việc', 'Personal Project']);
+const DEMANDING = new Set([CAT.WORK, CAT.JOB_SEARCH, CAT.PERSONAL_PROJECT]);
 /** Activities that indicate recovery. */
-const RESTORATIVE = new Set(['Rest', 'Leisure']);
+const RESTORATIVE = new Set([CAT.REST, CAT.LEISURE]);
 
 /** Returns the longest consecutive streak where `pred` is true, plus its date range. */
 function maxStreak(
@@ -85,7 +86,7 @@ export function evaluatePatterns(
     logged,
     (p) => (p.energy as number) < 3,
   );
-  const badMentalCount = byCategory.get('Bad mental health')?.count ?? 0;
+  const badMentalCount = byCategory.get(CAT.BAD_MENTAL_HEALTH)?.count ?? 0;
 
   if (lowStreak >= 2 || badMentalCount >= 2) {
     const parts: string[] = [];
@@ -136,8 +137,8 @@ export function evaluatePatterns(
   const veryLowDays = moodTimeline.filter((p) => (p.energy ?? 5) <= 2);
   if (veryLowDays.length >= 1) {
     const corr: string[] = [];
-    if (byCategory.has('Tìm việc')) corr.push('active job search');
-    if (byCategory.has('Bad physical health')) corr.push('physical health issues');
+    if (byCategory.has(CAT.JOB_SEARCH))   corr.push('active job search');
+    if (byCategory.has(CAT.BAD_PHYSICAL)) corr.push('physical health issues');
     if (demandingPct >= 55) corr.push('high-intensity work period');
 
     if (corr.length > 0) {
@@ -160,7 +161,7 @@ export function evaluatePatterns(
   }
 
   // ── Rule 6 — Job Search Active ────────────────────────────────────────
-  const jobSearch = byCategory.get('Tìm việc');
+  const jobSearch = byCategory.get(CAT.JOB_SEARCH);
   if (jobSearch && jobSearch.pct >= 10) {
     const trendLabel = jobSearch.trend === 'up' ? '↑ increasing' : jobSearch.trend === 'down' ? '↓ decreasing' : '→ stable';
     patterns.push({
@@ -171,7 +172,7 @@ export function evaluatePatterns(
   }
 
   // ── Rule 7 — Reflection Investment ───────────────────────────────────
-  const mental = byCategory.get('Mental Work');
+  const mental = byCategory.get(CAT.MENTAL_WORK);
   if (mental && mental.pct >= 15) {
     patterns.push({
       rule: 'REFLECTION_WEEK',

@@ -20,20 +20,20 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 # Category taxonomy v1 — must match PERSONAL-ANALYTICS.md
 # ---------------------------------------------------------------------------
 
-TAXONOMY_VERSION = 1
+TAXONOMY_VERSION = 2  # v1→v2: renamed "Tìm việc"→"Job Search", "Công việc"→"Work", "Tài chính"→"Finance"
 
 CATEGORIES: dict[str, str] = {
-    "Mental Work":        "Reflect, trauma processing, journaling, metacognition, therapy",
-    "Tìm việc":           "Apply job, viết CV, prep interview, research công ty, networking",
-    "Công việc":          "Tasks job hiện tại, freelance, meetings",
-    "Personal Project":   "Side project, coding ngoài giờ, học kỹ năng mới",
-    "Tài chính":          "Budget, bills, đầu tư, theo dõi chi tiêu",
-    "Relationships":      "Gặp bạn bè, gia đình, social events, đám cưới",
-    "Rest":               "Ngủ, nằm không làm gì, recovery có chủ đích — passive",
-    "Leisure":            "Game, phim, đọc giải trí, hobby — active enjoyment",
-    "Chores":             "Cắt tóc, giặt đồ, dọn nhà, admin tasks",
-    "Bad mental health":  "Lo lắng, stress, burnout, mất ngủ do tâm lý",
-    "Bad physical health":"Ốm, mệt thể xác, đau đầu, ngủ không đủ giấc",
+    "Mental Work":        "Journaling, reflection, trauma processing, metacognition, therapy sessions",
+    "Job Search":         "Job applications, CV writing, interview prep, company research, networking",
+    "Work":               "Current job tasks, freelance work, meetings, client deliverables",
+    "Personal Project":   "Side projects, coding outside work hours, learning new skills",
+    "Finance":            "Budgeting, bills, investments, expense tracking",
+    "Relationships":      "Seeing friends or family, social events, weddings, social obligations",
+    "Rest":               "Sleep, deliberate do-nothing recovery — passive recharge",
+    "Leisure":            "Gaming, films, recreational reading, hobbies — active enjoyment",
+    "Chores":             "Haircut, laundry, cleaning, admin errands",
+    "Bad mental health":  "Anxiety, stress, burnout, insomnia from psychological causes",
+    "Bad physical health":"Illness, physical fatigue, headaches, insufficient sleep",
 }
 
 _CATEGORY_LIST = "\n".join(f"- {name}: {desc}" for name, desc in CATEGORIES.items())
