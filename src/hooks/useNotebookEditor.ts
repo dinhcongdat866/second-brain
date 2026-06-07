@@ -118,6 +118,7 @@ function bindEditor(
   isGuest: boolean,
   getMemoryContext: () => string,
   appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void,
+  getAnalyticsContext: () => string,
 ): (() => void) | undefined {
   sweepOrphanThreads(doc, yXmlFragment);
   sweepOrphanWeeklyPlans(doc, yXmlFragment);
@@ -240,6 +241,7 @@ export function useNotebookEditor(
           true,
           getMemoryContext,
           appendMemory,
+          getAnalyticsContext,
         );
       });
 
@@ -302,6 +304,7 @@ export function useNotebookEditor(
         false,
         getMemoryContext,
         appendMemory,
+        getAnalyticsContext,
       );
     });
 
