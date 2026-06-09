@@ -111,6 +111,31 @@ export function createCollabSetup(docId: string, userId?: string): CollabSetup {
   return { ydoc, persistence, provider, yXmlFragment };
 }
 
+// ---------------------------------------------------------------------------
+// Global weekly-planner Y.Doc — shared across all notebook documents
+// ---------------------------------------------------------------------------
+
+/** Stable doc_id / room suffix for the global planner Y.Doc. */
+export const PLANNER_DOC_ID = '__weekly-planner__';
+
+export interface PlannerSetup {
+  ydoc: Y.Doc;
+  persistence: IndexeddbPersistence;
+  provider: WebsocketProvider;
+}
+
+/**
+ * Creates the global weekly-planner Y.Doc.
+ * All weekly_planner_cells in every notebook document read/write here,
+ * so planner data persists and syncs independently of any specific document.
+ */
+export function createPlannerSetup(userId?: string): PlannerSetup {
+  const ydoc = new Y.Doc({ gc: false });
+  const persistence = new IndexeddbPersistence(collabDbName(PLANNER_DOC_ID, userId), ydoc);
+  const provider = new WebsocketProvider(WS_URL, collabRoom(PLANNER_DOC_ID, userId), ydoc);
+  return { ydoc, persistence, provider };
+}
+
 /**
  * A brand-new Y.Doc has an empty fragment. ySyncPlugin would then render an
  * empty doc filled by the schema — producing a markdown_cell with a blank id.

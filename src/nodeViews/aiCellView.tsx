@@ -25,6 +25,7 @@ export class AiCellView implements NodeView {
     getMemoryContext: () => string = () => '',
     appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void = () => {},
     getAnalyticsContext: () => string = () => '',
+    plannerYdoc: Y.Doc | null = null,
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'ai-cell';
@@ -46,7 +47,7 @@ export class AiCellView implements NodeView {
     const getLocalContext = () => extractLocalContext(view.state.doc, cellId);
     const getDocContext = () => {
       const md = extractDocContext(view.state.doc);
-      const weekly = extractWeeklyContext(ydoc, view.state.doc);
+      const weekly = plannerYdoc ? extractWeeklyContext(plannerYdoc) : '';
       return [md, weekly].filter(Boolean).join('\n\n');
     };
 

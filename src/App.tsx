@@ -22,6 +22,7 @@ import { useUIStore } from './stores/uiStore';
 import { AiReportPage } from './components/AiReportPage';
 import { useAnalyticsContext } from './hooks/useAnalyticsContext';
 import { useClassificationSync } from './hooks/useClassificationSync';
+import { usePlannerYdoc } from './hooks/usePlannerYdoc';
 import './styles/main.css';
 
 function CellAdder({
@@ -68,9 +69,10 @@ function App() {
   const registry = isGuest ? guestRegistry : authRegistry;
   const { getMemoryContext, appendMemory } = useMemory(isGuest ? undefined : userId);
   const { getAnalyticsContext } = useAnalyticsContext(!isGuest);
-  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory, getAnalyticsContext);
+  const plannerYdoc = usePlannerYdoc(userId, isGuest);
+  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory, getAnalyticsContext, plannerYdoc);
   const peers = usePresence(providerRef);
-  useClassificationSync(ydoc, !isGuest);
+  useClassificationSync(plannerYdoc, !isGuest);
   const [showHistory, setShowHistory] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);

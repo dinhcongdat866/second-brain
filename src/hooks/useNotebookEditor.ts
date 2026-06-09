@@ -119,6 +119,7 @@ function bindEditor(
   getMemoryContext: () => string,
   appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void,
   getAnalyticsContext: () => string,
+  plannerYdoc: Y.Doc | null,
 ): (() => void) | undefined {
   sweepOrphanThreads(doc, yXmlFragment);
   sweepOrphanWeeklyPlans(doc, yXmlFragment);
@@ -164,8 +165,8 @@ function bindEditor(
       state,
       nodeViews: {
         markdown_cell: (node, view, getPos) => new MarkdownCellView(node, view, getPos),
-        ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext, appendMemory, getAnalyticsContext),
-        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, doc),
+        ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext, appendMemory, getAnalyticsContext, plannerYdoc),
+        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, plannerYdoc ?? doc),
       },
       handleDOMEvents: {
         click(_view, event) {
@@ -207,6 +208,7 @@ export function useNotebookEditor(
   getMemoryContext: () => string = () => '',
   appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void = () => {},
   getAnalyticsContext: () => string = () => '',
+  plannerYdoc: Y.Doc | null = null,
 ) {
   const [view, setView] = useState<EditorView | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
@@ -242,6 +244,7 @@ export function useNotebookEditor(
           getMemoryContext,
           appendMemory,
           getAnalyticsContext,
+          plannerYdoc,
         );
       });
 
@@ -305,6 +308,7 @@ export function useNotebookEditor(
         getMemoryContext,
         appendMemory,
         getAnalyticsContext,
+        plannerYdoc,
       );
     });
 
@@ -318,7 +322,10 @@ export function useNotebookEditor(
       setView(null);
       setYdoc(null);
     };
-  }, [activeDocId, isGuest, userId]); // editorRef is stable
+  // plannerYdoc in deps: re-bind editor once the global planner Y.Doc is ready.
+  // On first render plannerYdoc is null; it resolves in the next tick before
+  // persistence.whenSynced fires, so the editor is always created with a live plannerYdoc.
+  }, [activeDocId, isGuest, userId, plannerYdoc]); // editorRef is stable
 
   return { view, ydoc, providerRef };
 }

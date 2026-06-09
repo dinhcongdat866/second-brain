@@ -42,15 +42,13 @@ export function extractDocContext(doc: PMNode, maxChars = 1500): string {
 
 /**
  * Weekly planner context: serialize up to `maxWeeks` most-recent non-empty
- * weeks from every weekly_planner_cell in the current doc.
+ * weeks from all planner cells in the global planner Y.Doc.
+ * Data is not filtered by the current document — the planner is global.
  */
-export function extractWeeklyContext(ydoc: Y.Doc, doc: PMNode, maxWeeks = 4): string {
-  const plans = ydoc.getMap(WEEKLY_PLANS_KEY);
+export function extractWeeklyContext(plannerYdoc: Y.Doc, maxWeeks = 4): string {
+  const plans = plannerYdoc.getMap<Y.Map<unknown>>(WEEKLY_PLANS_KEY);
   const parts: string[] = [];
-  doc.forEach((cell) => {
-    if (cell.type.name !== 'weekly_planner_cell') return;
-    const plan = plans.get(cell.attrs.id as string) as Y.Map<unknown> | undefined;
-    if (!plan) return;
+  plans.forEach((plan) => {
     const serialized = serializeWeeklyForAI(plan, maxWeeks);
     if (serialized) parts.push(serialized);
   });
