@@ -322,8 +322,17 @@ function stripStyleMarkers(text: string): string {
   return text.replace(/\{[^}]*\}/g, '');
 }
 
+const MOOD_EMOJIS: Record<number, string> = { 1: '😴', 2: '😞', 3: '😐', 4: '🙂', 5: '🔥' };
+
 /**
  * Serialize up to `maxWeeks` most-recent non-empty weeks from this plan.
+ * Each day line includes the mood score when logged, e.g.:
+ *   Mon [mood: 🙂 4]:
+ *     [x] Feature build
+ *     [ ] Code review
+ *   Tue [no mood]:
+ *     [ ] Blog draft
+ *
  * Returns an empty string if the plan has no todos.
  */
 export function serializeWeeklyForAI(plan: Y.Map<unknown>, maxWeeks = 4): string {
@@ -338,12 +347,19 @@ export function serializeWeeklyForAI(plan: Y.Map<unknown>, maxWeeks = 4): string
     for (const day of DAY_KEYS) {
       const list = wm.get(day) as YDayList | undefined;
       if (!list || list.length === 0) continue;
+
+      const date = dayToDate(weekStart, day as DayKey);
+      const mood = getMoodForDate(plan, date);
+      const moodLabel = mood
+        ? `[mood: ${MOOD_EMOJIS[mood.energy]} ${mood.energy}]`
+        : '[no mood]';
+
       const todos = list.toArray().map(t => {
         const done = t.get('done') as boolean;
         const text = stripStyleMarkers(t.get('text') as string);
         return `    ${done ? '[x]' : '[ ]'} ${text}`;
       });
-      dayParts.push(`  ${DAY_LABELS[day as DayKey]}:\n${todos.join('\n')}`);
+      dayParts.push(`  ${DAY_LABELS[day as DayKey]} ${moodLabel}:\n${todos.join('\n')}`);
     }
     if (dayParts.length > 0) {
       entries.push({ weekStart, lines: `${weekRangeLabel(weekStart)}:\n${dayParts.join('\n')}` });
