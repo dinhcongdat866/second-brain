@@ -78,7 +78,10 @@ export function SelectionToolbarShell({
         const idx = Number(e.key) - 1;
         if (idx < swatches.length) {
           e.preventDefault();
-          onStyle(flyout as StyleKind, swatches[idx].value);
+          // 'text' flyout maps to the 'color' StyleKind ('text' is the flyout id,
+          // 'color' is the kind name used by the style system).
+          const kind: StyleKind = flyout === 'text' ? 'color' : (flyout as StyleKind);
+          onStyle(kind, swatches[idx].value);
           setFlyout(null);
         }
       }

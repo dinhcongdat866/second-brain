@@ -289,26 +289,45 @@ export function clearTodoStyle(
     const rawStart = map[visStart];
     const rawEnd = map[visEnd - 1] + 1;
 
-    const before = text.slice(0, rawStart);
-    const middle = text.slice(rawStart, rawEnd);
-    const after = text.slice(rawEnd);
+    // Collect all opener and closer positions for this kind.
+    const openPat = new RegExp(`\\{${ch}=[^}]+\\}`, 'g');
+    const closePat = new RegExp(`\\{\\/${ch}\\}`, 'g');
+    const openers: Array<[number, number]> = [];
+    const closers: Array<[number, number]> = [];
+    let m: RegExpExecArray | null;
 
-    // Nearest opener `{ch=...}` in `before`.
-    const openRe = new RegExp(`\\{${ch}=[^}]+\\}`, 'g');
-    let open: RegExpExecArray | null = null;
-    for (let m = openRe.exec(before); m; m = openRe.exec(before)) open = m;
-    const closeTok = `{/${ch}}`;
-    const closeIdx = after.indexOf(closeTok);
-    if (!open || closeIdx === -1) return; // nothing enclosing — no-op
+    openPat.lastIndex = 0;
+    while ((m = openPat.exec(text)) !== null) openers.push([m.index, m.index + m[0].length]);
+    closePat.lastIndex = 0;
+    while ((m = closePat.exec(text)) !== null) closers.push([m.index, m.index + m[0].length]);
 
-    todo.set(
-      'text',
-      before.slice(0, open.index) +
-        before.slice(open.index + open[0].length) +
-        middle +
-        after.slice(0, closeIdx) +
-        after.slice(closeIdx + closeTok.length),
-    );
+    // Pair each opener with the first closer that follows it (greedy, left-to-right).
+    const usedClosers = new Set<number>();
+    const pairs: Array<[number, number, number, number]> = []; // [openStart, openEnd, closeStart, closeEnd]
+    for (const [os, oe] of openers) {
+      for (let j = 0; j < closers.length; j++) {
+        if (usedClosers.has(j)) continue;
+        const [cs, ce] = closers[j];
+        if (cs >= oe) { usedClosers.add(j); pairs.push([os, oe, cs, ce]); break; }
+      }
+    }
+
+    // A span overlaps the selection if its opener starts before rawEnd AND
+    // its closer ends after rawStart — this catches all three cases:
+    //   (a) span fully inside selection, (b) span fully enclosing selection,
+    //   (c) span partially overlapping from either side.
+    const toRemove: Array<[number, number]> = [];
+    for (const [os, oe, cs, ce] of pairs) {
+      if (os < rawEnd && ce > rawStart) toRemove.push([os, oe], [cs, ce]);
+    }
+
+    if (toRemove.length === 0) return;
+
+    // Remove right-to-left so earlier positions stay valid.
+    toRemove.sort((a, b) => b[0] - a[0]);
+    let result = text;
+    for (const [s, e] of toRemove) result = result.slice(0, s) + result.slice(e);
+    todo.set('text', result);
     return;
   }
 }
