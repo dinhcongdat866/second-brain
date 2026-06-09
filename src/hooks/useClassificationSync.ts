@@ -157,13 +157,16 @@ async function syncClassifications(ydoc: Y.Doc): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * @param ydoc  - the active Y.Doc (null while loading)
- * @param enabled - false for guests; hook no-ops entirely
+ * @param ydoc     - the active Y.Doc (null while loading)
+ * @param enabled  - false for guests; hook no-ops entirely
+ * @param isReady  - true once IndexedDB + server state are loaded; prevents
+ *                   running on an empty ydoc before todos have been applied
  * @returns `sync()` — call to manually re-trigger (e.g. from /ai-report Generate)
  */
 export function useClassificationSync(
   ydoc: Y.Doc | null,
   enabled: boolean,
+  isReady: boolean,
 ): { sync: () => void } {
   const runningRef = useRef(false);
 
@@ -175,10 +178,10 @@ export function useClassificationSync(
       .finally(() => { runningRef.current = false; });
   }, [ydoc, enabled]);
 
-  // Auto-run once when ydoc first becomes available
+  // Auto-run once after ydoc is fully loaded (IndexedDB + server state applied).
   useEffect(() => {
-    if (ydoc && enabled) sync();
-  }, [ydoc, enabled, sync]);
+    if (ydoc && enabled && isReady) sync();
+  }, [ydoc, enabled, isReady, sync]);
 
   return { sync };
 }

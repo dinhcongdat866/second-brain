@@ -39,7 +39,7 @@ async function upsertCell(payload: CellPayload): Promise<void> {
 export function upsertUserTurn(cellId: string, docId: string, text: string): void {
   const content = text.trim();
   if (!content) return;
-  upsertCell({ cell_id: `${cellId}:u:${Date.now()}`, doc_id: docId, content }).catch(() => {});
+  upsertCell({ cell_id: cellId, doc_id: docId, content }).catch(() => {});
 }
 
 export interface SearchResult {
