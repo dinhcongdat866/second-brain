@@ -24,8 +24,9 @@ export class WeeklyCellView implements NodeView {
     this.dom = document.createElement('div');
     this.dom.className = 'weekly-cell-wrapper';
 
-    const cellId = node.attrs.id as string;
-    const plan = getWeeklyPlan(ydoc, cellId);
+    // All planner cells share one plan in the global plannerYdoc.
+    // Using a fixed key so every cell renders the same source of truth.
+    const plan = getWeeklyPlan(ydoc, 'global');
 
     const onDelete = () => {
       const pos = getPos();
