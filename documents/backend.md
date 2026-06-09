@@ -72,6 +72,27 @@ CPU-friendly, lazy-loaded once per process.
 | Paste image in markdown | `POST /images` → URL | per image |
 | Delete a document | `DELETE` state + images | after the undo window |
 
+## Analytics & classification
+
+See **[analytics-classification.md](analytics-classification.md)** for the full flow.
+
+Additional tables not listed above:
+
+```sql
+todo_classifications (todo_id PK, user_id, week_start, todo_text, categories JSONB, taxonomy_version, classified_at)
+mood_logs            (id PK, user_id, date, energy INT 1–5, note)
+```
+
+Additional endpoints:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /analytics/classify` | Batch-classify todos via Haiku (max 50). Upserts into `todo_classifications`. |
+| `GET /analytics/classifications?week_start=` | Stored classifications for one week (dirty-check). |
+| `GET /analytics/report-data?from_date=&to_date=` | SQL aggregates: category breakdown + mood timeline. |
+| `POST /analytics/generate` | Stream AI narrative (Sonnet) from aggregated report data. |
+| `POST /analytics/mood` · `GET /analytics/mood?date=` | Log / fetch daily mood entry. |
+
 ## Why images are a separate table (not in the Y.Doc)
 
 The Y.Doc is loaded fully into memory and re-synced/re-saved on every edit, and with `gc:false`
