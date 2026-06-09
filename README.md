@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src/assets/hero.png" alt="Second Brain" width="120" />
+  <img src="public/favicon.svg" alt="Second Brain" width="120" />
   <h1>Second Brain</h1>
   <p><strong>A local-first, multiplayer research notebook with a CRDT editor and AI cells.</strong></p>
   <p>ProseMirror · Yjs · React 19 · FastAPI · Claude</p>
