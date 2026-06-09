@@ -27,7 +27,7 @@ export type AllDays = Record<DayKey, TodoData[]>;
 // Week helpers
 // ---------------------------------------------------------------------------
 
-function getMondayOf(date: Date): string {
+export function getMondayOf(date: Date): string {
   const d = new Date(date);
   const day = d.getDay(); // 0 = Sunday
   const diff = day === 0 ? -6 : 1 - day;

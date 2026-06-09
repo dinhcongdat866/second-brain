@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import * as Y from 'yjs';
-import { WEEKLY_PLANS_KEY, DAY_KEYS } from '../collab/weeklyPlans';
+import { WEEKLY_PLANS_KEY, DAY_KEYS, getMondayOf } from '../collab/weeklyPlans';
 import { apiFetch } from '../lib/http';
 
 // ---------------------------------------------------------------------------
@@ -49,13 +49,6 @@ function stripMarkup(raw: string): string {
     .trim();
 }
 
-/** Monday of the week containing `date`, as 'YYYY-MM-DD'. */
-function mondayOf(date: Date): string {
-  const d = new Date(date);
-  const day = d.getDay();          // 0 = Sunday
-  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
-  return d.toISOString().slice(0, 10);
-}
 
 interface TodoItem {
   todo_id: string;
@@ -81,7 +74,7 @@ async function syncClassifications(ydoc: Y.Doc): Promise<void> {
   // 1. Target weeks: current Monday + 3 previous Mondays
   const today = new Date();
   const targetWeeks = Array.from({ length: WEEKS_TO_SCAN }, (_, i) =>
-    mondayOf(new Date(today.getTime() - i * 7 * 86_400_000)),
+    getMondayOf(new Date(today.getTime() - i * 7 * 86_400_000)),
   );
 
   // 2. Collect todos from Yjs, grouped by week_start
@@ -93,7 +86,7 @@ async function syncClassifications(ydoc: Y.Doc): Promise<void> {
     if (!(weeksMap instanceof Y.Map)) continue;
 
     for (const weekStart of targetWeeks) {
-      const weekData = weeksMap.get(weekStart);
+      const weekData = (weeksMap as Y.Map<unknown>).get(weekStart);
       if (!(weekData instanceof Y.Map)) continue;
 
       for (const day of DAY_KEYS) {
