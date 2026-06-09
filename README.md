@@ -16,7 +16,18 @@ planner. Everything syncs across tabs and devices and keeps working offline.
 > CRDT collaboration + AI integration**. See [`documents/`](documents/) for the architecture.
 
 <!-- TODO: add a screenshot or short demo gif here -->
-<img width="3835" height="2017" alt="image" src="https://github.com/user-attachments/assets/7f997b5f-139f-4b18-a8a6-c83cd083c176" />
+
+**1. Main page with multiple cursor:**
+
+<img width="1916" height="1010" alt="image" src="https://github.com/user-attachments/assets/9b2cce93-d021-46c4-a2b5-464c486b57ac" />
+
+**2. AI Report based on Weekly planner:**
+
+<img width="1919" height="1004" alt="image" src="https://github.com/user-attachments/assets/ae1a17ab-671f-4dee-9ebf-0270a366a578" />
+
+**3. AI cell formatting:**
+
+<img width="687" height="400" alt="image" src="https://github.com/user-attachments/assets/93498dcf-b082-4a06-99a4-a3c63fb327dd" />
 
 ## Why it's interesting
 
