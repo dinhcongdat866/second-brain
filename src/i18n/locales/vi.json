@@ -104,7 +104,7 @@
     "passwordPlaceholder": "Mật khẩu (tối thiểu 6 ký tự)",
     "checkEmail": "Kiểm tra email để xác nhận tài khoản, sau đó đăng nhập.",
     "continueAsGuest": "Dùng thử ngay",
-    "guestNote": "Không cần tài khoản · ghi chú chỉ lưu trong trình duyệt này"
+    "guestNote": "Không cần tài khoản · dữ liệu sẽ mất khi đóng tab"
   },
   "guest": {
     "bannerText": "Bạn đang ở chế độ khách — ghi chú sẽ không được lưu.",

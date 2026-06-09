@@ -104,7 +104,7 @@
     "passwordPlaceholder": "Password (min 6 chars)",
     "checkEmail": "Check your email to confirm your account, then sign in.",
     "continueAsGuest": "Try it now",
-    "guestNote": "No account needed · notes stay in this browser only"
+    "guestNote": "No account needed · notes are lost when you close the tab"
   },
   "guest": {
     "bannerText": "You're in guest mode — notes won't be saved.",
