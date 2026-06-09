@@ -178,3 +178,27 @@ export function createWeeklyPlannerCell(): PMNode {
 export function createInitialDoc(): PMNode {
   return notebookSchema.nodes.doc.create(null, [createMarkdownCell()]);
 }
+
+/**
+ * Demo document seeded for first-time guest visitors.
+ * Contains a short welcome markdown cell, a weekly planner, and an AI cell
+ * so the user immediately sees what the app can do without reading any docs.
+ */
+export function createGuestDemoDoc(): PMNode {
+  const heading = notebookSchema.nodes.heading.create(
+    { level: 1 },
+    notebookSchema.text('Welcome to Second Brain ✦'),
+  );
+  const para = notebookSchema.nodes.paragraph.create(
+    null,
+    notebookSchema.text(
+      'This is your personal notebook. Use the weekly planner below to track your tasks, or ask the AI cell a question. Your notes stay in this browser tab only.',
+    ),
+  );
+  const markdownCell = notebookSchema.nodes.markdown_cell.create(makeCellAttrs(), [heading, para]);
+  return notebookSchema.nodes.doc.create(null, [
+    markdownCell,
+    createWeeklyPlannerCell(),
+    createAiCell(),
+  ]);
+}

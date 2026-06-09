@@ -103,7 +103,8 @@
     "emailPlaceholder": "Email",
     "passwordPlaceholder": "Password (min 6 chars)",
     "checkEmail": "Check your email to confirm your account, then sign in.",
-    "continueAsGuest": "Continue as guest — data won't be saved"
+    "continueAsGuest": "Try it now",
+    "guestNote": "No account needed · notes stay in this browser only"
   },
   "guest": {
     "bannerText": "You're in guest mode — notes won't be saved.",

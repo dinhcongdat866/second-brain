@@ -113,10 +113,14 @@ export function LoginPage() {
           </>
         )}
 
-        {/* Guest */}
-        <button type="button" className="login-guest-btn" onClick={continueAsGuest}>
-          {t('login.continueAsGuest')}
-        </button>
+        {/* Guest CTA — visually separated, more prominent than a bare text link */}
+        <div className="login-guest-section">
+          <div className="login-divider"><span>{t('login.or')}</span></div>
+          <button type="button" className="login-guest-btn" onClick={continueAsGuest}>
+            {t('login.continueAsGuest')}
+          </button>
+          <p className="login-guest-note">{t('login.guestNote')}</p>
+        </div>
       </div>
     </div>
   );

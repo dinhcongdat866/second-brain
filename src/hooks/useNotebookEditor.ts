@@ -47,6 +47,7 @@ import {
   createGuestDocSetup,
   seedFromContent,
   seedIfEmpty,
+  seedGuestDoc,
   wireSaveStatus,
 } from '../collab/ydoc';
 import { runMigrations } from '../collab/schemaMigrations';
@@ -230,7 +231,7 @@ export function useNotebookEditor(
         if (pendingImport) {
           seedFromContent(doc, yXmlFragment, pendingImport.pmDoc);
         } else {
-          seedIfEmpty(doc, yXmlFragment);
+          seedGuestDoc(doc, yXmlFragment);
         }
         cleanup = bindEditor(
           editorRef.current!,

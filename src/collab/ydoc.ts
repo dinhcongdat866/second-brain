@@ -4,7 +4,7 @@ import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
 import { prosemirrorToYDoc } from 'y-prosemirror';
 import type { Node as PMNode } from 'prosemirror-model';
-import { createInitialDoc } from '../schema';
+import { createInitialDoc, createGuestDemoDoc } from '../schema';
 import { useUIStore } from '../stores/uiStore';
 import { WS_URL } from '../lib/config';
 import { NEON_SYNC_ORIGIN } from '../lib/backendSync';
@@ -144,6 +144,18 @@ export function createPlannerSetup(userId?: string): PlannerSetup {
 export function seedIfEmpty(ydoc: Y.Doc, yXmlFragment: Y.XmlFragment): void {
   if (yXmlFragment.length > 0) return;
   const seed = prosemirrorToYDoc(createInitialDoc(), XML_FRAGMENT_NAME);
+  Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(seed));
+  seed.destroy();
+}
+
+/**
+ * Like seedIfEmpty but uses the guest demo document — a markdown welcome cell,
+ * a weekly planner cell, and an AI cell — so first-time visitors immediately
+ * see what the app can do.
+ */
+export function seedGuestDoc(ydoc: Y.Doc, yXmlFragment: Y.XmlFragment): void {
+  if (yXmlFragment.length > 0) return;
+  const seed = prosemirrorToYDoc(createGuestDemoDoc(), XML_FRAGMENT_NAME);
   Y.applyUpdate(ydoc, Y.encodeStateAsUpdate(seed));
   seed.destroy();
 }
