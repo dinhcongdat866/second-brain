@@ -85,13 +85,15 @@ mood_logs            (id PK, user_id, date, energy INT 1–5, note)
 
 Additional endpoints:
 
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /analytics/classify` | Batch-classify todos via Haiku (max 50). Upserts into `todo_classifications`. |
-| `GET /analytics/classifications?week_start=` | Stored classifications for one week (dirty-check). |
-| `GET /analytics/report-data?from_date=&to_date=` | SQL aggregates: category breakdown + mood timeline. |
-| `POST /analytics/generate` | Stream AI narrative (Sonnet) from aggregated report data. |
-| `POST /analytics/mood` · `GET /analytics/mood?date=` | Log / fetch daily mood entry. |
+| Endpoint | Purpose | Response shape |
+|----------|---------|----------------|
+| `POST /analytics/classify` | Batch-classify todos via Haiku (max 50). Upserts into `todo_classifications`. | `{ results: [{ todo_id, categories: string[] }] }` |
+| `GET /analytics/classifications?week_start=` | Stored classifications for one week — used by frontend dirty-check. | `[{ todo_id, categories: string[], todo_text, taxonomy_version }]` |
+| `GET /analytics/report-data?from_date=&to_date=` | SQL aggregates: category breakdown + mood timeline. | `{ categoryBreakdown: [{ category, count, pct, trend }], moodTimeline: [{ date, energy\|null, note\|null }] }` |
+| `POST /analytics/report-generate` | AI narrative + prediction from pre-computed aggregates (Haiku). Frontend passes SQL results; AI only does qualitative interpretation. | `{ narrative, prediction: { text, confidence: "low"\|"medium"\|"high", reasoning }, proactiveQuestions: string[] }` |
+| `PUT /analytics/mood` | Upsert a daily mood entry (frontend-supplied UUID as PK). | `{ id, date, energy, note }` |
+| `GET /analytics/mood?from_date=&to_date=` | Fetch mood logs for a date range (inclusive). | `[{ id, date, energy, note }]` |
+| `DELETE /analytics/mood/{date}` | Remove a mood entry. | `204 No Content` |
 
 ## Why images are a separate table (not in the Y.Doc)
 
