@@ -1,4 +1,4 @@
-import { type Ref } from 'react';
+import { useEffect, type Ref } from 'react';
 import { ColorPalette, SizePicker } from './ToolbarPickers';
 import { TEXT_COLORS, BG_COLORS, FONT_SIZES, type StyleKind } from '../lib/toolbarStyles';
 
@@ -64,6 +64,30 @@ export function SelectionToolbarShell({
     onStyle(kind, value);
     setFlyout(null);
   };
+
+  // When a flyout is open, pressing 1–8 (or 1–4 for size) picks the
+  // corresponding swatch — faster than reaching for the mouse.
+  useEffect(() => {
+    if (!flyout) return;
+    const swatches = flyout === 'text' ? TEXT_COLORS : flyout === 'bg' ? BG_COLORS : FONT_SIZES;
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept while typing in any input / textarea.
+      const tag = (document.activeElement as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key >= '1' && e.key <= '9') {
+        const idx = Number(e.key) - 1;
+        if (idx < swatches.length) {
+          e.preventDefault();
+          onStyle(flyout as StyleKind, swatches[idx].value);
+          setFlyout(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  // onStyle / setFlyout are stable refs (useCallback / useState setter).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flyout]);
 
   const on = (name: string) => (activeMarks.has(name) ? ' ftb__btn--on' : '');
 

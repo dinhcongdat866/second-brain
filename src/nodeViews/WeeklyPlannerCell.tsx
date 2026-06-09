@@ -135,6 +135,8 @@ function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelecti
   const linkModeRef = useRef(false);
   const linkInputRef = useRef<HTMLInputElement>(null);
   const showTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // Ref for the toolbar element itself — used for click-outside detection.
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onSelectionChange = () => {
@@ -208,7 +210,7 @@ function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelecti
     window.getSelection()?.removeAllRanges();
     setFlyout(null);
     setToolbarPos(null);
-  }, [plan]);
+  }, [plan, weekStart]);
 
   const enterLinkMode = useCallback(() => {
     if (!savedFormatRef.current || !toolbarPos) return;
@@ -231,7 +233,7 @@ function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelecti
     savedLink.current = null;
     setLinkPos(null);
     setToolbarPos(null);
-  }, [plan, linkUrl]);
+  }, [plan, weekStart, linkUrl]);
 
   const cancelLink = useCallback(() => {
     linkModeRef.current = false;
@@ -242,6 +244,30 @@ function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelecti
     setToolbarPos(null);
   }, []);
 
+  // Click outside the toolbar while link-input is open → cancel.
+  useEffect(() => {
+    const onMouseDown = (e: MouseEvent) => {
+      if (!linkModeRef.current) return;
+      if (toolbarRef.current?.contains(e.target as Node)) return;
+      cancelLink();
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [cancelLink]);
+
+  // Ctrl+B / Ctrl+I when text is selected inside the weekly cell.
+  useEffect(() => {
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (!savedFormatRef.current) return;
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey) return;
+      const pairs: Record<string, [string, string]> = { b: ['**', '**'], i: ['_', '_'] };
+      const pair = pairs[e.key.toLowerCase()];
+      if (pair) { e.preventDefault(); applyFormat(pair[0], pair[1]); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [applyFormat]);
+
   const displayPos = linkMode ? linkPos : toolbarPos;
   if (!displayPos) return null;
 
@@ -251,6 +277,7 @@ function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelecti
 
   return (
     <SelectionToolbarShell
+      containerRef={toolbarRef}
       pos={displayPos}
       flyout={flyout}
       setFlyout={setFlyout}
