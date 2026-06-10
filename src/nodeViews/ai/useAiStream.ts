@@ -126,7 +126,10 @@ export function useAiStream({
         assistant.set('tokens_in', usage.inputTokens);
         assistant.set('tokens_out', usage.outputTokens);
         assistant.set('cost_usd', usage.costUsd);
-        logUsage(docId, cellId, usage);
+        // Anthropic usage is metered server-side by the /anthropic proxy (the
+        // client number is display-only and can't be trusted for the DB).
+        // Ollama doesn't go through the proxy, so log it from here (cost 0).
+        if (isOllamaModel(modelConfig.model)) logUsage(docId, cellId, usage);
       }
       abortRef.current = null;
       setStreaming(false);
@@ -188,6 +191,8 @@ export function useAiStream({
             thinkingTarget: thinkingText,
             images: imageUrls,
             userApiKey,
+            cellId,
+            docId,
             onSearching: (q) => {
               assistant.set('search_query', q);
               setSearchingActive(true);

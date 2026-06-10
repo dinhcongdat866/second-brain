@@ -14,12 +14,20 @@ import { supabase } from '../lib/supabase';
  * The user's own Anthropic key is forwarded via `x-user-api-key`; the proxy
  * has no fallback key, so a request without it is rejected with 400.
  */
-function makeClient(userApiKey?: string | null) {
+function makeClient(userApiKey?: string | null, cellId?: string, docId?: string) {
+  // x-cell-id / x-doc-id let the proxy attribute server-side usage metering to
+  // the originating cell. Omitted for non-cell calls (e.g. memory extraction),
+  // which the proxy then simply doesn't log.
+  const defaultHeaders: Record<string, string> = {};
+  if (userApiKey) defaultHeaders['x-user-api-key'] = userApiKey;
+  if (cellId) defaultHeaders['x-cell-id'] = cellId;
+  if (docId) defaultHeaders['x-doc-id'] = docId;
+
   return new Anthropic({
     baseURL: `${BACKEND_URL}/anthropic`,
     apiKey: 'proxied-by-backend',
     dangerouslyAllowBrowser: true,
-    ...(userApiKey ? { defaultHeaders: { 'x-user-api-key': userApiKey } } : {}),
+    defaultHeaders,
     fetch: async (url, init) => {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
@@ -128,6 +136,9 @@ const ANTHROPIC_PRICE: Record<string, [number, number, number, number]> = {
   'claude-opus-4-8':           [15,   75,   1.50, 15  ].map(v => v / 1_000_000) as [number,number,number,number],
 };
 
+/** Flat surcharge per web-search request ($10 / 1,000), on top of result tokens. */
+const WEB_SEARCH_PER_REQUEST = 10 / 1_000;
+
 function calcCost(u: Omit<UsageStats, 'costUsd'>, model: ModelId): number {
   if (isOllamaModel(model)) return 0;
   const price = ANTHROPIC_PRICE[model];
@@ -233,6 +244,9 @@ export type StreamOptions = {
   images?: string[];
   /** User's own Anthropic API key (from localStorage). Forwarded to backend proxy. */
   userApiKey?: string | null;
+  /** Cell + doc id so the proxy can attribute server-side usage metering. */
+  cellId?: string;
+  docId?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -300,8 +314,8 @@ export async function streamClaudeReply(
   onError: (err: Error) => void,
   options: StreamOptions = {},
 ): Promise<void> {
-  const { ragContext = '', memoryContext = '', analyticsContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults, images = [], userApiKey } = options;
-  const client = makeClient(userApiKey);
+  const { ragContext = '', memoryContext = '', analyticsContext = '', signal, config = DEFAULT_MODEL_CONFIG, thinkingTarget, onSearching, onSearchResults, images = [], userApiKey, cellId, docId } = options;
+  const client = makeClient(userApiKey, cellId, docId);
 
   const baseContext =
     (localContext ? '--- CELLS ABOVE THIS AI CELL ---\n' + localContext + '\n\n' : '') +
@@ -411,9 +425,14 @@ export async function streamClaudeReply(
   let outputTokens = 0;
   let cacheReadTokens = 0;
   let cacheCreationTokens = 0;
+  let webSearchRequests = 0;
 
   const buildUsage = (): UsageStats => {
-    const costUsd = calcCost({ inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens }, config.model);
+    // Fold the web-search surcharge into costUsd (display-only here; the proxy
+    // computes the authoritative figure server-side the same way).
+    const costUsd =
+      calcCost({ inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens }, config.model) +
+      webSearchRequests * WEB_SEARCH_PER_REQUEST;
     return { inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, costUsd };
   };
 
@@ -481,6 +500,12 @@ export async function streamClaudeReply(
 
       } else if (event.type === 'message_delta') {
         outputTokens = event.usage.output_tokens;
+        // Web-search count rides on the final usage as server_tool_use; the SDK
+        // type doesn't surface it, so read it off the raw event.
+        const stu = (raw['usage'] as Record<string, unknown> | undefined)?.['server_tool_use'] as
+          | { web_search_requests?: number }
+          | undefined;
+        if (stu?.web_search_requests != null) webSearchRequests = stu.web_search_requests;
       }
     }
 
