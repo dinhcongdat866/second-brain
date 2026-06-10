@@ -1,15 +1,21 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db.migrations import run_migrations
+from app.embeddings import warm_model
 from app.routers import embeddings, search, documents, usage, ai, images, analytics
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await run_migrations()
+    # Warm the embedding model in the background so the first RAG call doesn't
+    # pay the ~minute cold load. Not awaited: startup stays fast (health check
+    # passes immediately) while the model loads in a worker thread.
+    asyncio.create_task(warm_model())
     yield
 
 
