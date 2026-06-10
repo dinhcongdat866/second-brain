@@ -4,11 +4,15 @@ import type * as Y from 'yjs';
 import type { Turn } from './historyCompressor';
 import { BACKEND_URL, OLLAMA_URL } from '../lib/config';
 import { dataUrlToApiImage } from '../lib/imageResize';
+import { supabase } from '../lib/supabase';
 
 /**
  * Create an Anthropic client that routes through the backend proxy.
- * If a user API key is provided it is forwarded via x-user-api-key so the
- * proxy uses it instead of the server-side key.
+ *
+ * The proxy now requires a Supabase JWT (it is no longer an open relay), so a
+ * custom `fetch` attaches `Authorization: Bearer <token>` to every request.
+ * The user's own Anthropic key is forwarded via `x-user-api-key`; the proxy
+ * has no fallback key, so a request without it is rejected with 400.
  */
 function makeClient(userApiKey?: string | null) {
   return new Anthropic({
@@ -16,6 +20,13 @@ function makeClient(userApiKey?: string | null) {
     apiKey: 'proxied-by-backend',
     dangerouslyAllowBrowser: true,
     ...(userApiKey ? { defaultHeaders: { 'x-user-api-key': userApiKey } } : {}),
+    fetch: async (url, init) => {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      const headers = new Headers(init?.headers);
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      return fetch(url, { ...init, headers });
+    },
   });
 }
 

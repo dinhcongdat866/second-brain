@@ -3,7 +3,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     database_url: str
-    anthropic_api_key: str
+    # No server-side Anthropic key: the /anthropic proxy requires each caller to
+    # bring their own key (x-user-api-key) so the operator is never billed for
+    # other users' usage. Kept here only so an existing .env entry is ignored,
+    # not required.
+    anthropic_api_key: str = ""
     supabase_url: str = ""            # e.g. https://xxxx.supabase.co
     supabase_jwt_secret: str = ""     # Settings → API → JWT Settings → secret
     embedding_model: str = "all-MiniLM-L6-v2"

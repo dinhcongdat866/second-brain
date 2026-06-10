@@ -1,16 +1,23 @@
 """Reverse proxy for the Anthropic API.
 
-The frontend points its Anthropic SDK `baseURL` at `<backend>/anthropic`, with a
-dummy key. This proxy forwards each request verbatim to api.anthropic.com and
-injects the real key server-side — so the secret never reaches the browser
-bundle, while all client-side streaming logic (thinking, web search, usage)
-keeps working unchanged because it talks to the same API shape.
+The frontend points its Anthropic SDK `baseURL` at `<backend>/anthropic` and
+forwards the caller's own Anthropic key via `x-user-api-key`. This proxy
+forwards each request verbatim to api.anthropic.com so all client-side
+streaming logic (thinking, web search, usage) keeps working unchanged.
+
+Two guards prevent this from being an open relay that burns someone else's
+quota:
+  1. A valid Supabase JWT is required (Depends(get_current_user)) — anonymous
+     callers who only know the backend URL are rejected.
+  2. Each caller must supply their OWN key via `x-user-api-key`; there is no
+     server-side fallback key. A missing key is a 400, never a silent charge
+     to an operator-held key.
 """
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app.config import settings
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/anthropic", tags=["ai"])
 
@@ -26,13 +33,23 @@ _DROP_RESP_HEADERS = {"content-length", "transfer-encoding", "connection"}
 
 
 @router.api_route("/{path:path}", methods=["GET", "POST"])
-async def proxy(path: str, request: Request):
+async def proxy(
+    path: str,
+    request: Request,
+    user_id: str = Depends(get_current_user),
+):
+    user_key = request.headers.get("x-user-api-key", "").strip()
+    if not user_key:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anthropic API key provided. Set your key in the model settings panel.",
+        )
+
     body = await request.body()
     headers = {
         k: v for k, v in request.headers.items() if k.lower() in _FORWARD_HEADERS
     }
-    user_key = request.headers.get("x-user-api-key", "").strip()
-    headers["x-api-key"] = user_key if user_key else settings.anthropic_api_key
+    headers["x-api-key"] = user_key
     headers.setdefault("anthropic-version", "2023-06-01")
 
     client = httpx.AsyncClient(timeout=None)
