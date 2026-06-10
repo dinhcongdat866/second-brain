@@ -2,6 +2,7 @@ import * as Y from 'yjs';
 import type { Node as PMNode } from 'prosemirror-model';
 import { BACKEND_URL, EMBED_DEBOUNCE_MS, YJS_SAVE_DEBOUNCE_MS } from './config';
 import { apiFetch } from './http';
+import { getCachedToken } from './authToken';
 
 /**
  * Transaction origin used when applying state fetched from Neon.
@@ -112,22 +113,31 @@ export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
 }
 
 /**
- * Persist via navigator.sendBeacon — survives page teardown (tab close, app
- * backgrounded). Use on pagehide/visibilitychange where a normal fetch may be
- * cancelled. iOS Safari does NOT reliably fire `beforeunload`, so this is the
- * critical path that keeps data durable before IndexedDB can be evicted.
+ * Best-effort persist on hard page teardown (pagehide / tab close).
+ *
+ * Uses `fetch(..., { keepalive: true })` rather than `navigator.sendBeacon`:
+ * the save endpoint requires `Authorization: Bearer <jwt>`, and sendBeacon
+ * cannot set request headers — so a beacon save always 401'd and silently lost
+ * the write. keepalive fetch survives teardown AND carries the auth header.
+ *
+ * The token is read synchronously from the cached mirror (getCachedToken) since
+ * a dying page can't await supabase.auth.getSession(). Full state is sent (the
+ * endpoint overwrites, not merges); browsers cap total keepalive bodies at
+ * ~64 KB, so very large docs may be dropped here — the authenticated async
+ * flush on `visibilitychange: hidden` is the reliable path, this is redundancy.
  */
 export function saveDocStateBeacon(docId: string, ydoc: Y.Doc): void {
+  const token = getCachedToken();
+  if (!token) return; // no valid session — the endpoint would 401 anyway
   const state = Y.encodeStateAsUpdate(ydoc);
   const url = `${BACKEND_URL}/documents/${encodeURIComponent(docId)}/state`;
   const blob = new Blob([new Uint8Array(state)], { type: 'application/octet-stream' });
-  if (typeof navigator.sendBeacon === 'function' && navigator.sendBeacon(url, blob)) {
-    return;
-  }
-  // Fallback: keepalive fetch (still allowed during unload in most browsers).
   fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream' },
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      Authorization: `Bearer ${token}`,
+    },
     body: blob,
     keepalive: true,
   }).catch(() => {});

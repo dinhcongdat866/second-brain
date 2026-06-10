@@ -138,7 +138,11 @@ function bindEditor(
     stopSnapshot = startAutoSnapshot(doc);
     const syncer = createYjsSyncer(activeDocId, doc);
     stopSyncer = syncer.stop;
-    const onHide = () => { if (document.visibilityState === 'hidden') syncer.flushBeacon(); };
+    // On hide, the page is still alive (tab switch / app background) — do a full
+    // authenticated merge-save. This is the reliable durable path on iOS, where
+    // pagehide/beforeunload are flaky. The keepalive beacon below is only a
+    // last-ditch redundancy for an abrupt desktop tab-close.
+    const onHide = () => { if (document.visibilityState === 'hidden') syncer.flush(); };
     const onVisible = () => { if (document.visibilityState === 'visible') applyServerState(activeDocId, doc).catch(() => {}); };
     const onPageHide = () => syncer.flushBeacon();
     window.addEventListener('visibilitychange', onHide);

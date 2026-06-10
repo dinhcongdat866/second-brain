@@ -54,8 +54,21 @@ export function usePlannerYdoc(userId: string | undefined, isGuest: boolean): Pl
         setIsReady(true);
       });
 
+    // The planner doc only had a debounced save before — edits made within the
+    // debounce window before teardown were lost. Flush on teardown like the
+    // notebook doc: an authenticated merge-save when the page is still alive
+    // (hide), and a keepalive beacon as last resort on hard close (pagehide).
+    const onHide = () => { if (document.visibilityState === 'hidden') syncer.flush(); };
+    const onPageHide = () => syncer.flushBeacon();
+    window.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onPageHide);
+
     return () => {
       cancelled = true;
+      window.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onPageHide);
       syncer.stop();
       setup.provider.destroy();
       setup.persistence.destroy();
