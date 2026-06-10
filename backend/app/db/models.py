@@ -9,10 +9,14 @@ EMBEDDING_DIM = 384  # all-MiniLM-L6-v2 output size
 
 class YjsDocument(Base):
     __tablename__ = "yjs_documents"
-    __table_args__ = (Index("ix_yjs_documents_user_doc", "user_id", "doc_id"),)
 
+    # Composite PK: shared fixed doc_ids (__registry__, __weekly-planner__,
+    # __memory__) are per-user, so doc_id alone is NOT unique across users.
+    # A single-column PK let one user's save overwrite another's row (and steal
+    # its user_id), 404-ing the original owner. The migration below converts
+    # existing tables from the old single-column PK.
     doc_id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
     state: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

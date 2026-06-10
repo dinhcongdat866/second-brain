@@ -47,8 +47,10 @@ async def save_state(
         pg_insert(YjsDocument)
         .values(doc_id=doc_id, user_id=user_id, state=body, updated_at=now)
         .on_conflict_do_update(
-            index_elements=["doc_id"],
-            set_={"state": body, "updated_at": now, "user_id": user_id},
+            # Composite key: a save only ever updates the caller's OWN row, never
+            # another user's row that happens to share this doc_id.
+            index_elements=["user_id", "doc_id"],
+            set_={"state": body, "updated_at": now},
         )
     )
     await db.execute(stmt)
