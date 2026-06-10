@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 from app.auth import get_current_user
 from app.db.engine import get_db
 from app.db.models import CellEmbedding
-from app.embeddings import embed
+from app.embeddings import embed_async
 
 router = APIRouter(prefix="/embeddings", tags=["embeddings"])
 
@@ -27,7 +27,7 @@ async def upsert_embedding(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
-    vector = embed(body.content)
+    vector = await embed_async(body.content)
     stmt = (
         insert(CellEmbedding)
         .values(

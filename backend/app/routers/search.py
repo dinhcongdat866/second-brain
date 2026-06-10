@@ -6,7 +6,7 @@ from sqlalchemy import select, text
 from app.auth import get_current_user
 from app.db.engine import get_db
 from app.db.models import CellEmbedding
-from app.embeddings import embed
+from app.embeddings import embed_async
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -25,7 +25,7 @@ async def search(
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
-    vector = embed(q)
+    vector = await embed_async(q)
     rows = await db.execute(
         select(
             CellEmbedding.id,

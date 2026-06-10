@@ -1,3 +1,4 @@
+import asyncio
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
@@ -21,3 +22,12 @@ def get_model() -> "SentenceTransformer":
 
 def embed(text: str) -> list[float]:
     return get_model().encode(text, normalize_embeddings=True).tolist()
+
+
+async def embed_async(text: str) -> list[float]:
+    """
+    Off-load the CPU-bound encode to a worker thread so it does not block the
+    event loop. Without this, one embed() call (hundreds of ms) freezes every
+    other request — including in-flight AI streams — until it finishes.
+    """
+    return await asyncio.to_thread(embed, text)
