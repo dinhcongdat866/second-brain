@@ -37,17 +37,25 @@ export function usePlannerYdoc(userId: string | undefined, isGuest: boolean): Pl
 
     const setup = createPlannerSetup(userId);
     const syncer = createYjsSyncer(PLANNER_DOC_ID, setup.ydoc);
-    setPlannerYdoc(setup.ydoc);
     setIsReady(false);
 
     // Load from IndexedDB first, then merge server state on top.
-    // Only mark ready after both complete so consumers read a fully-loaded doc.
+    // The ydoc is only exposed once BOTH have been applied: handing out a
+    // still-loading doc lets getWeeklyPlan create a fresh empty 'global' plan
+    // that conflicts with (and can permanently shadow) the real one when the
+    // loaded state merges in — this exact race wiped the planner data once.
+    let cancelled = false;
     setup.persistence.whenSynced
       .then(() => applyServerState(PLANNER_DOC_ID, setup.ydoc))
-      .then(() => setIsReady(true))
-      .catch(() => setIsReady(true)); // still mark ready on error so UI isn't stuck
+      .catch(() => {}) // backend unreachable — IndexedDB state alone is still safe
+      .then(() => {
+        if (cancelled) return;
+        setPlannerYdoc(setup.ydoc);
+        setIsReady(true);
+      });
 
     return () => {
+      cancelled = true;
       syncer.stop();
       setup.provider.destroy();
       setup.persistence.destroy();

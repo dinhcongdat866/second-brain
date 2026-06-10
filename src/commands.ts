@@ -17,7 +17,6 @@ import {
 import type * as Y from 'yjs';
 import { notebookSchema, createMarkdownCell, createAiCell, createWeeklyPlannerCell } from './schema';
 import { getThread } from './collab/aiThreads';
-import { getWeeklyPlan } from './collab/weeklyPlans';
 
 // ---------------------------------------------------------------------------
 // Insert hard break (Enter, Shift-Enter)
@@ -411,7 +410,6 @@ export function makeInsertWeeklyCell(ydoc: Y.Doc): Command {
     const cell = createWeeklyPlannerCell();
     ydoc.transact(() => {
       insertCellAfterCurrent(cell)(state, dispatch);
-      getWeeklyPlan(ydoc, cell.attrs.id as string);
     });
     return true;
   };
@@ -445,7 +443,6 @@ export function makeAppendWeeklyCell(ydoc: Y.Doc): Command {
         tr.scrollIntoView();
         dispatch(tr);
       }
-      getWeeklyPlan(ydoc, cell.attrs.id as string);
     });
     return true;
   };

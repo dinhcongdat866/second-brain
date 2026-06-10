@@ -19,10 +19,19 @@ export class WeeklyCellView implements NodeView {
     node: PMNode,
     view: EditorView,
     getPos: () => number | undefined,
-    ydoc: Y.Doc,
+    ydoc: Y.Doc | null,
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'weekly-cell-wrapper';
+    this.root = createRoot(this.dom);
+
+    // null until the planner Y.Doc has loaded IndexedDB + server state.
+    // Never call getWeeklyPlan on a still-loading doc: it would create an
+    // empty 'global' plan that can shadow the real one on merge (data loss).
+    if (!ydoc) {
+      this.root.render(<div className="weekly-cell-loading">Loading planner…</div>);
+      return;
+    }
 
     // All planner cells share one plan in the global plannerYdoc.
     // Using a fixed key so every cell renders the same source of truth.
@@ -36,7 +45,6 @@ export class WeeklyCellView implements NodeView {
       requestAnimationFrame(() => view.focus());
     };
 
-    this.root = createRoot(this.dom);
     this.root.render(<WeeklyPlannerCell plan={plan} onDelete={onDelete} />);
   }
 

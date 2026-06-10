@@ -167,7 +167,7 @@ function bindEditor(
       nodeViews: {
         markdown_cell: (node, view, getPos) => new MarkdownCellView(node, view, getPos),
         ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext, appendMemory, getAnalyticsContext, plannerYdoc),
-        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, plannerYdoc ?? doc),
+        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, plannerYdoc),
       },
       handleDOMEvents: {
         click(_view, event) {
@@ -324,8 +324,8 @@ export function useNotebookEditor(
       setYdoc(null);
     };
   // plannerYdoc in deps: re-bind editor once the global planner Y.Doc is ready.
-  // On first render plannerYdoc is null; it resolves in the next tick before
-  // persistence.whenSynced fires, so the editor is always created with a live plannerYdoc.
+  // It stays null until the planner's IndexedDB + server state are fully loaded
+  // (see usePlannerYdoc); weekly cells render a loading placeholder until then.
   }, [activeDocId, isGuest, userId, plannerYdoc]); // editorRef is stable
 
   return { view, ydoc, providerRef };
