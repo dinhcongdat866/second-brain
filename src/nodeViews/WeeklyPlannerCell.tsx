@@ -5,10 +5,12 @@ import type * as Y from 'yjs';
 import {
   DAY_KEYS,
   DAY_LABELS,
+  WEEKLY_PLANS_KEY,
   type DayKey,
   type AllDays,
   type MoodEntry,
   addTodo,
+  getWeeklyPlan,
   toggleTodo,
   deleteTodo,
   formatTodoText,
@@ -498,12 +500,14 @@ function DayColumn({ day, date, todos, isToday, plan, weekStart, moodEntry }: Da
 // ---------------------------------------------------------------------------
 
 interface Props {
-  plan: Y.Map<unknown>;
+  ydoc: Y.Doc;
   onDelete: () => void;
 }
 
-export function WeeklyPlannerCell({ plan, onDelete }: Props) {
+export function WeeklyPlannerCell({ ydoc, onDelete }: Props) {
   const { t } = useTranslation();
+  // All planner cells render the shared 'global' plan inside the planner Y.Doc.
+  const [plan, setPlan] = useState<Y.Map<unknown>>(() => getWeeklyPlan(ydoc, 'global'));
   const [weekStart, setWeekStartState] = useState<string>(() => plan.get('weekStart') as string);
   const [days, setDays] = useState<AllDays>(() => readAllDays(plan, plan.get('weekStart') as string));
   const [moodLog, setMoodLog] = useState<Record<string, MoodEntry>>(() => readMoodLog(plan));
@@ -511,6 +515,21 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
   const todayKey = todayDayKey(weekStart);
+
+  // A late server merge can replace the 'global' entry wholesale (Y.Map
+  // same-key conflict — e.g. this client created a fresh plan while offline and
+  // the server's copy won the merge). The losing instance goes dead and stops
+  // emitting events, so watch the top-level plans map and re-resolve to always
+  // hold the live instance.
+  useEffect(() => {
+    const plans = ydoc.getMap<Y.Map<unknown>>(WEEKLY_PLANS_KEY);
+    const handler = () => {
+      const current = plans.get('global');
+      if (current && current !== plan) setPlan(current);
+    };
+    plans.observe(handler);
+    return () => plans.unobserve(handler);
+  }, [ydoc, plan]);
 
   useEffect(() => {
     const handler = () => {
@@ -520,6 +539,9 @@ export function WeeklyPlannerCell({ plan, onDelete }: Props) {
       setMoodLog(readMoodLog(plan));
     };
     plan.observeDeep(handler);
+    // Re-read immediately: `plan` may have just been swapped to the live
+    // instance (see the re-resolve effect above), or changed before subscribing.
+    handler();
     return () => plan.unobserveDeep(handler);
   }, [plan]);
 

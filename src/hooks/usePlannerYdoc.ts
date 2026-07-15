@@ -60,13 +60,25 @@ export function usePlannerYdoc(userId: string | undefined, isGuest: boolean): Pl
     // (hide), and a keepalive beacon as last resort on hard close (pagehide).
     const onHide = () => { if (document.visibilityState === 'hidden') syncer.flush(); };
     const onPageHide = () => syncer.flushBeacon();
+    // Late re-sync (mirrors the notebook doc's onVisible handler): if the
+    // initial fetch failed despite retries, or another device edited while the
+    // tab was hidden, merge fresh server state on tab-visible / network-online.
+    // The merge is tagged NEON_SYNC_ORIGIN, so the syncer won't re-save it.
+    const onRefetch = () => {
+      if (document.visibilityState !== 'visible') return;
+      applyServerState(PLANNER_DOC_ID, setup.ydoc).catch(() => {});
+    };
     window.addEventListener('visibilitychange', onHide);
+    window.addEventListener('visibilitychange', onRefetch);
+    window.addEventListener('online', onRefetch);
     window.addEventListener('pagehide', onPageHide);
     window.addEventListener('beforeunload', onPageHide);
 
     return () => {
       cancelled = true;
       window.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('visibilitychange', onRefetch);
+      window.removeEventListener('online', onRefetch);
       window.removeEventListener('pagehide', onPageHide);
       window.removeEventListener('beforeunload', onPageHide);
       syncer.stop();

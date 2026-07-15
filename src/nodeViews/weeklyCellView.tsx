@@ -2,7 +2,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import type * as Y from 'yjs';
-import { getWeeklyPlan } from '../collab/weeklyPlans';
 import { WeeklyPlannerCell } from './WeeklyPlannerCell';
 
 // ---------------------------------------------------------------------------
@@ -33,10 +32,6 @@ export class WeeklyCellView implements NodeView {
       return;
     }
 
-    // All planner cells share one plan in the global plannerYdoc.
-    // Using a fixed key so every cell renders the same source of truth.
-    const plan = getWeeklyPlan(ydoc, 'global');
-
     const onDelete = () => {
       const pos = getPos();
       if (pos == null) return;
@@ -45,7 +40,9 @@ export class WeeklyCellView implements NodeView {
       requestAnimationFrame(() => view.focus());
     };
 
-    this.root.render(<WeeklyPlannerCell plan={plan} onDelete={onDelete} />);
+    // All planner cells share the single 'global' plan inside plannerYdoc;
+    // the component resolves (and re-resolves after merges) it internally.
+    this.root.render(<WeeklyPlannerCell ydoc={ydoc} onDelete={onDelete} />);
   }
 
   update(node: PMNode) {
