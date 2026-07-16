@@ -11,8 +11,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../http', () => {
   class HttpError extends Error {
-    constructor(public status: number, public path: string) {
+    status: number;
+    path: string;
+    constructor(status: number, path: string) {
       super(`Backend responded ${status} for ${path}`);
+      this.status = status;
+      this.path = path;
     }
   }
   return { HttpError, apiFetch: vi.fn() };
