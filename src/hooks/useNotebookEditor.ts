@@ -315,6 +315,12 @@ export function useNotebookEditor(
         getAnalyticsContext,
         plannerYdoc,
       );
+    }).catch((err) => {
+      // Without this, any throw above (corrupt server state blob, sweep or
+      // migration error) rejects silently and the "Loading document" overlay
+      // never resolves. Deliberately not binding here: binding after an
+      // unknown failure risks seeding over half-applied state (data loss).
+      console.error(`[useNotebookEditor] load failed for doc ${activeDocId} — editor not bound.`, err);
     });
 
     return () => {

@@ -66,16 +66,32 @@ export async function searchCells(query: string, limit = 5): Promise<SearchResul
  * Backoff schedule between fetchDocState retries. The first request of a
  * session can hit a cold production stack (Fly machine waking → 502 without
  * CORS headers, Neon compute resume, backend JWKS fetch), so a single attempt
- * silently loses server state — retry for ~15 s before giving up.
+ * silently loses server state. Keep the total wall short (~7 s): the document
+ * loading overlay blocks on this fetch, and the editor re-binds (re-fetching)
+ * when the planner doc / active doc land, so long walls stack up sequentially.
  */
-const FETCH_STATE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000];
+const FETCH_STATE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Only transient failures are worth retrying: network/CORS errors (fetch
+ * rejects with TypeError) and 5xx / 408 / 429. Other 4xx (401, 403, 400…) are
+ * deterministic — the same request fails the same way, so retrying only stalls
+ * the loading overlay for no benefit.
+ */
+function isRetryableFetchError(err: unknown): boolean {
+  if (err instanceof HttpError) {
+    return err.status >= 500 || err.status === 408 || err.status === 429;
+  }
+  return true;
+}
+
+/**
  * Fetch the latest Yjs state for a doc from Neon.
  * Returns null if the doc has never been saved (404 — a definitive answer, no
- * retry) or if the backend stayed unreachable through all retries.
+ * retry), on a deterministic 4xx, or if the backend stayed unreachable
+ * through all retries.
  */
 export async function fetchDocState(docId: string): Promise<Uint8Array | null> {
   for (let attempt = 0; ; attempt++) {
@@ -86,8 +102,8 @@ export async function fetchDocState(docId: string): Promise<Uint8Array | null> {
       return new Uint8Array(await res.arrayBuffer());
     } catch (err) {
       if (err instanceof HttpError && err.status === 404) return null;
-      if (attempt >= FETCH_STATE_RETRY_DELAYS_MS.length) {
-        console.warn(`[backendSync] fetchDocState(${docId}) failed after ${attempt + 1} attempts`, err);
+      if (!isRetryableFetchError(err) || attempt >= FETCH_STATE_RETRY_DELAYS_MS.length) {
+        console.warn(`[backendSync] fetchDocState(${docId}) gave up (attempt ${attempt + 1}):`, err);
         return null;
       }
       await sleep(FETCH_STATE_RETRY_DELAYS_MS[attempt]);
