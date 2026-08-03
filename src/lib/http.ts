@@ -7,7 +7,7 @@
  * should not hit those endpoints anyway.
  */
 
-import { BACKEND_URL } from './config';
+import { API_TIMEOUT_MS, BACKEND_URL } from './config';
 import { supabase } from './supabase';
 
 export class HttpError extends Error {
@@ -22,15 +22,35 @@ export class HttpError extends Error {
   }
 }
 
-/** fetch against the backend base URL; throws HttpError on a non-OK status. */
-export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+export interface ApiFetchInit extends RequestInit {
+  /**
+   * Abort the request after this many ms (default API_TIMEOUT_MS).
+   * Ignored when the caller supplies its own `signal`.
+   */
+  timeoutMs?: number;
+}
+
+/**
+ * fetch against the backend base URL; throws HttpError on a non-OK status.
+ *
+ * Always time-boxed: a bare `fetch` waits forever, so a backend that is cold or
+ * half-alive can leave a caller pending indefinitely (this is what used to pin
+ * the document loading overlay until a manual refresh). A timeout surfaces as
+ * an AbortError, which callers treat as a transient failure.
+ */
+export async function apiFetch(path: string, init?: ApiFetchInit): Promise<Response> {
+  const { timeoutMs = API_TIMEOUT_MS, ...rest } = init ?? {};
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
 
-  const headers = new Headers(init?.headers);
+  const headers = new Headers(rest.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const res = await fetch(`${BACKEND_URL}${path}`, { ...init, headers });
+  const res = await fetch(`${BACKEND_URL}${path}`, {
+    ...rest,
+    headers,
+    signal: rest.signal ?? AbortSignal.timeout(timeoutMs),
+  });
   if (!res.ok) throw new HttpError(res.status, path);
   return res;
 }

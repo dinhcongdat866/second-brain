@@ -27,6 +27,29 @@ export const OLLAMA_URL = trimUrl(
 
 // --- Timings (ms) ---------------------------------------------------------
 
+/**
+ * Default per-request timeout for `apiFetch`.
+ *
+ * `fetch` has no timeout of its own: a production machine that is waking up can
+ * accept the connection and then never answer, leaving the promise pending
+ * forever. Every request therefore carries an AbortSignal — endpoints that
+ * legitimately run longer (LLM calls, blob uploads) pass their own value.
+ */
+export const API_TIMEOUT_MS = 30_000;
+
+/**
+ * Timeout for the Yjs state fetch. Deliberately short: it runs on the document
+ * load path, and failing fast is cheap now that the editor binds from the
+ * IndexedDB cache first and merges server state in the background.
+ */
+export const STATE_FETCH_TIMEOUT_MS = 8_000;
+
+/** Timeout for saving Yjs state / uploading images — large bodies, slow uplinks. */
+export const UPLOAD_TIMEOUT_MS = 60_000;
+
+/** Timeout for backend endpoints that call an LLM and stream nothing back. */
+export const LLM_TIMEOUT_MS = 180_000;
+
 /** Debounce for persisting the Yjs doc to Neon. */
 export const YJS_SAVE_DEBOUNCE_MS = 4_000;
 

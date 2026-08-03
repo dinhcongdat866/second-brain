@@ -51,6 +51,7 @@ import {
   wireSaveStatus,
 } from '../collab/ydoc';
 import { runMigrations } from '../collab/schemaMigrations';
+import { nullPlannerHandle, type PlannerHandle } from '../collab/plannerHandle';
 import { addTurn, getThread, sweepOrphanThreads } from '../collab/aiThreads';
 import { sweepOrphanWeeklyPlans } from '../collab/weeklyPlans';
 import { consumePendingImport } from '../lib/importState';
@@ -120,7 +121,7 @@ function bindEditor(
   getMemoryContext: () => string,
   appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void,
   getAnalyticsContext: () => string,
-  plannerYdoc: Y.Doc | null,
+  planner: PlannerHandle,
 ): (() => void) | undefined {
   sweepOrphanThreads(doc, yXmlFragment);
   sweepOrphanWeeklyPlans(doc, yXmlFragment);
@@ -170,8 +171,8 @@ function bindEditor(
       state,
       nodeViews: {
         markdown_cell: (node, view, getPos) => new MarkdownCellView(node, view, getPos),
-        ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext, appendMemory, getAnalyticsContext, plannerYdoc),
-        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, plannerYdoc),
+        ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext, appendMemory, getAnalyticsContext, planner),
+        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, planner),
       },
       handleDOMEvents: {
         click(_view, event) {
@@ -213,7 +214,7 @@ export function useNotebookEditor(
   getMemoryContext: () => string = () => '',
   appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void = () => {},
   getAnalyticsContext: () => string = () => '',
-  plannerYdoc: Y.Doc | null = null,
+  planner: PlannerHandle = nullPlannerHandle,
 ) {
   const [view, setView] = useState<EditorView | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
@@ -249,7 +250,7 @@ export function useNotebookEditor(
           getMemoryContext,
           appendMemory,
           getAnalyticsContext,
-          plannerYdoc,
+          planner,
         );
       });
 
@@ -269,6 +270,23 @@ export function useNotebookEditor(
     let editorCleanup: (() => void) | undefined;
     let cancelled = false;
 
+    const bind = () => {
+      editorCleanup = bindEditor(
+        editorRef.current!,
+        yXmlFragment,
+        provider.awareness,
+        doc,
+        activeDocId,
+        setView,
+        setYdoc,
+        false,
+        getMemoryContext,
+        appendMemory,
+        getAnalyticsContext,
+        planner,
+      );
+    };
+
     persistence.whenSynced.then(async () => {
       if (cancelled) return;
 
@@ -283,38 +301,42 @@ export function useNotebookEditor(
             }
           });
         }
-      } else {
-        const hadServerState = await applyServerState(activeDocId, doc);
-        if (cancelled) return;
-        if (!hadServerState && !provider.synced) {
-          await new Promise<void>((resolve) => {
-            const onSync = (isSynced: boolean) => {
-              if (!isSynced) return;
-              provider.off('sync', onSync);
-              resolve();
-            };
-            provider.on('sync', onSync);
-            setTimeout(() => { provider.off('sync', onSync); resolve(); }, 2000);
-          });
-          if (cancelled) return;
-        }
-        seedIfEmpty(doc, yXmlFragment);
+        bind();
+        return;
       }
 
-      editorCleanup = bindEditor(
-        editorRef.current!,
-        yXmlFragment,
-        provider.awareness,
-        doc,
-        activeDocId,
-        setView,
-        setYdoc,
-        false,
-        getMemoryContext,
-        appendMemory,
-        getAnalyticsContext,
-        plannerYdoc,
-      );
+      // Cache-first. IndexedDB already holds the document at this point, so
+      // render it now and merge the server state underneath — Yjs is a CRDT,
+      // ySyncPlugin re-renders the moment the merge lands. Blocking first paint
+      // on this fetch is what pinned the loading overlay for the whole duration
+      // of a cold backend wake-up.
+      if (yXmlFragment.length > 0) {
+        bind();
+        applyServerState(activeDocId, doc).catch((err) => {
+          console.warn(`[useNotebookEditor] background state merge failed for ${activeDocId}`, err);
+        });
+        return;
+      }
+
+      // Empty local cache (first load on this device): here we must wait. Seeding
+      // before the server answers would create initial content that then merges
+      // *alongside* the real document instead of being replaced by it.
+      const hadServerState = await applyServerState(activeDocId, doc);
+      if (cancelled) return;
+      if (!hadServerState && !provider.synced) {
+        await new Promise<void>((resolve) => {
+          const onSync = (isSynced: boolean) => {
+            if (!isSynced) return;
+            provider.off('sync', onSync);
+            resolve();
+          };
+          provider.on('sync', onSync);
+          setTimeout(() => { provider.off('sync', onSync); resolve(); }, 2000);
+        });
+        if (cancelled) return;
+      }
+      seedIfEmpty(doc, yXmlFragment);
+      bind();
     }).catch((err) => {
       // Without this, any throw above (corrupt server state blob, sweep or
       // migration error) rejects silently and the "Loading document" overlay
@@ -333,10 +355,11 @@ export function useNotebookEditor(
       setView(null);
       setYdoc(null);
     };
-  // plannerYdoc in deps: re-bind editor once the global planner Y.Doc is ready.
-  // It stays null until the planner's IndexedDB + server state are fully loaded
-  // (see usePlannerYdoc); weekly cells render a loading placeholder until then.
-  }, [activeDocId, isGuest, userId, plannerYdoc]); // editorRef is stable
+  // `planner` is a stable handle (identity never changes), so listing it here
+  // is inert — the planner Y.Doc arriving no longer tears the editor down and
+  // re-fetches the document. Weekly cells render a placeholder and swap
+  // themselves in when the handle notifies them (see collab/plannerHandle).
+  }, [activeDocId, isGuest, userId, planner]); // editorRef is stable
 
   return { view, ydoc, providerRef };
 }

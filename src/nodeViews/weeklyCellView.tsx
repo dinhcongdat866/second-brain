@@ -2,6 +2,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import type * as Y from 'yjs';
+import type { PlannerHandle } from '../collab/plannerHandle';
 import { WeeklyPlannerCell } from './WeeklyPlannerCell';
 
 // ---------------------------------------------------------------------------
@@ -13,24 +14,17 @@ import { WeeklyPlannerCell } from './WeeklyPlannerCell';
 export class WeeklyCellView implements NodeView {
   dom: HTMLElement;
   private root: Root;
+  private unsubscribe?: () => void;
 
   constructor(
     node: PMNode,
     view: EditorView,
     getPos: () => number | undefined,
-    ydoc: Y.Doc | null,
+    planner: PlannerHandle,
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'weekly-cell-wrapper';
     this.root = createRoot(this.dom);
-
-    // null until the planner Y.Doc has loaded IndexedDB + server state.
-    // Never call getWeeklyPlan on a still-loading doc: it would create an
-    // empty 'global' plan that can shadow the real one on merge (data loss).
-    if (!ydoc) {
-      this.root.render(<div className="weekly-cell-loading">Loading planner…</div>);
-      return;
-    }
 
     const onDelete = () => {
       const pos = getPos();
@@ -40,9 +34,28 @@ export class WeeklyCellView implements NodeView {
       requestAnimationFrame(() => view.focus());
     };
 
-    // All planner cells share the single 'global' plan inside plannerYdoc;
+    // All planner cells share the single 'global' plan inside the planner doc;
     // the component resolves (and re-resolves after merges) it internally.
-    this.root.render(<WeeklyPlannerCell ydoc={ydoc} onDelete={onDelete} />);
+    const renderPlanner = (ydoc: Y.Doc) => {
+      this.root.render(<WeeklyPlannerCell ydoc={ydoc} onDelete={onDelete} />);
+    };
+
+    const ydoc = planner.get();
+    if (ydoc) {
+      renderPlanner(ydoc);
+      return;
+    }
+
+    // The planner doc is still loading. Never call getWeeklyPlan on a
+    // still-loading doc: it would create an empty 'global' plan that can shadow
+    // the real one on merge (data loss). Show a placeholder and swap in the
+    // real UI the moment the handle publishes the doc.
+    this.root.render(<div className="weekly-cell-loading">Loading planner…</div>);
+    this.unsubscribe = planner.subscribe((loaded) => {
+      this.unsubscribe?.();
+      this.unsubscribe = undefined;
+      renderPlanner(loaded);
+    });
   }
 
   update(node: PMNode) {
@@ -58,6 +71,7 @@ export class WeeklyCellView implements NodeView {
   }
 
   destroy() {
+    this.unsubscribe?.();
     const root = this.root;
     queueMicrotask(() => root.unmount());
   }

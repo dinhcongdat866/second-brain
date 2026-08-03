@@ -3,6 +3,7 @@ import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView, NodeView } from 'prosemirror-view';
 import type * as Y from 'yjs';
 import { getThread } from '../collab/aiThreads';
+import type { PlannerHandle } from '../collab/plannerHandle';
 import { extractDocContext, extractLocalContext, extractWeeklyContext } from '../lib/docContext';
 import { AiCell } from './AiCell';
 
@@ -25,7 +26,7 @@ export class AiCellView implements NodeView {
     getMemoryContext: () => string = () => '',
     appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void = () => {},
     getAnalyticsContext: () => string = () => '',
-    plannerYdoc: Y.Doc | null = null,
+    planner?: PlannerHandle,
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'ai-cell';
@@ -47,6 +48,9 @@ export class AiCellView implements NodeView {
     const getLocalContext = () => extractLocalContext(view.state.doc, cellId);
     const getDocContext = () => {
       const md = extractDocContext(view.state.doc);
+      // Read through the handle at call time: the planner doc may still have
+      // been loading when this cell was created.
+      const plannerYdoc = planner?.get() ?? null;
       const weekly = plannerYdoc ? extractWeeklyContext(plannerYdoc) : '';
       return [md, weekly].filter(Boolean).join('\n\n');
     };

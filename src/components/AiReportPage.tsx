@@ -8,6 +8,7 @@
  * PDF export via window.print() — @media print CSS in ai-report.css.
  */
 import { useState, useCallback } from 'react';
+import { LLM_TIMEOUT_MS } from '../lib/config';
 import { apiFetch } from '../lib/http';
 import {
   evaluatePatterns,
@@ -239,6 +240,7 @@ export function AiReportPage({ onClose }: Props) {
           moodTimeline: json.moodTimeline,
           detectedPatterns: detected,
         }),
+        timeoutMs: LLM_TIMEOUT_MS,
       });
       const aiJson: AiInsights = await aiRes.json();
       setAiInsights(aiJson);

@@ -3,6 +3,12 @@ import { STYLE_OPEN_RE, STYLE_CLOSE_RE, type StyleKind } from '../lib/toolbarSty
 
 export const WEEKLY_PLANS_KEY = 'weeklyPlans';
 
+/**
+ * Every weekly_planner_cell, in every document, renders this one shared plan
+ * inside the planner Y.Doc — the cell is a view, not a data owner.
+ */
+export const SHARED_PLAN_ID = 'global';
+
 export type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
 export const DAY_KEYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];

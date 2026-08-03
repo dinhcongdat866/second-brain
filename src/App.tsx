@@ -69,8 +69,8 @@ function App() {
   const registry = isGuest ? guestRegistry : authRegistry;
   const { getMemoryContext, appendMemory } = useMemory(isGuest ? undefined : userId);
   const { getAnalyticsContext } = useAnalyticsContext(!isGuest);
-  const { ydoc: plannerYdoc, isReady: plannerReady } = usePlannerYdoc(userId, isGuest);
-  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory, getAnalyticsContext, plannerYdoc);
+  const { ydoc: plannerYdoc, isReady: plannerReady, handle: plannerHandle } = usePlannerYdoc(userId, isGuest);
+  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory, getAnalyticsContext, plannerHandle);
   const peers = usePresence(providerRef);
   useClassificationSync(plannerYdoc, !isGuest, plannerReady);
   const [showHistory, setShowHistory] = useState(false);

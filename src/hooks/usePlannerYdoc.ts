@@ -1,12 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as Y from 'yjs';
 import { createPlannerSetup, PLANNER_DOC_ID } from '../collab/ydoc';
+import {
+  createPlannerHandle,
+  type PlannerHandle,
+  type PlannerHandleController,
+} from '../collab/plannerHandle';
+import { SHARED_PLAN_ID, WEEKLY_PLANS_KEY } from '../collab/weeklyPlans';
 import { createYjsSyncer, applyServerState } from '../lib/backendSync';
 
 export interface PlannerYdocResult {
   ydoc: Y.Doc | null;
   /** True once IndexedDB + server state have been applied — safe to read todos. */
   isReady: boolean;
+  /** Stable reference for node views; see collab/plannerHandle. */
+  handle: PlannerHandle;
 }
 
 /**
@@ -23,14 +31,24 @@ export function usePlannerYdoc(userId: string | undefined, isGuest: boolean): Pl
   const [plannerYdoc, setPlannerYdoc] = useState<Y.Doc | null>(null);
   const [isReady, setIsReady] = useState(false);
 
+  // useState (not useRef) so the handle is created once and read during render
+  // without tripping the "no refs during render" rule.
+  const [handle] = useState<PlannerHandleController>(createPlannerHandle);
+
+  /** Hand the doc to node views (handle) and to React consumers (state). */
+  const publish = useCallback((ydoc: Y.Doc | null) => {
+    handle.set(ydoc);
+    setPlannerYdoc(ydoc);
+  }, [handle]);
+
   useEffect(() => {
     if (isGuest) {
       const ydoc = new Y.Doc();
-      setPlannerYdoc(ydoc);
+      publish(ydoc);
       setIsReady(true);
       return () => {
+        publish(null);
         ydoc.destroy();
-        setPlannerYdoc(null);
         setIsReady(false);
       };
     }
@@ -39,18 +57,27 @@ export function usePlannerYdoc(userId: string | undefined, isGuest: boolean): Pl
     const syncer = createYjsSyncer(PLANNER_DOC_ID, setup.ydoc);
     setIsReady(false);
 
-    // Load from IndexedDB first, then merge server state on top.
-    // The ydoc is only exposed once BOTH have been applied: handing out a
-    // still-loading doc lets getWeeklyPlan create a fresh empty 'global' plan
-    // that conflicts with (and can permanently shadow) the real one when the
-    // loaded state merges in — this exact race wiped the planner data once.
     let cancelled = false;
     setup.persistence.whenSynced
-      .then(() => applyServerState(PLANNER_DOC_ID, setup.ydoc))
+      .then(() => {
+        if (cancelled) return undefined;
+        // Cache-first: once IndexedDB holds the shared plan, hand the doc out
+        // immediately so planner cells render from cache instead of waiting on
+        // the network. The server merge lands on top and WeeklyPlannerCell
+        // re-resolves the plan instance.
+        //
+        // With an empty cache we must wait: getWeeklyPlan would create a fresh
+        // empty 'global' plan that can win the Y.Map conflict against the
+        // server's copy and permanently shadow it — the race that wiped the
+        // planner data once.
+        const plans = setup.ydoc.getMap<Y.Map<unknown>>(WEEKLY_PLANS_KEY);
+        if (plans.has(SHARED_PLAN_ID)) publish(setup.ydoc);
+        return applyServerState(PLANNER_DOC_ID, setup.ydoc);
+      })
       .catch(() => {}) // backend unreachable — IndexedDB state alone is still safe
       .then(() => {
         if (cancelled) return;
-        setPlannerYdoc(setup.ydoc);
+        publish(setup.ydoc);
         setIsReady(true);
       });
 
@@ -84,11 +111,11 @@ export function usePlannerYdoc(userId: string | undefined, isGuest: boolean): Pl
       syncer.stop();
       setup.provider.destroy();
       setup.persistence.destroy();
+      publish(null);
       setup.ydoc.destroy();
-      setPlannerYdoc(null);
       setIsReady(false);
     };
-  }, [userId, isGuest]);
+  }, [userId, isGuest, publish]);
 
-  return { ydoc: plannerYdoc, isReady };
+  return { ydoc: plannerYdoc, isReady, handle };
 }

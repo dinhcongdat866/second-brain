@@ -1,6 +1,12 @@
 import * as Y from 'yjs';
 import type { Node as PMNode } from 'prosemirror-model';
-import { BACKEND_URL, EMBED_DEBOUNCE_MS, YJS_SAVE_DEBOUNCE_MS } from './config';
+import {
+  BACKEND_URL,
+  EMBED_DEBOUNCE_MS,
+  STATE_FETCH_TIMEOUT_MS,
+  UPLOAD_TIMEOUT_MS,
+  YJS_SAVE_DEBOUNCE_MS,
+} from './config';
 import { apiFetch, HttpError } from './http';
 import { getCachedToken } from './authToken';
 
@@ -66,9 +72,10 @@ export async function searchCells(query: string, limit = 5): Promise<SearchResul
  * Backoff schedule between fetchDocState retries. The first request of a
  * session can hit a cold production stack (Fly machine waking → 502 without
  * CORS headers, Neon compute resume, backend JWKS fetch), so a single attempt
- * silently loses server state. Keep the total wall short (~7 s): the document
- * loading overlay blocks on this fetch, and the editor re-binds (re-fetching)
- * when the planner doc / active doc land, so long walls stack up sequentially.
+ * silently loses server state. Each attempt is capped by
+ * STATE_FETCH_TIMEOUT_MS, so the worst case is bounded (~4 × 8 s + 7 s of
+ * backoff) — and it no longer blocks first paint, since the editor binds from
+ * the IndexedDB cache and merges whatever this returns afterwards.
  */
 const FETCH_STATE_RETRY_DELAYS_MS = [1_000, 2_000, 4_000];
 
@@ -76,9 +83,9 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 /**
  * Only transient failures are worth retrying: network/CORS errors (fetch
- * rejects with TypeError) and 5xx / 408 / 429. Other 4xx (401, 403, 400…) are
- * deterministic — the same request fails the same way, so retrying only stalls
- * the loading overlay for no benefit.
+ * rejects with TypeError), timeouts (AbortError) and 5xx / 408 / 429. Other
+ * 4xx (401, 403, 400…) are deterministic — the same request fails the same
+ * way, so retrying only burns time for no benefit.
  */
 function isRetryableFetchError(err: unknown): boolean {
   if (err instanceof HttpError) {
@@ -98,6 +105,7 @@ export async function fetchDocState(docId: string): Promise<Uint8Array | null> {
     try {
       const res = await apiFetch(
         `/documents/${encodeURIComponent(docId)}/state`,
+        { timeoutMs: STATE_FETCH_TIMEOUT_MS },
       );
       return new Uint8Array(await res.arrayBuffer());
     } catch (err) {
@@ -143,6 +151,7 @@ export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
     method: 'POST',
     headers: { 'Content-Type': 'application/octet-stream' },
     body: new Blob([new Uint8Array(state)]),
+    timeoutMs: UPLOAD_TIMEOUT_MS,
   });
 }
 
@@ -230,6 +239,7 @@ export async function uploadImage(blob: Blob, docId: string): Promise<string | n
       method: 'POST',
       headers: { 'Content-Type': blob.type || 'image/jpeg' },
       body: blob,
+      timeoutMs: UPLOAD_TIMEOUT_MS,
     });
     const { id } = (await res.json()) as { id: string };
     return `${BACKEND_URL}/images/${id}`;

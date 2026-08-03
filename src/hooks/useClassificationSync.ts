@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as Y from 'yjs';
 import { WEEKLY_PLANS_KEY, DAY_KEYS, getMondayOf } from '../collab/weeklyPlans';
+import { LLM_TIMEOUT_MS } from '../lib/config';
 import { apiFetch } from '../lib/http';
 
 // ---------------------------------------------------------------------------
@@ -141,6 +142,7 @@ async function syncClassifications(ydoc: Y.Doc): Promise<void> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ todos: batch }),
+      timeoutMs: LLM_TIMEOUT_MS,
     });
   }
 }
