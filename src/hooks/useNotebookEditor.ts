@@ -55,6 +55,7 @@ import { nullPlannerHandle, type PlannerHandle } from '../collab/plannerHandle';
 import { addTurn, getThread, sweepOrphanThreads } from '../collab/aiThreads';
 import { sweepOrphanWeeklyPlans } from '../collab/weeklyPlans';
 import { consumePendingImport } from '../lib/importState';
+import { exposeYDoc } from '../lib/devYDocs';
 import { createDocSyncer, createYjsSyncer, applyServerState } from '../lib/backendSync';
 
 type ProseMirrorMapping = ReturnType<typeof initProseMirrorDoc>['mapping'];
@@ -128,6 +129,7 @@ function bindEditor(
   runMigrations(doc);
   bindYDoc(doc);
   setYdoc(doc);
+  exposeYDoc('notebook', doc);
 
   let unwireSave: (() => void) | undefined;
   let stopSnapshot: (() => void) | undefined;

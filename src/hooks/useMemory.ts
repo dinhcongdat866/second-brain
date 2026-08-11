@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createYjsSyncer } from '../lib/backendSync';
+import { exposeYDoc } from '../lib/devYDocs';
 import {
   MEMORY_DOC_ID,
   createMemorySetup,
@@ -27,6 +28,7 @@ export function useMemory(userId?: string) {
   useEffect(() => {
     const { ydoc, persistence, provider, whenReady } = createMemorySetup(userId);
     ydocRef.current = ydoc;
+    exposeYDoc('memory', ydoc);
     const syncer = createYjsSyncer(MEMORY_DOC_ID, ydoc);
 
     const refresh = () => {

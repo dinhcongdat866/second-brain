@@ -19,6 +19,7 @@ import { deleteDocStorage } from '../collab/ydoc';
 import { deleteDocState, deleteDocImages, createYjsSyncer, applyServerState } from '../lib/backendSync';
 import { apiFetch } from '../lib/http';
 import { supabase } from '../lib/supabase';
+import { exposeYDoc } from '../lib/devYDocs';
 
 const ACTIVE_KEY = 'active-doc-id';
 
@@ -107,6 +108,7 @@ export function useDocRegistry(userId?: string) {
   useEffect(() => {
     const setup = createRegistrySetup(userId);
     setupRef.current = setup;
+    exposeYDoc('registry', setup.ydoc);
     const syncer = createYjsSyncer(REGISTRY_DOC_ID, setup.ydoc);
     syncerRef.current = syncer;
 

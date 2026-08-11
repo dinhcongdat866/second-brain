@@ -8,6 +8,7 @@ import {
 } from '../collab/plannerHandle';
 import { SHARED_PLAN_ID, WEEKLY_PLANS_KEY } from '../collab/weeklyPlans';
 import { createYjsSyncer, applyServerState } from '../lib/backendSync';
+import { exposeYDoc } from '../lib/devYDocs';
 
 export interface PlannerYdocResult {
   ydoc: Y.Doc | null;
@@ -39,6 +40,7 @@ export function usePlannerYdoc(userId: string | undefined, isGuest: boolean): Pl
   const publish = useCallback((ydoc: Y.Doc | null) => {
     handle.set(ydoc);
     setPlannerYdoc(ydoc);
+    exposeYDoc('planner', ydoc);
   }, [handle]);
 
   useEffect(() => {
