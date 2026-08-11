@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as Y from 'yjs';
 import { WEEKLY_PLANS_KEY, DAY_KEYS, getMondayOf } from '../collab/weeklyPlans';
+import { getApiKey } from '../lib/apiKey';
 import { LLM_TIMEOUT_MS } from '../lib/config';
 import { apiFetch } from '../lib/http';
 
@@ -72,6 +73,11 @@ interface ClassifyRecord {
 // ---------------------------------------------------------------------------
 
 async function syncClassifications(ydoc: Y.Doc): Promise<void> {
+  // Classification is billed to the user's own Anthropic key (the backend has
+  // none). Without a key every batch would 400, so skip the scan entirely.
+  const userApiKey = getApiKey();
+  if (!userApiKey) return;
+
   // 1. Target weeks: current Monday + 3 previous Mondays
   const today = new Date();
   const targetWeeks = Array.from({ length: WEEKS_TO_SCAN }, (_, i) =>
@@ -140,7 +146,7 @@ async function syncClassifications(ydoc: Y.Doc): Promise<void> {
     const batch = dirty.slice(i, i + BATCH_SIZE);
     await apiFetch('/analytics/classify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-user-api-key': userApiKey },
       body: JSON.stringify({ todos: batch }),
       timeoutMs: LLM_TIMEOUT_MS,
     });

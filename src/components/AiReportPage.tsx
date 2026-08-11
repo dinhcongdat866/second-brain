@@ -8,6 +8,7 @@
  * PDF export via window.print() — @media print CSS in ai-report.css.
  */
 import { useState, useCallback } from 'react';
+import { getApiKey } from '../lib/apiKey';
 import { LLM_TIMEOUT_MS } from '../lib/config';
 import { apiFetch } from '../lib/http';
 import {
@@ -231,9 +232,11 @@ export function AiReportPage({ onClose }: Props) {
 
       // ── Phase 2: AI narrative (slower — show spinner while waiting) ─────
       setAiLoading(true);
+      const userApiKey = getApiKey();
+      if (!userApiKey) throw new Error('Set your Anthropic API key in the model settings panel to generate the AI narrative.');
       const aiRes = await apiFetch('/analytics/report-generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-user-api-key': userApiKey },
         body: JSON.stringify({
           period: periodMeta,
           categoryBreakdown: json.categoryBreakdown,

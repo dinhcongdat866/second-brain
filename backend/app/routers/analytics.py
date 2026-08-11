@@ -1,4 +1,5 @@
 """Personal analytics — todo classification and mood log endpoints."""
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone, date as dt_date, timedelta
@@ -7,13 +8,12 @@ from typing import Literal
 log = logging.getLogger(__name__)
 
 import anthropic
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
-from app.config import settings
 from app.db.engine import get_db
 from app.db.models import MoodLog, TodoClassification
 
@@ -94,9 +94,30 @@ class MoodEntry(BaseModel):
 # Classification
 # ---------------------------------------------------------------------------
 
-def _classify_one(text: str, client: anthropic.Anthropic) -> list[str]:
+def _require_user_key(x_user_api_key: str | None) -> str:
+    """
+    Every Anthropic call in this router is billed to the caller, never to the
+    operator — same rule the /anthropic proxy enforces. There is no fallback key.
+    """
+    key = (x_user_api_key or "").strip()
+    if not key:
+        raise HTTPException(
+            status_code=400,
+            detail="No Anthropic API key provided. Set your key in the model settings panel.",
+        )
+    return key
+
+
+# Bound on concurrent Anthropic calls per request. Classification is one call
+# per todo, so a 50-todo batch used to run 50 round-trips back to back (minutes,
+# and long enough to hit the client timeout). Kept modest to stay well inside
+# Anthropic's per-key rate limits.
+_CLASSIFY_CONCURRENCY = 5
+
+
+async def _classify_one(text: str, client: anthropic.AsyncAnthropic) -> list[str]:
     """Call Claude to classify a single todo. Returns list of canonical category names."""
-    resp = client.messages.create(
+    resp = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=128,   # 64 was tight; longer category lists can push past it
         system=_CLASSIFY_SYSTEM,
@@ -128,16 +149,26 @@ async def classify_todos(
     body: ClassifyRequest,
     db: AsyncSession = Depends(get_db),
     user_id: str = Depends(get_current_user),
+    x_user_api_key: str | None = Header(default=None),
 ):
     """Classify a batch of todos (max 50). Upserts results into todo_classifications."""
     if not body.todos:
         return ClassifyResponse(results=[])
 
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    results: list[ClassifyResult] = []
+    client = anthropic.AsyncAnthropic(api_key=_require_user_key(x_user_api_key))
 
-    for item in body.todos:
-        categories = _classify_one(item.text, client)
+    # Classify in parallel (bounded), then write sequentially: the AsyncSession
+    # is not safe to share across concurrent tasks.
+    sem = asyncio.Semaphore(_CLASSIFY_CONCURRENCY)
+
+    async def classify(item: TodoItem) -> list[str]:
+        async with sem:
+            return await _classify_one(item.text, client)
+
+    all_categories = await asyncio.gather(*(classify(item) for item in body.todos))
+
+    results: list[ClassifyResult] = []
+    for item, categories in zip(body.todos, all_categories):
         result = ClassifyResult(todo_id=item.todo_id, categories=categories)
         results.append(result)
 
@@ -146,6 +177,11 @@ async def classify_todos(
         if existing:
             existing.todo_text = item.text
             existing.categories = json.dumps(categories, ensure_ascii=False)
+            # Without this the row keeps its old taxonomy_version, so the
+            # client's dirty-check ("stored version < current") stays true and
+            # re-classifies the same todo on every load — forever, and now on
+            # the user's own API key.
+            existing.taxonomy_version = TAXONOMY_VERSION
             existing.classified_at = datetime.now(timezone.utc)
         else:
             db.add(TodoClassification(
@@ -486,6 +522,7 @@ class GenerateResponse(BaseModel):
 async def generate_report(
     body: GenerateRequest,
     user_id: str = Depends(get_current_user),
+    x_user_api_key: str | None = Header(default=None),
 ):
     """
     Generate AI narrative, prediction, and proactive questions from pre-computed
@@ -499,8 +536,8 @@ async def generate_report(
         patterns=[p.model_dump() for p in body.detectedPatterns],
     )
 
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    resp = client.messages.create(
+    client = anthropic.AsyncAnthropic(api_key=_require_user_key(x_user_api_key))
+    resp = await client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=512,
         system=_REPORT_SYSTEM,

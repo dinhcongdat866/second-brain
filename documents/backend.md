@@ -11,7 +11,7 @@ Tables are created on startup via `Base.metadata.create_all` (no Alembic).
 ```
 backend/app/
   main.py              app, CORS, router registration, startup migrations
-  config.py            pydantic settings (DATABASE_URL, ANTHROPIC_API_KEY, ALLOWED_ORIGINS)
+  config.py            pydantic settings (DATABASE_URL, SUPABASE_*, ALLOWED_ORIGINS)
   db/
     engine.py          async engine + session
     models.py          ORM models

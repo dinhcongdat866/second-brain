@@ -91,7 +91,7 @@ pnpm dev:ws                       # → ws://localhost:1234
 cd backend
 python -m venv .venv && .venv/Scripts/activate   # (Unix: source .venv/bin/activate)
 pip install -r requirements.txt
-cp .env.example .env              # set DATABASE_URL + ANTHROPIC_API_KEY
+cp .env.example .env              # set DATABASE_URL (no Anthropic key — see below)
 uvicorn app.main:app --reload     # → http://localhost:8000
 ```
 
@@ -106,7 +106,7 @@ features are simply disabled until the backend is up.
 | Frontend | `VITE_WS_URL` | y-websocket relay (default `ws://localhost:1234`) |
 | Frontend | `VITE_OLLAMA_URL` | local Ollama daemon (default `http://localhost:11434`) |
 | Backend | `DATABASE_URL` | Neon Postgres connection string |
-| Backend | `ANTHROPIC_API_KEY` | Claude key (server-side only) |
+| Backend | — | no Anthropic key: every AI call carries the caller's own via `x-user-api-key` |
 | Backend | `ALLOWED_ORIGINS` | comma-separated CORS origins |
 
 ## Scripts

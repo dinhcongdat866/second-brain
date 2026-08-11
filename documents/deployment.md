@@ -34,9 +34,11 @@ it). Config in `backend/fly.toml`. Secrets (`fly secrets set`):
 
 ```
 DATABASE_URL      Neon connection string
-ANTHROPIC_API_KEY Claude key — lives ONLY here
 ALLOWED_ORIGINS   the Vercel URL (CORS)
 ```
+
+No Anthropic key here: every AI endpoint requires the caller's own key via the
+`x-user-api-key` header, so the operator is never billed for a user's usage.
 
 Deploy with `fly deploy` from `backend/`. New tables (e.g. `images`) are created automatically
 on startup. Machines scale to zero when idle, so the first request after a quiet period pays a
