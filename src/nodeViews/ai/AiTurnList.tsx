@@ -1,7 +1,8 @@
-import { type RefObject } from 'react';
+import { useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ImageLightbox } from '../../components/ImageLightbox';
 import type { TurnRole } from '../../collab/aiThreads';
 import { formatSmartDate, formatFullDate } from '../../lib/formatDate';
 import { IconCopy, IconCheck, IconPencil } from './icons';
@@ -66,6 +67,7 @@ export function AiTurnList({
   turnsEndRef,
 }: Props) {
   const { t } = useTranslation();
+  const [zoomedSrc, setZoomedSrc] = useState<string | null>(null);
   return (
     <div className="ai-cell__turns">
       {turns.length === 0 && (
@@ -97,7 +99,14 @@ export function AiTurnList({
                   {turn.images && turn.images.length > 0 && (
                     <div className="ai-turn__images">
                       {turn.images.map((src, ii) => (
-                        <img key={ii} src={src} alt="" className="ai-turn__image" />
+                        <img
+                          key={ii}
+                          src={src}
+                          alt=""
+                          className="ai-turn__image"
+                          loading="lazy"
+                          onClick={() => setZoomedSrc(src)}
+                        />
                       ))}
                     </div>
                   )}
@@ -217,6 +226,8 @@ export function AiTurnList({
 
       {error && <div className="ai-cell__error">{error}</div>}
       <div ref={turnsEndRef} />
+
+      {zoomedSrc && <ImageLightbox src={zoomedSrc} onClose={() => setZoomedSrc(null)} />}
     </div>
   );
 }

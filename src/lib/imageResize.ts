@@ -50,20 +50,6 @@ export async function resizeImageToBlob(file: File, maxEdge = 1920, quality = 0.
   );
 }
 
-/**
- * Convert a `data:<type>;base64,<data>` URL back to a Blob for upload.
- * Lets an AI-cell image be resized once and then both sent to the vision API
- * (as base64) and uploaded to /images (as bytes) without decoding twice.
- */
-export function dataUrlToBlob(dataUrl: string): Blob | null {
-  const m = /^data:([^;]+);base64,(.+)$/s.exec(dataUrl);
-  if (!m) return null;
-  const binary = atob(m[2]);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new Blob([bytes], { type: m[1] });
-}
-
 export interface ApiImage {
   media_type: string;
   data: string;

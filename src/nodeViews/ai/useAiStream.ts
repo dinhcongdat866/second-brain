@@ -12,7 +12,11 @@ import {
 import { compressHistory } from '../../collab/historyCompressor';
 import { upsertUserTurn, searchCells, logUsage, uploadImage, deleteImage } from '../../lib/backendSync';
 import { getApiKey } from '../../lib/apiKey';
-import { dataUrlToBlob, resizeImageToDataUrl } from '../../lib/imageResize';
+import { resizeImageToBlob, resizeImageToDataUrl } from '../../lib/imageResize';
+
+/** Long edge / quality of the copy kept in /images — sized for the lightbox. */
+const STORED_MAX_EDGE = 2560;
+const STORED_QUALITY = 0.85;
 
 interface Args {
   thread: YThread;
@@ -68,6 +72,17 @@ export function useAiStream({
   /**
    * Resize + queue image files to attach to the next prompt.
    *
+   * Each file is resized twice, for two different consumers:
+   *   - VISION_MAX_EDGE data URL → what the model sees (Anthropic downscales to
+   *     ~1568px anyway, so anything larger is tokens spent for nothing) and the
+   *     thumbnail preview while composing.
+   *   - STORED_MAX_EDGE blob → the copy kept in /images, sized so the lightbox
+   *     still looks sharp on a retina screen.
+   *
+   * The original file is never uploaded: at lightbox size it looks identical,
+   * it would bloat a Postgres LargeBinary column, and going through canvas
+   * strips EXIF (including GPS) as a side effect worth keeping.
+   *
    * The upload starts here rather than at submit time so the /images URL is
    * usually ready by the time the turn is written, and so submit() stays
    * synchronous. The thumbnail renders from the data URL immediately either way.
@@ -80,8 +95,7 @@ export function useAiStream({
         const id = crypto.randomUUID();
         setPendingImages((prev) => [...prev, { id, dataUrl, url: null }]);
 
-        const blob = dataUrlToBlob(dataUrl);
-        if (!blob) continue;
+        const blob = await resizeImageToBlob(file, STORED_MAX_EDGE, STORED_QUALITY);
         uploadImage(blob, docId).then((url) => {
           if (!url) return; // upload failed — turn keeps the text, drops the image
           // Removed while the upload was still in flight: the image never made
