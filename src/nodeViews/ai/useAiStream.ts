@@ -10,9 +10,9 @@ import {
   type ModelConfig,
 } from '../../collab/claudeStream';
 import { compressHistory } from '../../collab/historyCompressor';
-import { upsertUserTurn, searchCells, logUsage } from '../../lib/backendSync';
+import { upsertUserTurn, searchCells, logUsage, uploadImage } from '../../lib/backendSync';
 import { getApiKey } from '../../lib/apiKey';
-import { resizeImageToDataUrl } from '../../lib/imageResize';
+import { dataUrlToBlob, resizeImageToDataUrl } from '../../lib/imageResize';
 
 interface Args {
   thread: YThread;
@@ -52,19 +52,40 @@ export function useAiStream({
   const [error, setError] = useState<string | null>(null);
   const [editFromIdx, setEditFromIdx] = useState<number | null>(null);
   const [searchingActive, setSearchingActive] = useState(false);
-  const [pendingImages, setPendingImages] = useState<{ id: string; dataUrl: string }[]>([]);
+  // `dataUrl` feeds the vision request and the local thumbnail; `url` is what
+  // gets written to the Y.Doc once the upload lands (null while in flight or
+  // if the upload failed).
+  const [pendingImages, setPendingImages] = useState<
+    { id: string; dataUrl: string; url: string | null }[]
+  >([]);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const modalInputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  /** Resize + queue image files to attach to the next prompt. */
+  /**
+   * Resize + queue image files to attach to the next prompt.
+   *
+   * The upload starts here rather than at submit time so the /images URL is
+   * usually ready by the time the turn is written, and so submit() stays
+   * synchronous. The thumbnail renders from the data URL immediately either way.
+   */
   const addImages = async (files: File[] | FileList) => {
     const imgs = Array.from(files).filter((f) => f.type.startsWith('image/'));
     for (const file of imgs) {
       try {
         const dataUrl = await resizeImageToDataUrl(file);
-        setPendingImages((prev) => [...prev, { id: crypto.randomUUID(), dataUrl }]);
+        const id = crypto.randomUUID();
+        setPendingImages((prev) => [...prev, { id, dataUrl, url: null }]);
+
+        const blob = dataUrlToBlob(dataUrl);
+        if (!blob) continue;
+        uploadImage(blob, docId).then((url) => {
+          if (!url) return; // upload failed — turn keeps the text, drops the image
+          setPendingImages((prev) =>
+            prev.map((p) => (p.id === id ? { ...p, url } : p)),
+          );
+        });
       } catch {
         /* skip unreadable image */
       }
@@ -85,9 +106,14 @@ export function useAiStream({
       setEditFromIdx(null);
     }
 
+    // Two different things: base64 goes to the vision API (it needs the bytes),
+    // /images URLs go into the Y.Doc. Storing base64 here would embed the image
+    // in the document forever — gc:false never reclaims it, and every save
+    // re-uploads the whole doc.
     const imageUrls = pendingImages.map((p) => p.dataUrl);
+    const storedUrls = pendingImages.map((p) => p.url).filter((u): u is string => !!u);
     const userTurn = addTurn(thread, 'user', text);
-    if (imageUrls.length > 0) userTurn.set('images', JSON.stringify(imageUrls));
+    if (storedUrls.length > 0) userTurn.set('images', JSON.stringify(storedUrls));
     setPendingImages([]);
     upsertUserTurn(cellId, docId, text);
     const assistant = addTurn(thread, 'assistant');

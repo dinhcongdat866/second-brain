@@ -2,8 +2,10 @@
  * Client-side image downscale before sending to the vision API.
  *
  * Claude resizes images to ~1.15 MP / 1568px long edge anyway, so we cap there
- * to avoid uploading needlessly large payloads (also keeps the base64 we store
- * in the Y.Doc reasonable). Everything is re-encoded as JPEG.
+ * to avoid uploading needlessly large payloads. Everything is re-encoded as JPEG.
+ *
+ * Base64 never reaches the Y.Doc: it exists only long enough to build the
+ * vision request. What the document stores is an /images URL.
  */
 
 const MAX_EDGE = 1568;
@@ -46,6 +48,20 @@ export async function resizeImageToBlob(file: File, maxEdge = 1920, quality = 0.
       quality,
     ),
   );
+}
+
+/**
+ * Convert a `data:<type>;base64,<data>` URL back to a Blob for upload.
+ * Lets an AI-cell image be resized once and then both sent to the vision API
+ * (as base64) and uploaded to /images (as bytes) without decoding twice.
+ */
+export function dataUrlToBlob(dataUrl: string): Blob | null {
+  const m = /^data:([^;]+);base64,(.+)$/s.exec(dataUrl);
+  if (!m) return null;
+  const binary = atob(m[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: m[1] });
 }
 
 export interface ApiImage {

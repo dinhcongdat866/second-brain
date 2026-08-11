@@ -18,7 +18,7 @@ export interface TurnView {
   thinking?: string;
   searchQuery?: string;
   searchSources?: SearchSource[];
-  /** Data-URL images attached to a user turn. */
+  /** `/images` URLs attached to a user turn (never base64 — see useAiStream). */
   images?: string[];
 }
 
