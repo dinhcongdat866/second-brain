@@ -248,6 +248,20 @@ export async function uploadImage(blob: Blob, docId: string): Promise<string | n
   }
 }
 
+/**
+ * Delete one uploaded image, given the URL `uploadImage` returned.
+ *
+ * Call this when an attachment is discarded before it ever lands in a
+ * document — otherwise the row survives until the whole document is deleted.
+ * The id is the last path segment, which is safe because this module is also
+ * what built the URL.
+ */
+export function deleteImage(imageUrl: string): void {
+  const id = imageUrl.split('/').pop();
+  if (!id) return;
+  apiFetch(`/images/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+}
+
 /** Remove all images belonging to a deleted document. */
 export function deleteDocImages(docId: string, token?: string | null): void {
   deleteWithToken(`/images/by-doc/${encodeURIComponent(docId)}`, token);

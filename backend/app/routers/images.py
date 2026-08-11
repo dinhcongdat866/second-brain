@@ -54,6 +54,25 @@ async def get_image(img_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+@router.delete("/{img_id}", status_code=204)
+async def delete_image(
+    img_id: str,
+    db: AsyncSession = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    """
+    Delete a single image. Used when an attachment is discarded before it is
+    ever referenced by a document — without it the row would linger until the
+    whole document is deleted.
+
+    Scoped to the owner: GET is public by unguessable ID, but DELETE must not be.
+    """
+    await db.execute(
+        delete(Image).where(Image.id == img_id, Image.user_id == user_id)
+    )
+    await db.commit()
+
+
 @router.delete("/by-doc/{doc_id}", status_code=204)
 async def delete_doc_images(
     doc_id: str,

@@ -10,7 +10,7 @@ import {
   type ModelConfig,
 } from '../../collab/claudeStream';
 import { compressHistory } from '../../collab/historyCompressor';
-import { upsertUserTurn, searchCells, logUsage, uploadImage } from '../../lib/backendSync';
+import { upsertUserTurn, searchCells, logUsage, uploadImage, deleteImage } from '../../lib/backendSync';
 import { getApiKey } from '../../lib/apiKey';
 import { dataUrlToBlob, resizeImageToDataUrl } from '../../lib/imageResize';
 
@@ -62,6 +62,8 @@ export function useAiStream({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const modalInputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** Image ids removed before their upload finished — deleted once it lands. */
+  const discardedRef = useRef<Set<string>>(new Set());
 
   /**
    * Resize + queue image files to attach to the next prompt.
@@ -82,6 +84,13 @@ export function useAiStream({
         if (!blob) continue;
         uploadImage(blob, docId).then((url) => {
           if (!url) return; // upload failed — turn keeps the text, drops the image
+          // Removed while the upload was still in flight: the image never made
+          // it into the tray, so delete it now rather than leaving it orphaned.
+          if (discardedRef.current.has(id)) {
+            discardedRef.current.delete(id);
+            deleteImage(url);
+            return;
+          }
           setPendingImages((prev) =>
             prev.map((p) => (p.id === id ? { ...p, url } : p)),
           );
@@ -92,8 +101,20 @@ export function useAiStream({
     }
   };
 
-  const removeImage = (id: string) =>
+  /**
+   * Discard a queued image. Deletes the uploaded copy too — this is the one
+   * moment we know for certain the image will never be referenced by a turn.
+   * (Closing the tab mid-compose still leaks; that needs a server-side sweep.)
+   */
+  const removeImage = (id: string) => {
+    const target = pendingImages.find((p) => p.id === id);
+    if (target?.url) {
+      deleteImage(target.url);
+    } else if (target) {
+      discardedRef.current.add(id); // upload still in flight — delete on arrival
+    }
     setPendingImages((prev) => prev.filter((p) => p.id !== id));
+  };
 
   const submit = () => {
     const text = prompt.trim();
