@@ -69,7 +69,7 @@ export async function searchCells(query: string, limit = 5): Promise<SearchResul
 }
 
 /**
- * Backoff schedule between fetchDocState retries. The first request of a
+ * Backoff schedule between document-read retries. The first request of a
  * session can hit a cold production stack (Fly machine waking → 502 without
  * CORS headers, Neon compute resume, backend JWKS fetch), so a single attempt
  * silently loses server state. Each attempt is capped by
@@ -95,23 +95,23 @@ function isRetryableFetchError(err: unknown): boolean {
 }
 
 /**
- * Fetch the latest Yjs state for a doc from Neon.
+ * Run a document read with the retry ladder above.
  * Returns null if the doc has never been saved (404 — a definitive answer, no
  * retry), on a deterministic 4xx, or if the backend stayed unreachable
  * through all retries.
  */
-export async function fetchDocState(docId: string): Promise<Uint8Array | null> {
+async function readWithRetry<T>(
+  label: string,
+  path: string,
+  parse: (res: Response) => Promise<T>,
+): Promise<T | null> {
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await apiFetch(
-        `/documents/${encodeURIComponent(docId)}/state`,
-        { timeoutMs: STATE_FETCH_TIMEOUT_MS },
-      );
-      return new Uint8Array(await res.arrayBuffer());
+      return await parse(await apiFetch(path, { timeoutMs: STATE_FETCH_TIMEOUT_MS }));
     } catch (err) {
       if (err instanceof HttpError && err.status === 404) return null;
       if (!isRetryableFetchError(err) || attempt >= FETCH_STATE_RETRY_DELAYS_MS.length) {
-        console.warn(`[backendSync] fetchDocState(${docId}) gave up (attempt ${attempt + 1}):`, err);
+        console.warn(`[backendSync] ${label} gave up (attempt ${attempt + 1}):`, err);
         return null;
       }
       await sleep(FETCH_STATE_RETRY_DELAYS_MS[attempt]);
@@ -120,39 +120,115 @@ export async function fetchDocState(docId: string): Promise<Uint8Array | null> {
 }
 
 /**
+ * Split the framed body returned by GET /sync into individual Yjs updates.
+ * Frame layout is [4-byte big-endian length][bytes], repeated.
+ */
+export function parseSyncFrames(buf: ArrayBuffer): Uint8Array[] {
+  const view = new DataView(buf);
+  const out: Uint8Array[] = [];
+  let off = 0;
+  while (off + 4 <= buf.byteLength) {
+    const len = view.getUint32(off);
+    off += 4;
+    if (len === 0 || off + len > buf.byteLength) break; // truncated — stop, keep what parsed
+    out.push(new Uint8Array(buf, off, len));
+    off += len;
+  }
+  return out;
+}
+
+/** What the server holds for a doc: its updates, plus how far we consumed. */
+export interface DocSync {
+  updates: Uint8Array[];
+  /** Highest delta id merged — passed back on a snapshot write. */
+  maxUpdateId: number;
+}
+
+/**
+ * Fetch the snapshot + every delta appended since, from GET /sync.
+ * Retries and times out per readWithRetry; null on 404 or after giving up.
+ */
+export function fetchDocSync(docId: string): Promise<DocSync | null> {
+  return readWithRetry(
+    `fetchDocSync(${docId})`,
+    `/documents/${encodeURIComponent(docId)}/sync`,
+    async (res) => ({
+      updates: parseSyncFrames(await res.arrayBuffer()),
+      maxUpdateId: Number(res.headers.get('X-Max-Update-Id') ?? 0) || 0,
+    }),
+  );
+}
+
+/**
  * Fetch server state and merge it into the given Y.Doc via CRDT applyUpdate.
  * Uses NEON_SYNC_ORIGIN so listeners can skip re-saving remote-only updates.
  * Returns true if server had a state to apply, false if first-time or unreachable.
+ *
+ * Also records how far this doc has consumed the delta log, so a later snapshot
+ * write only collapses rows it actually merged.
  */
 export async function applyServerState(docId: string, ydoc: Y.Doc): Promise<boolean> {
-  const state = await fetchDocState(docId);
-  if (!state) return false;
-  Y.applyUpdate(ydoc, state, NEON_SYNC_ORIGIN);
+  const sync = await fetchDocSync(docId);
+  if (!sync || sync.updates.length === 0) return false;
+  ydoc.transact(() => {
+    for (const update of sync.updates) Y.applyUpdate(ydoc, update, NEON_SYNC_ORIGIN);
+  }, NEON_SYNC_ORIGIN);
+  mergedUpTo.set(docId, Math.max(mergedUpTo.get(docId) ?? 0, sync.maxUpdateId));
   return true;
 }
 
 /**
- * Persist the Yjs state to Neon using a read-merge-write cycle.
- *
- * A plain overwrite causes data loss when two clients have diverged (e.g. DEV
- * opened a doc before PROD saved its content, seeded an empty cell, then
- * overwrote Neon with that empty state). By fetching the current server state
- * first and merging it (CRDT) before saving, the written blob always contains
- * the union of all known operations — safe even under concurrent saves.
- *
- * The merge is tagged NEON_SYNC_ORIGIN so createYjsSyncer does not treat it as
- * a local edit and re-schedule another save.
+ * Highest delta id merged per doc. Module-level because the syncer, the
+ * loading path and the teardown beacon all need the same number, and they
+ * live in different components.
  */
-export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
-  const remote = await fetchDocState(docId);
-  if (remote) Y.applyUpdate(ydoc, remote, NEON_SYNC_ORIGIN);
-  const state = Y.encodeStateAsUpdate(ydoc);
-  await apiFetch(`/documents/${encodeURIComponent(docId)}/state`, {
+const mergedUpTo = new Map<string, number>();
+
+/**
+ * Append one delta — the hot path, run a few seconds after you stop typing.
+ *
+ * Nothing is read and nothing is overwritten, so this cannot lose a concurrent
+ * save, and the body is proportional to what you just typed rather than to the
+ * whole document (which only grows, since gc is disabled for time-travel).
+ */
+export async function appendDocUpdate(docId: string, update: Uint8Array): Promise<void> {
+  await apiFetch(`/documents/${encodeURIComponent(docId)}/updates`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/octet-stream' },
-    body: new Blob([new Uint8Array(state)]),
+    body: new Blob([new Uint8Array(update)]),
     timeoutMs: UPLOAD_TIMEOUT_MS,
   });
+}
+
+/**
+ * Write a full snapshot, collapsing the deltas it contains — the cold path,
+ * run when the tab is hidden or a document is deleted, not on every edit.
+ *
+ * Still a read-merge-write: it re-reads immediately before writing so the
+ * snapshot can never be older than what the server holds, and it collapses
+ * only up to the id returned by that same read. The window between read and
+ * write is unchanged, but it now opens seconds-apart-on-hide instead of every
+ * four seconds of typing.
+ */
+export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
+  const remote = await fetchDocSync(docId);
+  if (remote) {
+    ydoc.transact(() => {
+      for (const update of remote.updates) Y.applyUpdate(ydoc, update, NEON_SYNC_ORIGIN);
+    }, NEON_SYNC_ORIGIN);
+  }
+  const upTo = Math.max(mergedUpTo.get(docId) ?? 0, remote?.maxUpdateId ?? 0);
+  mergedUpTo.set(docId, upTo);
+  const state = Y.encodeStateAsUpdate(ydoc);
+  await apiFetch(
+    `/documents/${encodeURIComponent(docId)}/state?up_to=${upTo}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: new Blob([new Uint8Array(state)]),
+      timeoutMs: UPLOAD_TIMEOUT_MS,
+    },
+  );
 }
 
 /**
@@ -164,17 +240,19 @@ export async function saveDocState(docId: string, ydoc: Y.Doc): Promise<void> {
  * the write. keepalive fetch survives teardown AND carries the auth header.
  *
  * The token is read synchronously from the cached mirror (getCachedToken) since
- * a dying page can't await supabase.auth.getSession(). Full state is sent (the
- * endpoint overwrites, not merges); browsers cap total keepalive bodies at
- * ~64 KB, so very large docs may be dropped here — the authenticated async
- * flush on `visibilitychange: hidden` is the reliable path, this is redundancy.
+ * a dying page can't await supabase.auth.getSession().
+ *
+ * It appends rather than snapshots, for two reasons: a dying page cannot re-read
+ * the server first, so an overwrite here could replace a newer snapshot; and the
+ * body is only the unsent delta, which comfortably fits the ~64 KB cap browsers
+ * put on keepalive bodies (the old full-state version silently exceeded it on
+ * large docs).
  */
-export function saveDocStateBeacon(docId: string, ydoc: Y.Doc): void {
+export function saveDocStateBeacon(docId: string, update: Uint8Array): void {
   const token = getCachedToken();
   if (!token) return; // no valid session — the endpoint would 401 anyway
-  const state = Y.encodeStateAsUpdate(ydoc);
-  const url = `${BACKEND_URL}/documents/${encodeURIComponent(docId)}/state`;
-  const blob = new Blob([new Uint8Array(state)], { type: 'application/octet-stream' });
+  const url = `${BACKEND_URL}/documents/${encodeURIComponent(docId)}/updates`;
+  const blob = new Blob([new Uint8Array(update)], { type: 'application/octet-stream' });
   fetch(url, {
     method: 'POST',
     headers: {
@@ -269,40 +347,78 @@ export function deleteDocImages(docId: string, token?: string | null): void {
 
 /**
  * Wire a debounced Yjs → Neon saver onto a Y.Doc.
- * Also exposes `flush()` for immediate save (use in beforeunload).
+ *
+ * Two paths, deliberately different:
+ *   - the debounced one appends a delta — small, frequent, cannot overwrite;
+ *   - `flush()` writes a full snapshot — large, rare, and collapses the deltas
+ *     it contains so the log does not grow without bound.
+ *
+ * `sentSV` is the state vector of everything already handed to the server, so
+ * each delta carries only what changed since. Updates arriving with
+ * NEON_SYNC_ORIGIN came *from* the server, so they advance `sentSV` without
+ * scheduling anything — otherwise the client would echo remote work back.
  */
 export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = YJS_SAVE_DEBOUNCE_MS) {
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let sentSV: Uint8Array | undefined;
+  let dirty = false;
 
-  const persist = () => saveDocState(docId, ydoc).catch(() => {});
+  /** Bytes the server has not seen yet, or null when there is nothing to send. */
+  const pendingDelta = (): Uint8Array | null => {
+    if (!dirty) return null;
+    return Y.encodeStateAsUpdate(ydoc, sentSV);
+  };
+
+  const markSent = () => {
+    sentSV = Y.encodeStateVector(ydoc);
+    dirty = false;
+  };
+
+  const persist = async () => {
+    const delta = pendingDelta();
+    if (!delta) return;
+    // Capture before awaiting: edits made during the request must stay dirty.
+    const sv = Y.encodeStateVector(ydoc);
+    await appendDocUpdate(docId, delta);
+    sentSV = sv;
+    dirty = false;
+  };
 
   const schedule = (_update: Uint8Array, origin: unknown) => {
-    // Ignore updates that originated from pulling Neon state — they are already
-    // persisted remotely and scheduling a re-save would create a pointless cycle.
-    if (origin === NEON_SYNC_ORIGIN) return;
+    if (origin === NEON_SYNC_ORIGIN) {
+      // Already on the server by definition — record it as sent, don't echo it.
+      sentSV = Y.encodeStateVector(ydoc);
+      return;
+    }
+    dirty = true;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
       timer = null;
-      persist();
+      persist().catch(() => {});
     }, debounceMs);
   };
 
   ydoc.on('update', schedule);
 
   return {
-    /** Flush immediately (clears pending debounce timer). */
+    /**
+     * Snapshot immediately (clears pending debounce timer). Used when the tab
+     * is hidden and when a document is deleted — the rare, durable path that
+     * also compacts the delta log.
+     */
     flush: () => {
       if (timer) { clearTimeout(timer); timer = null; }
-      persist();
+      saveDocState(docId, ydoc).then(markSent).catch(() => {});
     },
     /**
-     * Flush via sendBeacon — for pagehide/visibilitychange (survives teardown).
-     * sendBeacon is fire-and-forget so we skip the merge-read; the next normal
-     * save will merge any concurrent remote writes.
+     * Last-ditch flush on hard teardown (pagehide). Appends the unsent delta
+     * via a keepalive request — an append can't clobber, and the delta is small
+     * enough to survive the browser's keepalive body cap.
      */
     flushBeacon: () => {
       if (timer) { clearTimeout(timer); timer = null; }
-      saveDocStateBeacon(docId, ydoc);
+      const delta = pendingDelta();
+      if (delta) saveDocStateBeacon(docId, delta);
     },
     stop: () => {
       ydoc.off('update', schedule);

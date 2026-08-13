@@ -54,3 +54,11 @@ async def run_migrations() -> None:
         # The old standalone (user_id, doc_id) index is now redundant with the
         # composite PK's implicit index — drop it if it lingers from Phase 2.
         await conn.execute(text("DROP INDEX IF EXISTS ix_yjs_documents_user_doc"))
+
+        # Phase 5: append-only Yjs deltas (yjs_updates). create_all above makes
+        # the table; this index is stated explicitly so an existing table picks
+        # it up too. Every read is "all rows for this owner+doc, in id order".
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_yjs_updates_owner "
+            "ON yjs_updates (user_id, doc_id, id)"
+        ))

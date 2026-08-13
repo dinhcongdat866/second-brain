@@ -25,6 +25,33 @@ class YjsDocument(Base):
     )
 
 
+class YjsUpdate(Base):
+    """
+    Append-only Yjs deltas for a document.
+
+    A save used to send the whole document every few seconds; on a doc that only
+    grows (gc is disabled for time-travel) that is hundreds of MB per hour of
+    typing, and the read-merge-write cycle could drop a concurrent save. Deltas
+    are appended here instead — nothing is ever overwritten, so a save cannot
+    lose another device's work.
+
+    Rows are consumed by a snapshot write into YjsDocument, which collapses
+    everything up to a client-supplied id and deletes those rows.
+    """
+    __tablename__ = "yjs_updates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    doc_id: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    update: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (Index("ix_yjs_updates_owner", "user_id", "doc_id", "id"),)
+
+
 class UsageLog(Base):
     """One row per AI response turn — queryable for cost analytics."""
     __tablename__ = "usage_log"
