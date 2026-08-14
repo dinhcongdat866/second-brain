@@ -177,10 +177,19 @@ def _validate_one(raw: object) -> tuple[int | None, str, str | None, int, str]:
     cat_raw = raw.get("category")
     # An unknown category degrades to "Other" — a real bucket, so this is an
     # honest answer. There is no equivalent honest default for an amount.
-    category = (
-        _CATEGORY_LOWER.get(cat_raw.lower(), CATEGORY_FALLBACK)
-        if isinstance(cat_raw, str) else CATEGORY_FALLBACK
-    )
+    #
+    # But it is logged, because "Other" then means two different things: this
+    # line genuinely fits nowhere, or the model answered something unrecognised.
+    # Nothing in the stored row distinguishes them, so a prompt that started
+    # returning e.g. translated names would quietly funnel everything here with
+    # no signal at all. The log is that signal.
+    category = CATEGORY_FALLBACK
+    if isinstance(cat_raw, str):
+        category = _CATEGORY_LOWER.get(cat_raw.lower(), CATEGORY_FALLBACK)
+        if category is CATEGORY_FALLBACK and cat_raw.lower() != CATEGORY_FALLBACK.lower():
+            log.warning("[money/parse] unrecognised category %r → %s", cat_raw, CATEGORY_FALLBACK)
+    elif cat_raw is not None:
+        log.warning("[money/parse] non-string category %r → %s", cat_raw, CATEGORY_FALLBACK)
 
     cp_raw = raw.get("counterparty")
     counterparty = cp_raw.strip() if isinstance(cp_raw, str) and cp_raw.strip() else None

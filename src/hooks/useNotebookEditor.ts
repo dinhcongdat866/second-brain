@@ -174,7 +174,7 @@ function bindEditor(
       nodeViews: {
         markdown_cell: (node, view, getPos) => new MarkdownCellView(node, view, getPos),
         ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext, appendMemory, getAnalyticsContext, planner),
-        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, planner),
+        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, planner, isGuest),
       },
       handleDOMEvents: {
         click(_view, event) {

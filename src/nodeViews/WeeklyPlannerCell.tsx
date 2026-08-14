@@ -487,7 +487,8 @@ interface DayColumnProps {
   day: DayKey;
   date: string;
   todos: AllDays[DayKey];
-  money: MoneyEntryData[];
+  /** null = money tier off for this session (guest — see WeeklyPlannerCell). */
+  money: MoneyEntryData[] | null;
   isToday: boolean;
   ydoc: Y.Doc;
   plan: Y.Map<unknown>;
@@ -529,13 +530,13 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
 
   // Recomputed every render, never stored: two devices each adding to a saved
   // total would be permanently wrong with no way to tell afterwards.
-  const total = moneyTotal(money);
-  const known = money.filter((e) => e.amount !== null).length;
+  const total = moneyTotal(money ?? []);
+  const known = (money ?? []).filter((e) => e.amount !== null).length;
   // A day whose lines are all still pending would otherwise total "+0", which
   // reads as "spent nothing today" — a confident wrong number, the exact thing
   // the flagged state exists to avoid. Show nothing until something is known,
   // and mark the figure as partial while any line is still unaccounted for.
-  const totalIsPartial = known < money.length;
+  const totalIsPartial = known < (money?.length ?? 0);
 
   return (
     <div className={`weekly-day${isToday ? ' weekly-day--today' : ''}`}>
@@ -579,6 +580,7 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
         onKeyDown={handleKeyDown}
         onClick={(e) => e.stopPropagation()}
       />
+      {money !== null && (
       <div className="weekly-day__money">
         {money.map((entry) => (
           <MoneyRow key={entry.id} entry={entry} onDelete={() => handleMoneyDelete(entry.id)} />
@@ -603,6 +605,7 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
           onClick={(e) => e.stopPropagation()}
         />
       </div>
+      )}
     </div>
   );
 }
@@ -670,9 +673,16 @@ function DebtLedger({ signature }: { signature: string }) {
 interface Props {
   ydoc: Y.Doc;
   onDelete: () => void;
+  /**
+   * Guests have no backend session, so useMoneySync is disabled for them and no
+   * line would ever be parsed. The whole money tier is hidden rather than shown
+   * inert: an input that only ever produces lines stuck on "reading…", with no
+   * amount, no day total and no ledger, is worse than not offering it.
+   */
+  isGuest: boolean;
 }
 
-export function WeeklyPlannerCell({ ydoc, onDelete }: Props) {
+export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
   const { t } = useTranslation();
   // All planner cells render the one shared plan inside the planner Y.Doc.
   const [plan, setPlan] = useState<Y.Map<unknown>>(() => getWeeklyPlan(ydoc, SHARED_PLAN_ID));
@@ -809,7 +819,7 @@ export function WeeklyPlannerCell({ ydoc, onDelete }: Props) {
               day={day}
               date={date}
               todos={days[day]}
-              money={moneyLog[date] ?? []}
+              money={isGuest ? null : (moneyLog[date] ?? [])}
               isToday={todayKey === day}
               ydoc={ydoc}
               plan={plan}
@@ -819,7 +829,7 @@ export function WeeklyPlannerCell({ ydoc, onDelete }: Props) {
           );
         })}
       </div>
-      <DebtLedger signature={ledgerSignature} />
+      {!isGuest && <DebtLedger signature={ledgerSignature} />}
       <WeeklySelectionToolbar containerRef={containerRef} plan={plan} weekStart={weekStart} />
     </div>
   );

@@ -21,6 +21,7 @@ export class WeeklyCellView implements NodeView {
     view: EditorView,
     getPos: () => number | undefined,
     planner: PlannerHandle,
+    isGuest: boolean,
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'weekly-cell-wrapper';
@@ -37,7 +38,7 @@ export class WeeklyCellView implements NodeView {
     // All planner cells share the single 'global' plan inside the planner doc;
     // the component resolves (and re-resolves after merges) it internally.
     const renderPlanner = (ydoc: Y.Doc) => {
-      this.root.render(<WeeklyPlannerCell ydoc={ydoc} onDelete={onDelete} />);
+      this.root.render(<WeeklyPlannerCell ydoc={ydoc} onDelete={onDelete} isGuest={isGuest} />);
     };
 
     const ydoc = planner.get();

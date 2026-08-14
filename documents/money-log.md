@@ -271,6 +271,12 @@ Below the week grid: the ledger panel, fed by `GET /money/ledger`.
 A flagged line (`status='needs_amount'`) renders with the amber warning and keeps the raw text
 editable — no number is ever shown for it.
 
+**Guests do not get the money tier at all.** They have no backend session, so `useMoneySync` is
+disabled and nothing would ever be parsed; the input, the rows, the day total and the ledger are
+all hidden rather than shown inert. Offering an input whose lines are permanently stuck on
+"reading…", with no amount and no total, is worse than not offering it. `isGuest` reaches the cell
+through `WeeklyCellView`; todos are untouched, since they need no backend.
+
 ---
 
 ## 8. Explicitly out of slice 1
