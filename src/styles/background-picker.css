@@ -1,13 +1,11 @@
 /* ---------- Background picker ---------- */
 
-.bg-picker__trigger {
-  font-size: 15px;
-  padding: 4px 8px;
-}
-
+/* Inherits the shared icon-button treatment. It used to carry a filled colour
+   swatch, which made it the only control in the header with a solid background
+   — the eye read it as an alert rather than as a tool. "A background is set" is
+   now said with the accent colour on the glyph alone. */
 .bg-picker__trigger--active {
-  background: var(--nb-accent-light);
-  border-color: var(--nb-border-focus);
+  color: var(--nb-accent);
 }
 
 .bg-picker__panel {
@@ -51,7 +49,7 @@
   border-radius: var(--nb-r-sm);
   background: var(--nb-bg-page);
   color: var(--nb-text);
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-family: inherit;
   outline: none;
   min-width: 0;

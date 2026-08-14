@@ -8,6 +8,9 @@
     "importTitle": "Nhập file Markdown thành tài liệu mới",
     "export": "Xuất .md",
     "exportTitle": "Xuất ra Markdown",
+    "background": "Ảnh nền",
+    "more": "Thêm",
+    "analytics": "Báo cáo phân tích",
     "hideEditor": "Ẩn khung editor",
     "showEditor": "Hiện khung editor",
     "resizeEditor": "Kéo để đổi bề rộng · bấm đúp để về mặc định"
@@ -82,6 +85,7 @@
     }
   },
   "weekly": {
+    "kind": "Lịch tuần",
     "prevWeek": "Tuần trước",
     "nextWeek": "Tuần sau",
     "changeWeek": "Đổi tuần",

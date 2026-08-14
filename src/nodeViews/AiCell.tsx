@@ -186,7 +186,7 @@ export function AiCell({
           <span className="ai-cell__badge">✦ AI</span>
           {sessionCost > 0 && (
             <span className="ai-cell__session-cost" title={t('ai.sessionCost')}>
-              💸 ${sessionCost.toFixed(4)}
+              ${sessionCost.toFixed(2)}
             </span>
           )}
           {minimized && <span className="ai-cell__preview">{previewText}</span>}

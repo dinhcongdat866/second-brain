@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { uploadImage } from '../lib/backendSync';
+import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
+import { Icon } from './Icon';
 
 interface Props {
   docId: string;
@@ -10,6 +12,7 @@ interface Props {
 }
 
 export function BackgroundPicker({ docId, currentBg, onApply }: Props) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [urlInput, setUrlInput] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -67,12 +70,12 @@ export function BackgroundPicker({ docId, currentBg, onApply }: Props) {
     <>
       <Button
         ref={btnRef}
-        variant="secondary"
+        variant="icon"
         className={`bg-picker__trigger${currentBg ? ' bg-picker__trigger--active' : ''}`}
         onClick={() => setOpen((v) => !v)}
-        title="Set background image"
+        title={t('app.background')}
       >
-        🎨
+        <Icon name="palette" />
       </Button>
 
       {open &&

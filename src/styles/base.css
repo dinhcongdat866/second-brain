@@ -37,16 +37,80 @@ body {
   box-shadow: var(--nb-shadow-sm);
 }
 
+/* All header tools in one group, pushed right, tight enough to read as a set
+   rather than as five unrelated buttons. */
+.app-header__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.app-header__divider {
+  width: 1px;
+  height: 18px;
+  background: var(--nb-border-faint);
+  margin: 0 4px;
+}
+
+/* ---------- Overflow menu ---------- */
+
+.overflow-menu {
+  position: relative;
+  display: flex;
+}
+
+.overflow-menu__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: var(--z-dropdown);
+  min-width: 168px;
+  padding: 4px;
+  background: var(--nb-bg-surface);
+  border: 1px solid var(--nb-border-faint);
+  border-radius: var(--nb-r-md);
+  box-shadow: var(--nb-shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.overflow-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  font-family: inherit;
+  font-size: var(--text-md);
+  color: var(--nb-text);
+  background: none;
+  border: none;
+  border-radius: var(--nb-r-xs);
+  cursor: pointer;
+  text-align: left;
+}
+
+.overflow-menu__item:hover:not(:disabled) {
+  background: var(--nb-bg-hover);
+}
+
+.overflow-menu__item:disabled {
+  color: var(--nb-text-3);
+  cursor: default;
+}
+
 .app-header h1 {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--nb-text);
   letter-spacing: -0.01em;
 }
 
 .save-status {
-  font-size: 12px;
+  font-size: var(--text-sm);
   transition: opacity 0.2s;
 }
 
@@ -104,7 +168,7 @@ body {
   bottom: 0;
   left: 4px;
   width: 2px;
-  border-radius: 1px;
+  border-radius: var(--nb-r-full);
   background: var(--nb-weekly-accent);
   opacity: 0;
   transition: opacity var(--dur-base, 0.15s) var(--ease, ease);

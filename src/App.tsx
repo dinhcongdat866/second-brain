@@ -6,6 +6,7 @@ import type { EditorView } from 'prosemirror-view';
 import { appendMarkdownCell, makeAppendAiCell, makeAppendWeeklyCell } from './commands';
 import { BackgroundPicker } from './components/BackgroundPicker';
 import { Button } from './components/Button';
+import { Icon } from './components/Icon';
 import { FloatingToolbar } from './components/FloatingToolbar';
 import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
@@ -42,6 +43,72 @@ function readStoredEditorWidth(): number {
     if (Number.isFinite(stored) && stored >= MIN_EDITOR_WIDTH) return stored;
   } catch { /* private mode — fall through to the default */ }
   return DEFAULT_EDITOR_WIDTH;
+}
+
+/**
+ * The rare actions, one click behind a "…" — import and export.
+ *
+ * Frequency should decide prominence. These two were sitting in the header as
+ * full-width text buttons next to controls used every session, which is how a
+ * toolbar ends up looking crowded without being useful.
+ */
+function OverflowMenu({
+  onImport,
+  onExport,
+  exportDisabled,
+}: {
+  onImport: () => void;
+  onExport: () => void | Promise<void>;
+  exportDisabled: boolean;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="overflow-menu" ref={ref}>
+      <Button variant="icon" onClick={() => setOpen((v) => !v)} title={t('app.more')}>
+        <Icon name="more" />
+      </Button>
+      {open && (
+        <div className="overflow-menu__panel" role="menu">
+          <button
+            type="button"
+            className="overflow-menu__item"
+            role="menuitem"
+            onClick={() => { setOpen(false); onImport(); }}
+          >
+            <Icon name="import" size={15} />
+            {t('app.import')}
+          </button>
+          <button
+            type="button"
+            className="overflow-menu__item"
+            role="menuitem"
+            disabled={exportDisabled}
+            onClick={() => { setOpen(false); void onExport(); }}
+          >
+            <Icon name="export" size={15} />
+            {t('app.export')}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function CellAdder({
@@ -193,7 +260,7 @@ function App() {
           onClick={() => setSidebarOpen((v) => !v)}
           title={t('app.toggleSidebar')}
         >
-          ☰
+          <Icon name="menu" />
         </Button>
         <h1>{activeDocName}</h1>
         {saveStatus !== 'idle' && (
@@ -201,56 +268,54 @@ function App() {
             {saveStatus === 'pending' ? 'Saving...' : 'Saved'}
           </span>
         )}
-        <Button
-          variant="secondary"
-          style={{ marginLeft: 'auto' }}
-          onClick={() => setShowHistory(true)}
-          title={t('app.viewHistory')}
-        >
-          {t('app.history')}
-        </Button>
-        {!isGuest && (
-          <Button
-            variant="secondary"
-            onClick={() => setShowAnalytics(true)}
-            title="Personal analytics report"
-          >
-            📊
-          </Button>
-        )}
-        <Button
-          variant="secondary"
-          onClick={() => importMarkdownAsNewDoc(registry.importDoc)}
-          title={t('app.importTitle')}
-        >
-          {t('app.import')}
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={!view || !ydoc}
-          onClick={async () => {
-            if (!view || !ydoc) return;
-            const content = exportDocToMarkdown(view.state.doc, ydoc, activeDocName);
-            await saveMarkdownFile(content, activeDocName);
-          }}
-          title={t('app.exportTitle')}
-        >
-          {t('app.export')}
-        </Button>
-        <BackgroundPicker
-          docId={registry.activeDocId}
-          currentBg={activeDocBg}
-          onApply={(url) => registry.setBgImage(registry.activeDocId, url)}
-        />
-        {activeDocBg && (
+        {/*
+          One button language: every control here is an icon of the same size
+          and treatment, so the row reads as a set. Import and export moved into
+          the overflow menu — they are used a few times a month and were taking
+          the most expensive space on screen.
+        */}
+        <div className="app-header__tools">
           <Button
             variant="icon"
-            onClick={() => setEditorHidden((v) => !v)}
-            title={editorHidden ? t('app.showEditor') : t('app.hideEditor')}
+            onClick={() => setShowHistory(true)}
+            title={t('app.viewHistory')}
           >
-            {editorHidden ? '◻' : '▣'}
+            <Icon name="history" />
           </Button>
-        )}
+          {!isGuest && (
+            <Button
+              variant="icon"
+              onClick={() => setShowAnalytics(true)}
+              title={t('app.analytics')}
+            >
+              <Icon name="chart" />
+            </Button>
+          )}
+          <BackgroundPicker
+            docId={registry.activeDocId}
+            currentBg={activeDocBg}
+            onApply={(url) => registry.setBgImage(registry.activeDocId, url)}
+          />
+          {activeDocBg && (
+            <Button
+              variant="icon"
+              onClick={() => setEditorHidden((v) => !v)}
+              title={editorHidden ? t('app.showEditor') : t('app.hideEditor')}
+            >
+              <Icon name={editorHidden ? 'eyeOff' : 'eye'} />
+            </Button>
+          )}
+          <span className="app-header__divider" aria-hidden="true" />
+          <OverflowMenu
+            onImport={() => importMarkdownAsNewDoc(registry.importDoc)}
+            onExport={async () => {
+              if (!view || !ydoc) return;
+              const content = exportDocToMarkdown(view.state.doc, ydoc, activeDocName);
+              await saveMarkdownFile(content, activeDocName);
+            }}
+            exportDisabled={!view || !ydoc}
+          />
+        </div>
       </header>
 
       <div className="app-body" style={resizing ? { cursor: 'col-resize', userSelect: 'none' } : undefined}>

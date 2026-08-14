@@ -28,7 +28,7 @@
 }
 
 .login-brand-icon {
-  font-size: 28px;
+  font-size: var(--text-2xl);
   color: var(--nb-accent);
   display: block;
   margin-bottom: var(--space-sm);
@@ -214,7 +214,7 @@
   height: 28px;
   border: 3px solid var(--nb-border);
   border-top-color: var(--nb-accent);
-  border-radius: 50%;
+  border-radius: var(--nb-r-full);
   animation: spin 0.7s linear infinite;
 }
 

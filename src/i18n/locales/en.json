@@ -8,6 +8,9 @@
     "importTitle": "Import a Markdown file as a new document",
     "export": "Export .md",
     "exportTitle": "Export as Markdown",
+    "background": "Background image",
+    "more": "More",
+    "analytics": "Personal analytics",
     "hideEditor": "Hide editor frame",
     "showEditor": "Show editor frame",
     "resizeEditor": "Drag to resize · double-click to reset"
@@ -82,6 +85,7 @@
     }
   },
   "weekly": {
+    "kind": "Week",
     "prevWeek": "Previous week",
     "nextWeek": "Next week",
     "changeWeek": "Change week",

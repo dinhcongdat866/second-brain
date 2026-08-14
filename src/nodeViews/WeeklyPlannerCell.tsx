@@ -928,6 +928,7 @@ export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
   return (
     <div className="weekly-cell" ref={containerRef}>
       <div className="weekly-cell__header">
+        <span className="weekly-cell__kind">{t('weekly.kind')}</span>
         <div className="weekly-cell__weeknav">
           <button
             type="button"

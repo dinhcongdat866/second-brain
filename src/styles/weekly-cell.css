@@ -11,11 +11,17 @@
  * overflowed the card it visually belongs to, and read as broken. Width now
  * comes from the editor itself, which the user can drag (see .notebook-wrap).
  */
+/*
+ * Identity is the 2px rule down the left edge, not a coloured background.
+ * An inset shadow rather than a border-left: it survives the rounded corner and
+ * costs no layout, so nothing shifts when the cell is selected.
+ */
 .weekly-cell {
   background: var(--nb-weekly-bg);
   border: 1px solid var(--nb-weekly-border);
   border-radius: var(--nb-r-cell);
-  padding: 12px 14px;
+  box-shadow: inset 2px 0 0 var(--nb-weekly-accent);
+  padding: 12px 14px 12px 16px;
   /*
    * Queried by the grid below. A media query would be wrong here: the sidebar
    * is resizable, so the width this cell actually gets is not a function of the
@@ -25,8 +31,22 @@
 }
 
 .weekly-cell:focus-within {
-  border-color: var(--nb-weekly-accent);
-  box-shadow: 0 0 0 2px rgba(80, 70, 166, 0.08);
+  border-color: var(--nb-border);
+  /* Keep the identity rule and add the focus ring — replacing the shadow here
+     would make the left edge blink off whenever you click into the cell. */
+  box-shadow: inset 2px 0 0 var(--nb-weekly-accent), 0 0 0 2px rgba(80, 70, 166, 0.08);
+}
+
+/* Says which kind of cell this is, so the accent colour does not have to be
+   learned. Small, uppercase, quiet — a label, not a heading. */
+.weekly-cell__kind {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--nb-weekly-accent);
+  margin-right: 10px;
+  flex-shrink: 0;
 }
 
 .weekly-cell__header {
@@ -44,7 +64,7 @@
 }
 
 .weekly-cell__title {
-  font-size: 13px;
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--nb-weekly-accent);
   letter-spacing: 0.01em;
@@ -57,14 +77,14 @@
 }
 
 .weekly-cell__title:hover {
-  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+  background: var(--nb-weekly-today-bg);
 }
 
 .weekly-cell__weekbtn {
   background: none;
   border: none;
   color: var(--nb-weekly-accent);
-  font-size: 16px;
+  font-size: var(--text-lg);
   line-height: 1;
   cursor: pointer;
   padding: 0 4px;
@@ -74,16 +94,16 @@
 
 .weekly-cell__weekbtn:hover {
   opacity: 1;
-  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+  background: var(--nb-weekly-today-bg);
 }
 
 /* Inline date editor — shown when the week label is clicked. */
 .weekly-cell__dateedit {
-  font-size: 13px;
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--nb-weekly-accent);
   font-family: inherit;
-  background: var(--nb-bg, #fff);
+  background: var(--nb-bg-surface);
   border: 1px solid var(--nb-weekly-accent);
   border-radius: var(--nb-r-xs);
   padding: 1px 4px;
@@ -104,7 +124,7 @@
   align-items: center;
   gap: 3px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--nb-text-3);
@@ -117,7 +137,7 @@
 }
 
 .weekly-section-toggle:hover {
-  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+  background: var(--nb-weekly-today-bg);
   color: var(--nb-text-2);
 }
 
@@ -127,7 +147,7 @@
 }
 
 .weekly-section-toggle__chevron {
-  font-size: 9px;
+  font-size: var(--text-xs);
   line-height: 1;
 }
 
@@ -135,7 +155,7 @@
   background: none;
   border: none;
   color: var(--nb-text-3);
-  font-size: 16px;
+  font-size: var(--text-lg);
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;
@@ -226,7 +246,7 @@
 }
 
 .weekly-day__header {
-  font-size: 10px;
+  font-size: var(--text-xs);
   font-weight: 700;
   color: var(--nb-text-3);
   text-transform: uppercase;
@@ -273,7 +293,7 @@
 }
 
 .weekly-todo__text {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--nb-text);
   flex: 1;
   line-height: 1.5;
@@ -287,7 +307,7 @@
 }
 
 .weekly-todo__text a {
-  color: #3b6fcc;
+  color: var(--nb-link);
   text-decoration: underline;
   text-decoration-color: rgba(59, 111, 204, 0.45);
 }
@@ -301,7 +321,7 @@
 .weekly-todo__edit {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-family: inherit;
   line-height: 1.5;
   color: var(--nb-text);
@@ -319,7 +339,7 @@
    nothing shifts when they appear. */
 .weekly-todo__act {
   opacity: 0;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--nb-text-3);
   cursor: pointer;
   background: none;
@@ -331,7 +351,7 @@
 }
 
 .weekly-todo__del {
-  font-size: 13px;
+  font-size: var(--text-md);
 }
 
 .weekly-todo:hover .weekly-todo__act,
@@ -350,7 +370,7 @@
 /* ---- Add input ---- */
 
 .weekly-day__input {
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-family: inherit;
   border: none;
   border-top: 1px solid var(--nb-border-faint);
@@ -410,7 +430,7 @@
   align-items: baseline;
   gap: 0 5px;
   position: relative;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.45;
 }
 
@@ -432,7 +452,7 @@
 
 .weekly-money__pending {
   margin-left: auto;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--nb-text-3);
   font-style: italic;
 }
@@ -440,7 +460,7 @@
 /* Flagged line: the raw text stays, and no number is shown at all. */
 .weekly-money__warn {
   margin-left: auto;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--nb-money-warn);
   background: var(--nb-money-warn-bg);
   border-radius: var(--nb-r-xs);
@@ -454,7 +474,7 @@
 
 .weekly-money__del {
   opacity: 0;
-  font-size: 13px;
+  font-size: var(--text-md);
   color: var(--nb-text-3);
   cursor: pointer;
   background: none;
@@ -472,7 +492,7 @@
   display: flex;
   justify-content: space-between;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--nb-text-3);
   padding-top: 2px;
   font-variant-numeric: tabular-nums;
@@ -502,7 +522,7 @@
 }
 
 .weekly-ledger__title {
-  font-size: 11px;
+  font-size: var(--text-xs);
   color: var(--nb-text-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -513,7 +533,7 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .weekly-ledger__who {
@@ -525,7 +545,7 @@
   flex: 1;
   text-align: center;
   color: var(--nb-text-3);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -554,10 +574,10 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1;
   padding: 1px 2px;
-  border-radius: 3px;
+  border-radius: var(--nb-r-xs);
   color: var(--nb-text-3);
   opacity: 0;
   transition: opacity 0.15s;
@@ -571,7 +591,7 @@
 }
 
 .mood-picker__icon:hover {
-  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+  background: var(--nb-weekly-today-bg);
 }
 
 .mood-picker__popover {
@@ -599,23 +619,23 @@
   border: 1px solid transparent;
   border-radius: var(--nb-r-xs);
   cursor: pointer;
-  font-size: 18px;
+  font-size: var(--text-xl);
   padding: 3px 4px;
   line-height: 1;
   transition: background 0.1s, border-color 0.1s;
 }
 
 .mood-picker__emoji-btn:hover {
-  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+  background: var(--nb-weekly-today-bg);
 }
 
 .mood-picker__emoji-btn--active {
   border-color: var(--nb-weekly-accent);
-  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+  background: var(--nb-weekly-today-bg);
 }
 
 .mood-picker__note {
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-family: inherit;
   border: none;
   border-top: 1px solid var(--nb-border-faint);

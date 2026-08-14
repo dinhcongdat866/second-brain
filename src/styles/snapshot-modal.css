@@ -13,7 +13,7 @@
 .snap-modal {
   background: var(--nb-bg-surface);
   border: 1px solid var(--nb-border);
-  border-radius: 10px;
+  border-radius: var(--nb-r-cell);
   box-shadow: var(--nb-shadow-md);
   width: min(860px, 92vw);
   height: min(580px, 90vh);
@@ -32,7 +32,7 @@
 }
 
 .snap-modal__title {
-  font-size: 15px;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--nb-text);
 }
@@ -58,7 +58,7 @@
 .snap-take-btn { margin-bottom: 6px; }
 
 .snap-empty {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--nb-text-3);
   line-height: 1.55;
   margin: 4px;
@@ -80,7 +80,7 @@
 
 .snap-item__label {
   flex: 1;
-  font-size: 12.5px;
+  font-size: var(--text-md);
   color: var(--nb-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -119,7 +119,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: var(--text-md);
   color: var(--nb-text-3);
 }
 

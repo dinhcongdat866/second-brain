@@ -20,10 +20,27 @@
   --nb-text-2:        #6b6256;
   --nb-text-3:        #a89f90;
 
+  /*
+   * ── Cell canvas ──
+   * Every cell type sits on this one surface. Cells used to be colour-coded by
+   * their whole background — lavender planner, mint AI — and when every block
+   * on the page is tinted, the tint stops carrying information and the page
+   * reads as a swatch card. Worse, cool lavender and mint on warm parchment is
+   * a clash the eye registers before it reads a word.
+   *
+   * Identity moved to a 2px accent rule down the left edge plus a small label,
+   * which says both "which kind" and "which one" for a fraction of the ink.
+   * Colour is now spent on state (today, focus, error) instead.
+   *
+   * To go back to coloured cells, point --nb-weekly-bg / --nb-ai-bg at their
+   * old values (#f6f4ff and #f0faf4) — nothing else needs to change.
+   */
+  --nb-cell-canvas:      #faf5e7;
+
   /* ── AI cell — sage / mint green ── */
-  --nb-ai-bg:            #f0faf4;
+  --nb-ai-bg:            var(--nb-cell-canvas);
   --nb-ai-bg-surface:    #f8fdfb;
-  --nb-ai-border:        #bfe8cf;
+  --nb-ai-border:        var(--nb-border-faint);
   --nb-ai-border-focus:  #7ec8a0;
   --nb-ai-border-header: #d4f0e2;
   --nb-ai-accent:        #2a7a50;
@@ -34,9 +51,9 @@
   --ai-user-bubble:      rgba(0, 0, 0, 0.07);
   --nb-code-color:       #8b3e1a;
 
-  /* ── Weekly planner cell — soft lavender/indigo ── */
-  --nb-weekly-bg:       #f6f4ff;
-  --nb-weekly-border:   #d4cdf5;
+  /* ── Weekly planner cell — indigo accent on the shared canvas ── */
+  --nb-weekly-bg:       var(--nb-cell-canvas);
+  --nb-weekly-border:   var(--nb-border-faint);
   --nb-weekly-accent:   #5046a6;
   /* "Today" uses a warm amber — complementary to the cool indigo theme so it
      pops against both the lavender cell bg and the plain day columns. */
@@ -58,6 +75,12 @@
   --nb-danger-hover:  #a02020;
   --nb-danger-light:  #f87171;
 
+  /* ── Success ──
+     Was referenced as `var(--nb-success)` in three places without ever
+     being defined, so a Tailwind green rendered every time. Same green the
+     money log already uses for money coming in. */
+  --nb-success:       #2f7d4f;
+
   /* Weekend columns — a fresh mint, not a grey wash. A translucent black tint
      just dirties the paper, and reads as "disabled" for the two days that are
      the good ones. Mint is the one other clean family already in this palette
@@ -71,6 +94,30 @@
   --nb-money-in:      #2f7d4f;   /* money arriving */
   --nb-money-warn:    #9a6b00;   /* parsed, but no amount found */
   --nb-money-warn-bg: rgba(240, 180, 40, 0.14);
+
+  /* ── Links ── */
+  --nb-link:          #3b6fcc;
+  --nb-link-hover:    #2a52a0;
+
+  /* ── Status families ──
+     Backgrounds and borders that go with --nb-danger / --nb-success and the
+     warning below. These were scattered as raw hex across ai-report.css, which
+     is why that page reads slightly cooler than the rest of the app: the values
+     are Tailwind's, not this palette's. Collected here so re-tuning them is one
+     edit rather than fifteen. */
+  --nb-danger-bg:     #fef2f2;
+  --nb-danger-border: #fecaca;
+  --nb-success-bg:    #f0fdf4;
+  --nb-success-tint:  #dcfce7;
+  --nb-success-border:#86efac;
+  --nb-warning:       #a16207;
+  --nb-warning-bg:    #fffbeb;
+  --nb-warning-tint:  #fef9c3;
+  --nb-warning-border:#fde68a;
+
+  /* ── Floating dark chrome (selection toolbar) ── */
+  --nb-chrome-bg:     #1c1c1e;
+  --nb-chrome-text:   #d0d0d0;
 
   /* ── Neutral / theme-agnostic surfaces ── */
   --nb-white:         #ffffff;
@@ -88,14 +135,22 @@
   --space-2xl:  24px;
   --space-3xl:  32px;
 
-  /* ── Typography ── */
+  /*
+   * ── Typography ──
+   *
+   * Every step has ONE role. The app had drifted to ten sizes inside a 10–18px
+   * band (10, 11, 12, 13, 13.5, 14, 15, 16, 17, 18) with nothing to say which
+   * was which — and sizes a reader cannot tell apart on purpose read as noise
+   * rather than hierarchy. Pick by role, never by eye.
+   */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --text-xs:    11px;
-  --text-sm:    12px;
-  --text-md:    13px;
-  --text-base:  14px;
-  --text-lg:    16px;
-  --text-xl:    20px;
+  --text-xs:    11px;   /* uppercase labels, badges, metadata */
+  --text-sm:    12px;   /* secondary UI, dense chrome */
+  --text-md:    13px;   /* default UI text — buttons, sidebar, controls */
+  --text-base:  14px;   /* editor body, anything meant to be read */
+  --text-lg:    16px;   /* section titles, h3 */
+  --text-xl:    20px;   /* page titles, h2 */
+  --text-2xl:   26px;   /* h1 */
   --weight-normal:    400;
   --weight-medium:    500;
   --weight-semibold:  600;
