@@ -22,6 +22,7 @@ import {
   type MoneyEntryData,
 } from '../collab/weeklyPlans';
 import { getApiKey } from '../lib/apiKey';
+import { deleteMoneyEntryRow } from '../lib/backendSync';
 import { LLM_TIMEOUT_MS } from '../lib/config';
 import { apiFetch } from '../lib/http';
 
@@ -72,12 +73,7 @@ function hasUnparsedEntry(ydoc: Y.Doc): boolean {
   return false;
 }
 
-interface StoredEntry {
-  entry_id: string;
-  raw_text: string | null;
-  taxonomy_version: number | null;
-}
-
+/** The shape both GET /money/entries and POST /money/parse return per line. */
 interface ParsedResult {
   entry_id: string;
   amount: number | null;
@@ -85,6 +81,26 @@ interface ParsedResult {
   counterparty: string | null;
   debt_delta: number;
   status: MoneyEntryData['status'];
+}
+
+/** A parsed row as GET /money/entries returns it — same fields plus provenance. */
+interface StoredEntry extends ParsedResult {
+  raw_text: string | null;
+  taxonomy_version: number | null;
+}
+
+/** Turn a backend row into the fields the Y.Doc entry carries. */
+function toPatch(row: ParsedResult, text: string): Partial<MoneyEntryData> {
+  return {
+    amount:       row.amount,
+    category:     row.category,
+    counterparty: row.counterparty,
+    debtDelta:    row.debt_delta,
+    status:       row.status,
+    // Records what this result was derived from: edit the text and the
+    // dirty-check fires again, leave it alone and this line stays free.
+    parsedFrom:   text,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -119,17 +135,34 @@ async function syncMoney(ydoc: Y.Doc): Promise<void> {
   const stored: StoredEntry[] = await res.json();
   const storedMap = new Map(stored.map((r) => [r.entry_id, r]));
 
-  // 3. Dirty list.
-  const dirty = pending.filter((entry) => {
-    const row = storedMap.get(entry.id);
-    return (
-      row === undefined ||                                              // new line
-      row.raw_text !== entry.text ||                                    // text edited
-      (row.taxonomy_version ?? 0) < CURRENT_MONEY_TAXONOMY_VERSION ||   // taxonomy bumped
-      entry.parsedFrom !== entry.text                                   // Y.Doc copy stale
-    );
-  });
+  // 3. Split what needs the model from what the DB can already answer.
+  //
+  // These are different questions and conflating them costs real money. The DB
+  // row can be current while the Y.Doc copy is not — that is exactly what
+  // happens when the tab closes after /money/parse wrote its row but before the
+  // response came back. Treating that as "dirty" re-ran the whole parse and
+  // billed the user a second time to be told the same thing.
+  const needsModel: MoneyEntryData[] = [];
+  const canCopy: Array<{ entry: MoneyEntryData; row: StoredEntry }> = [];
 
+  for (const entry of pending) {
+    const row = storedMap.get(entry.id);
+    const rowIsCurrent =
+      row !== undefined &&
+      row.raw_text === entry.text &&
+      (row.taxonomy_version ?? 0) >= CURRENT_MONEY_TAXONOMY_VERSION;
+
+    if (!rowIsCurrent) { needsModel.push(entry); continue; }
+    if (entry.parsedFrom !== entry.text) canCopy.push({ entry, row: row! });
+    // else: DB and Y.Doc agree — nothing to do, and nothing to pay for.
+  }
+
+  // Copy first: free, and it clears the common case before anything is billed.
+  for (const { entry, row } of canCopy) {
+    updateMoneyEntry(ydoc, entry.id, toPatch(row, entry.text));
+  }
+
+  const dirty = needsModel;
   if (dirty.length === 0) return;
 
   // 4. Parse in batches, writing each batch back before starting the next so a
@@ -151,22 +184,31 @@ async function syncMoney(ydoc: Y.Doc): Promise<void> {
     const { results } = (await parseRes.json()) as { results: ParsedResult[] };
     const byId = new Map(results.map((r) => [r.entry_id, r]));
 
+    const live = ydoc.getMap<Y.Map<unknown>>(MONEY_LOG_KEY);
+
     for (const entry of batch) {
       const r = byId.get(entry.id);
       if (!r) continue;
-      updateMoneyEntry(ydoc, entry.id, {
-        amount:       r.amount,
-        category:     r.category,
-        counterparty: r.counterparty,
-        debtDelta:    r.debt_delta,
-        status:       r.status,
-        // Records what this result was derived from: edit the text and the
-        // dirty-check fires again, leave it alone and this line stays free.
-        parsedFrom:   entry.text,
-      });
+      // The line can be deleted while its batch is in flight — typing something,
+      // seeing it is wrong and removing it is exactly what people do during the
+      // seconds this call takes. The parse upserted a row for it anyway, so that
+      // row has to go, or it sits in money_entries with nothing in the document
+      // pointing at it, still counted by SUM(debt_delta) in the ledger.
+      // Checking the map rather than the deleted id also cleans up lines another
+      // device removed while this one was parsing.
+      if (!live.has(entry.id)) { deleteMoneyEntryRow(entry.id); continue; }
+      updateMoneyEntry(ydoc, entry.id, toPatch(r, entry.text));
     }
   }
 }
+
+/**
+ * The sync pass, exposed for tests. Everything worth asserting here — that a
+ * line already answered by the DB is not re-billed, that a line deleted
+ * mid-flight has its row removed — lives in this function rather than in the
+ * hook wrapper around it.
+ */
+export const syncMoneyForTest = syncMoney;
 
 // ---------------------------------------------------------------------------
 // Hook

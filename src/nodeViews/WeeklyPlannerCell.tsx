@@ -42,6 +42,7 @@ import {
 } from '../lib/toolbarStyles';
 import { SelectionToolbarShell } from '../components/SelectionToolbarShell';
 import { moneyCategoryLabel } from '../lib/moneyTaxonomy';
+import { deleteMoneyEntryRow } from '../lib/backendSync';
 import { apiFetch } from '../lib/http';
 
 // ---------------------------------------------------------------------------
@@ -574,9 +575,10 @@ function DayColumn({
   const handleMoneyDelete = useCallback((id: string) => {
     deleteMoneyEntry(ydoc, id);
     // Drop the SQL projection too, or the entry keeps counting toward monthly
-    // totals and the debt ledger after it has left the document.
-    void apiFetch(`/money/entries/${encodeURIComponent(id)}`, { method: 'DELETE' })
-      .catch(() => { /* offline — a later parse of the surviving lines is still correct */ });
+    // totals and the debt ledger after it has left the document. If a parse for
+    // this line is in flight it will re-create the row after this DELETE lands;
+    // useMoneySync notices the line is gone and removes it again.
+    deleteMoneyEntryRow(id);
   }, [ydoc]);
 
   // Recomputed every render, never stored: two devices each adding to a saved

@@ -340,6 +340,17 @@ export function deleteImage(imageUrl: string): void {
   apiFetch(`/images/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
 }
 
+/**
+ * Drop the SQL projection of a money line that has left the document.
+ *
+ * Fire-and-forget: the Y.Doc is the source of truth, so a failure here only
+ * leaves a stale row, which the next sync pass will try again to remove.
+ */
+export function deleteMoneyEntryRow(entryId: string): void {
+  apiFetch(`/money/entries/${encodeURIComponent(entryId)}`, { method: 'DELETE' })
+    .catch(() => { /* offline — retried on a later pass */ });
+}
+
 /** Remove all images belonging to a deleted document. */
 export function deleteDocImages(docId: string, token?: string | null): void {
   deleteWithToken(`/images/by-doc/${encodeURIComponent(docId)}`, token);
