@@ -26,6 +26,24 @@ import { useMoneySync } from './hooks/useMoneySync';
 import { usePlannerYdoc } from './hooks/usePlannerYdoc';
 import './styles/main.css';
 
+// ---------------------------------------------------------------------------
+// Editor width — user-set, persisted
+// ---------------------------------------------------------------------------
+
+const EDITOR_WIDTH_KEY = 'editorWidth';
+/** Comfortable measure for prose; the width the editor has always had. */
+const DEFAULT_EDITOR_WIDTH = 960;
+/** Below this, prose is cramped and the weekly grid folds to two per row anyway. */
+const MIN_EDITOR_WIDTH = 520;
+
+function readStoredEditorWidth(): number {
+  try {
+    const stored = Number(localStorage.getItem(EDITOR_WIDTH_KEY));
+    if (Number.isFinite(stored) && stored >= MIN_EDITOR_WIDTH) return stored;
+  } catch { /* private mode — fall through to the default */ }
+  return DEFAULT_EDITOR_WIDTH;
+}
+
 function CellAdder({
   view,
   ydoc,
@@ -81,6 +99,10 @@ function App() {
   const [sidebarWidth, setSidebarWidth] = useState(220);
   const [editorHidden, setEditorHidden] = useState(false);
   const [resizing, setResizing] = useState(false);
+  // Persisted, unlike the sidebar: this is a per-person reading preference, and
+  // having to widen the editor again on every load would make it not worth using.
+  const [editorWidth, setEditorWidth] = useState(readStoredEditorWidth);
+  const mainRef = useRef<HTMLElement>(null);
   const saveStatus = useUIStore((s) => s.saveStatus);
 
   const startSidebarResize = useCallback((e: React.MouseEvent) => {
@@ -101,6 +123,44 @@ function App() {
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
   }, [sidebarWidth]);
+
+  /**
+   * Drag either edge of the editor to set its width.
+   *
+   * `side` is which edge was grabbed. The wrap is centred, so growing it by one
+   * pixel moves each edge by half — the delta is doubled so the edge stays under
+   * the cursor instead of lagging behind it at half speed.
+   *
+   * The upper bound is the space actually available right now, measured from the
+   * main column, so a wide editor can never be dragged out past the window or
+   * under the sidebar.
+   */
+  const startEditorResize = useCallback((side: 'left' | 'right') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = editorWidth;
+    const available = (mainRef.current?.clientWidth ?? window.innerWidth) - 32;
+    setResizing(true);
+
+    const onMove = (ev: MouseEvent) => {
+      const delta = (ev.clientX - startX) * (side === 'right' ? 2 : -2);
+      setEditorWidth(Math.max(MIN_EDITOR_WIDTH, Math.min(available, startWidth + delta)));
+    };
+    const onUp = () => {
+      setResizing(false);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [editorWidth]);
+
+  /** Double-click a handle to go back to the default reading width. */
+  const resetEditorWidth = useCallback(() => setEditorWidth(DEFAULT_EDITOR_WIDTH), []);
+
+  useEffect(() => {
+    try { localStorage.setItem(EDITOR_WIDTH_KEY, String(editorWidth)); } catch { /* private mode */ }
+  }, [editorWidth]);
 
   // Reset editor visibility when switching documents.
   useEffect(() => { setEditorHidden(false); }, [registry.activeDocId]);
@@ -215,10 +275,26 @@ function App() {
           </>
         )}
         <main
+          ref={mainRef}
           className={`app-main${activeDocBg ? ' app-main--bg' : ''}`}
           style={activeDocBg ? { backgroundImage: `url(${activeDocBg})` } : undefined}
         >
-          <div className={`notebook-wrap${editorHidden ? ' notebook-wrap--hidden' : ''}`}>
+          <div
+            className={`notebook-wrap${editorHidden ? ' notebook-wrap--hidden' : ''}`}
+            style={{ width: editorWidth, maxWidth: '100%' }}
+          >
+            <div
+              className={`editor-resize-handle editor-resize-handle--left${resizing ? ' editor-resize-handle--dragging' : ''}`}
+              onMouseDown={startEditorResize('left')}
+              onDoubleClick={resetEditorWidth}
+              title={t('app.resizeEditor')}
+            />
+            <div
+              className={`editor-resize-handle editor-resize-handle--right${resizing ? ' editor-resize-handle--dragging' : ''}`}
+              onMouseDown={startEditorResize('right')}
+              onDoubleClick={resetEditorWidth}
+              title={t('app.resizeEditor')}
+            />
             {/* editorRef must stay mounted for the EditorView to attach; the
                 loading overlay sits on top until the doc has synced + bound. */}
             <div ref={editorRef} className="notebook-editor" />

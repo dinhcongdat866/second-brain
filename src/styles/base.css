@@ -69,14 +69,50 @@ body {
   background-attachment: fixed;
 }
 
-/* Wraps editor + cell adder, constrains max-width */
+/* Wraps editor + cell adder. Width is set inline from App state (user-dragged,
+   persisted); the 960px that used to be hard-coded here is now its default. */
 .notebook-wrap {
-  width: 100%;
-  max-width: 960px;
   display: flex;
   flex-direction: column;
   position: relative;
   transition: opacity var(--dur-base) var(--ease);
+}
+
+/*
+ * Grab either edge to set the editor width; double-click to reset.
+ *
+ * Sits outside the card (negative offset) so it never covers content or steals
+ * clicks meant for a cell, and stays invisible until pointed at — the app has
+ * one of these on the sidebar already and this reads the same way.
+ */
+.editor-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.editor-resize-handle--left  { left: -14px; }
+.editor-resize-handle--right { right: -14px; }
+
+.editor-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--nb-weekly-accent);
+  opacity: 0;
+  transition: opacity var(--dur-base, 0.15s) var(--ease, ease);
+}
+
+.editor-resize-handle:hover::after,
+.editor-resize-handle--dragging::after {
+  opacity: 0.35;
 }
 
 .notebook-wrap--hidden {

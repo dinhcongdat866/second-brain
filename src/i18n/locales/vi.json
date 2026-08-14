@@ -9,7 +9,8 @@
     "export": "Xuất .md",
     "exportTitle": "Xuất ra Markdown",
     "hideEditor": "Ẩn khung editor",
-    "showEditor": "Hiện khung editor"
+    "showEditor": "Hiện khung editor",
+    "resizeEditor": "Kéo để đổi bề rộng · bấm đúp để về mặc định"
   },
   "cellAdder": {
     "markdown": "+ Markdown",
@@ -86,7 +87,8 @@
     "changeWeek": "Đổi tuần",
     "deleteCell": "Xoá cell",
     "add": "Thêm…",
-    "editHint": "Bấm đúp để sửa",
+    "editTodo": "Sửa",
+    "deleteTodo": "Xoá",
     "addMoney": "+ tiền…",
     "dayTotal": "Cả ngày",
     "partialTotal": "Chưa tính hết — còn dòng chưa có số tiền",

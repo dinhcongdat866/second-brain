@@ -506,13 +506,25 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const editRef = useRef<HTMLInputElement>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Grow the box to fit its content, so no part of a long todo is hidden. */
+  const fitToContent = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  };
 
   useEffect(() => {
     if (!editingId) return;
     const el = editRef.current;
-    el?.focus();
-    el?.select();
+    if (!el) return;
+    fitToContent(el);
+    el.focus();
+    // Caret at the end rather than selecting everything: a full selection means
+    // the next keystroke wipes the todo, which is alarming when the point was
+    // to fix one word.
+    el.setSelectionRange(el.value.length, el.value.length);
   }, [editingId]);
 
   const startEdit = (todo: TodoData) => {
@@ -527,12 +539,12 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
     setEditingId(null);
   };
 
-  const handleEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     e.stopPropagation();
-    if (e.key === 'Enter') { commitEdit(); return; }
-    // Escape drops the draft. Blur (below) saves, so this is the only way out
-    // that discards — worth having, since the input starts fully selected and
-    // one keystroke can wipe the line.
+    // Enter saves rather than inserting a newline: a todo is one line of text,
+    // and the renderer has no notion of a line break inside one.
+    if (e.key === 'Enter') { e.preventDefault(); commitEdit(); return; }
+    // Escape drops the draft; blur saves. This is the only way out that discards.
     if (e.key === 'Escape') setEditingId(null);
   };
 
@@ -597,11 +609,15 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
               onKeyDown={(e) => e.stopPropagation()}
             />
             {editingId === todo.id ? (
-              <input
+              // A textarea, not an input: it grows to fit, so a long todo is
+              // fully visible while being edited instead of scrolling inside a
+              // one-line box.
+              <textarea
                 ref={editRef}
+                rows={1}
                 className="weekly-todo__edit"
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => { setDraft(e.target.value); fitToContent(e.target); }}
                 onKeyDown={handleEditKeyDown}
                 onBlur={commitEdit}
                 onClick={(e) => e.stopPropagation()}
@@ -611,19 +627,28 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
                 data-todo-id={todo.id}
                 data-day={day}
                 className={`weekly-todo__text${todo.done ? ' weekly-todo__text--done' : ''}`}
-                // Double-click, not click: selecting text inside this span is
-                // what drives the formatting toolbar, so a single click has to
-                // keep meaning "select". Same idiom as renaming a document.
-                onDoubleClick={() => startEdit(todo)}
-                title={t('weekly.editHint')}
                 dangerouslySetInnerHTML={{ __html: renderMd(todo.text) }}
               />
             )}
+            {editingId !== todo.id && (
+              <button
+                type="button"
+                className="weekly-todo__act"
+                // A visible button, not a double-click: a hidden gesture is one
+                // nobody discovers, and here it also competes with the click
+                // people use to select text for the formatting toolbar.
+                // onMouseDown, so the button wins before the span's selection.
+                onMouseDown={(e) => { e.preventDefault(); startEdit(todo); }}
+                title={t('weekly.editTodo')}
+              >
+                ✎
+              </button>
+            )}
             <button
               type="button"
-              className="weekly-todo__del"
+              className="weekly-todo__act weekly-todo__del"
               onClick={() => deleteTodo(plan, weekStart, day, todo.id)}
-              title="Delete"
+              title={t('weekly.deleteTodo')}
             >
               ×
             </button>

@@ -5,22 +5,12 @@
 }
 
 /*
- * Prose wants a narrow measure; a seven-column week does not. The editor column
- * is capped at 960px (.notebook-wrap), which leaves ~121px per day — narrow
- * enough that Vietnamese wraps every two or three words. On a wide screen this
- * cell breaks out of that cap, buying each day roughly a third more width.
- *
- * Only above 1280px, so it can never push past the viewport on the laptop
- * widths where 960px is already most of the screen.
+ * The cell stays inside the editor card. An earlier version widened it past the
+ * card with negative margins to buy the day columns room; measuring showed it
+ * did not overflow the viewport, which was the wrong thing to measure — it
+ * overflowed the card it visually belongs to, and read as broken. Width now
+ * comes from the editor itself, which the user can drag (see .notebook-wrap).
  */
-@media (min-width: 1280px) {
-  .weekly-cell-wrapper {
-    width: calc(100% + 200px);
-    margin-left: -100px;
-    margin-right: -100px;
-  }
-}
-
 .weekly-cell {
   background: var(--nb-weekly-bg);
   border: 1px solid var(--nb-weekly-border);
@@ -236,8 +226,12 @@
   text-decoration-color: rgba(59, 111, 204, 0.45);
 }
 
-/* Inline editor — sits exactly where the rendered text was, so opening it does
-   not shift the row. Shows raw source, markers included. */
+/*
+ * Inline editor. A textarea that grows to fit (height is set from scrollHeight
+ * in JS), so the whole todo stays visible while editing — a one-line input hid
+ * everything past the first line, which is most todos at this column width.
+ * `resize: none` because the height is driven by content, not by a drag.
+ */
 .weekly-todo__edit {
   flex: 1;
   min-width: 0;
@@ -248,25 +242,39 @@
   background: var(--nb-bg-surface);
   border: 1px solid var(--nb-weekly-accent);
   border-radius: var(--nb-r-xs);
-  padding: 0 3px;
+  padding: 1px 3px;
   outline: none;
+  resize: none;
+  overflow: hidden;
+  display: block;
 }
 
-.weekly-todo__del {
+/* Row actions (edit, delete) — revealed on hover, but always in the layout so
+   nothing shifts when they appear. */
+.weekly-todo__act {
   opacity: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--nb-text-3);
   cursor: pointer;
   background: none;
   border: none;
-  padding: 0;
+  padding: 0 1px;
   line-height: 1;
   flex-shrink: 0;
   transition: opacity 0.1s, color 0.1s;
 }
 
-.weekly-todo:hover .weekly-todo__del {
+.weekly-todo__del {
+  font-size: 13px;
+}
+
+.weekly-todo:hover .weekly-todo__act,
+.weekly-todo__act:focus-visible {
   opacity: 1;
+}
+
+.weekly-todo__act:hover {
+  color: var(--nb-weekly-accent);
 }
 
 .weekly-todo__del:hover {

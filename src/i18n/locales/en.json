@@ -9,7 +9,8 @@
     "export": "Export .md",
     "exportTitle": "Export as Markdown",
     "hideEditor": "Hide editor frame",
-    "showEditor": "Show editor frame"
+    "showEditor": "Show editor frame",
+    "resizeEditor": "Drag to resize · double-click to reset"
   },
   "cellAdder": {
     "markdown": "+ Markdown",
@@ -86,7 +87,8 @@
     "changeWeek": "Change week",
     "deleteCell": "Delete cell",
     "add": "Add…",
-    "editHint": "Double-click to edit",
+    "editTodo": "Edit",
+    "deleteTodo": "Delete",
     "addMoney": "+ money…",
     "dayTotal": "All day",
     "partialTotal": "Incomplete — some lines have no amount yet",
