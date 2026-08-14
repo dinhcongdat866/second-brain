@@ -81,11 +81,16 @@ function inlineMarks(s: string): string {
     .replace(/`([^`]+)`/g, '<code>$1</code>');
 }
 
-function renderMd(raw: string): string {
-  const esc = raw
+/** Text as itself, safe to hand to dangerouslySetInnerHTML. */
+function escapeHtml(raw: string): string {
+  return raw
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+function renderMd(raw: string): string {
+  const esc = escapeHtml(raw);
 
   // Pull links out to placeholders BEFORE running inline marks: this keeps mark
   // syntax inside URLs (e.g. `a_b`) intact and prevents the generated
@@ -177,7 +182,11 @@ function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelecti
       const node = range.startContainer;
       const span = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Element)
         ?.closest('[data-todo-id]');
-      if (!span) {
+      // While a todo is being edited its span holds the RAW source, not the
+      // rendered text. The offsets below are visible-text offsets mapped back
+      // through the stored string, so acting on them here would apply markers
+      // at the wrong places. The toolbar simply stays out of the way.
+      if (!span || (span as HTMLElement).isContentEditable) {
         setToolbarPos(null);
         savedFormatRef.current = null;
         return;
@@ -513,49 +522,46 @@ function DayColumn({
   const { t } = useTranslation();
   const [input, setInput] = useState('');
   const [moneyInput, setMoneyInput] = useState('');
-  // Which todo is open for editing, and the uncommitted draft of its raw text.
+  // Which todo is open for editing. There is no draft state: the text being
+  // edited lives in the DOM, in the same element that renders it the rest of
+  // the time — see the contentEditable span below.
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const editRef = useRef<HTMLTextAreaElement>(null);
-
-  /** Grow the box to fit its content, so no part of a long todo is hidden. */
-  const fitToContent = (el: HTMLTextAreaElement | null) => {
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  };
+  const editRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (!editingId) return;
     const el = editRef.current;
     if (!el) return;
-    fitToContent(el);
     el.focus();
     // Caret at the end rather than selecting everything: a full selection means
     // the next keystroke wipes the todo, which is alarming when the point was
     // to fix one word.
-    el.setSelectionRange(el.value.length, el.value.length);
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
   }, [editingId]);
 
-  const startEdit = (todo: TodoData) => {
-    // The raw source, not the rendered HTML: what you edit is what is stored,
-    // markers and all, which is the same string formatTodoText works on.
-    setDraft(todo.text);
-    setEditingId(todo.id);
-  };
+  const startEdit = (todo: TodoData) => setEditingId(todo.id);
 
   const commitEdit = () => {
-    if (editingId) updateTodoText(plan, weekStart, day, editingId, draft);
+    // Read the text out of the element itself. `textContent` is exactly the raw
+    // source, because that is what was put in — markers and all, the same
+    // string formatTodoText operates on.
+    const next = editRef.current?.textContent ?? '';
+    if (editingId) updateTodoText(plan, weekStart, day, editingId, next);
     setEditingId(null);
   };
 
-  const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleEditKeyDown = (e: KeyboardEvent<HTMLSpanElement>) => {
     e.stopPropagation();
-    // Enter saves rather than inserting a newline: a todo is one line of text,
-    // and the renderer has no notion of a line break inside one.
+    // Enter saves rather than inserting a line break: a todo is one line of
+    // text, and the renderer has no notion of a break inside one.
     if (e.key === 'Enter') { e.preventDefault(); commitEdit(); return; }
-    // Escape drops the draft; blur saves. This is the only way out that discards.
+    // Escape drops the edit; blur saves. This is the only way out that discards.
     if (e.key === 'Escape') setEditingId(null);
   };
 
@@ -621,28 +627,43 @@ function DayColumn({
               onChange={() => toggleTodo(plan, weekStart, day, todo.id)}
               onKeyDown={(e) => e.stopPropagation()}
             />
-            {editingId === todo.id ? (
-              // A textarea, not an input: it grows to fit, so a long todo is
-              // fully visible while being edited instead of scrolling inside a
-              // one-line box.
-              <textarea
-                ref={editRef}
-                rows={1}
-                className="weekly-todo__edit"
-                value={draft}
-                onChange={(e) => { setDraft(e.target.value); fitToContent(e.target); }}
-                onKeyDown={handleEditKeyDown}
-                onBlur={commitEdit}
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <span
-                data-todo-id={todo.id}
-                data-day={day}
-                className={`weekly-todo__text${todo.done ? ' weekly-todo__text--done' : ''}`}
-                dangerouslySetInnerHTML={{ __html: renderMd(todo.text) }}
-              />
-            )}
+            {/*
+              One element, editable or not — never a swap.
+              Editing used to replace this span with a textarea, and a textarea
+              carries an intrinsic width from its `cols` default that a 92px day
+              column cannot absorb, so opening the editor pushed the column out
+              of shape. Nothing about a caret requires a different box: the same
+              span takes one, keeps its width, its wrapping and its place in the
+              row, and the layout has no opportunity to move.
+
+              What it shows while editing is the raw source rather than the
+              rendered result — `**bold**`, `{c=#1971c2}…{/c}` and all — because
+              that is the string being edited and the one formatTodoText works
+              on. React sets it once via the html prop below and then leaves it
+              alone (the prop does not change while editing, since nothing is
+              written until commit), so typing is never clobbered mid-word.
+            */}
+            <span
+              ref={editingId === todo.id ? editRef : undefined}
+              data-todo-id={todo.id}
+              data-day={day}
+              className={`weekly-todo__text${todo.done ? ' weekly-todo__text--done' : ''}`}
+              contentEditable={editingId === todo.id}
+              suppressContentEditableWarning
+              onKeyDown={editingId === todo.id ? handleEditKeyDown : undefined}
+              onBlur={editingId === todo.id ? commitEdit : undefined}
+              // A contentEditable accepts pasted HTML by default, which would
+              // put markup this renderer never produced into the stored text.
+              onPaste={(e) => {
+                if (editingId !== todo.id) return;
+                e.preventDefault();
+                const text = e.clipboardData.getData('text/plain').replace(/\s+/g, ' ');
+                document.execCommand('insertText', false, text);
+              }}
+              dangerouslySetInnerHTML={{
+                __html: editingId === todo.id ? escapeHtml(todo.text) : renderMd(todo.text),
+              }}
+            />
             {editingId !== todo.id && (
               <button
                 type="button"

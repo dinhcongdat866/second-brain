@@ -313,26 +313,36 @@
 }
 
 /*
- * Inline editor. A textarea that grows to fit (height is set from scrollHeight
- * in JS), so the whole todo stays visible while editing — a one-line input hid
- * everything past the first line, which is most todos at this column width.
- * `resize: none` because the height is driven by content, not by a drag.
+ * Editing state — the same element, with a caret in it.
+ *
+ * This used to be a separate textarea, and that was the bug: a textarea brings
+ * an intrinsic width from its `cols` default, which a 92px day column cannot
+ * absorb, so opening the editor pushed the column out of shape. Nothing here
+ * changes the box. No width, no display, no padding that would reflow the row —
+ * only a ring and a paler surface, so the element that was reading as text now
+ * reads as text you can type in.
+ *
+ * The ring is a box-shadow rather than a border for the same reason: a border
+ * occupies layout, and one appearing on click would shift every todo below it.
  */
-.weekly-todo__edit {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--text-sm);
-  font-family: inherit;
-  line-height: 1.5;
-  color: var(--nb-text);
+.weekly-todo__text[contenteditable='true'] {
   background: var(--nb-bg-surface);
-  border: 1px solid var(--nb-weekly-accent);
   border-radius: var(--nb-r-xs);
-  padding: 1px 3px;
+  box-shadow: 0 0 0 1px var(--nb-weekly-accent);
   outline: none;
-  resize: none;
-  overflow: hidden;
-  display: block;
+  cursor: text;
+  /* Raw source is shown while editing, so leading spaces and runs of spaces are
+     part of what is being edited and must survive. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* A finished todo is struck through; the strike would follow the raw markers
+   around while editing, which makes the text harder to read exactly when it
+   needs to be read. */
+.weekly-todo__text--done[contenteditable='true'] {
+  text-decoration: none;
+  color: var(--nb-text);
 }
 
 /* Row actions (edit, delete) — revealed on hover, but always in the layout so
