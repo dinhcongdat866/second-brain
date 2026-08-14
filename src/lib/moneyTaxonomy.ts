@@ -23,6 +23,14 @@ export const MONEY_CAT = {
   BORROWING:      'Borrowing',
   DEBT_REPAYMENT: 'Debt Repayment',
   OTHER:          'Other',
+  /**
+   * Client-generated only. The parser never returns it and the backend has
+   * never heard of it: a balance correction is bookkeeping, not something that
+   * happened to your money. moneyStats excludes it from every figure, because
+   * counting a −200.000 correction as spending would make fixing your wallet
+   * look like a shopping trip.
+   */
+  ADJUSTMENT:     'Balance Adjustment',
 } as const;
 
 export type MoneyCategoryName = (typeof MONEY_CAT)[keyof typeof MONEY_CAT];
@@ -42,6 +50,7 @@ const I18N_KEY: Record<string, string> = {
   [MONEY_CAT.BORROWING]:      'borrowing',
   [MONEY_CAT.DEBT_REPAYMENT]: 'debtRepayment',
   [MONEY_CAT.OTHER]:          'other',
+  [MONEY_CAT.ADJUSTMENT]:     'adjustment',
 };
 
 /**

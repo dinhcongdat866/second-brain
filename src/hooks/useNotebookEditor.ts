@@ -41,6 +41,7 @@ import { imagePastePlugin } from '../plugins/imagePastePlugin';
 import { AiCellView } from '../nodeViews/aiCellView';
 import { MarkdownCellView } from '../nodeViews/markdownCellView';
 import { WeeklyCellView } from '../nodeViews/weeklyCellView';
+import { MoneyCellView } from '../nodeViews/moneyCellView';
 import { startAutoSnapshot } from '../collab/snapshots';
 import {
   createCollabSetup,
@@ -175,6 +176,7 @@ function bindEditor(
         markdown_cell: (node, view, getPos) => new MarkdownCellView(node, view, getPos),
         ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext, appendMemory, getAnalyticsContext, planner),
         weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, planner, isGuest),
+        money_cell: (node, view, getPos) => new MoneyCellView(node, view, getPos, planner, isGuest),
       },
       handleDOMEvents: {
         click(_view, event) {

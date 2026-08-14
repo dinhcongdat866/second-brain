@@ -1,5 +1,6 @@
 import * as Y from 'yjs';
 import { STYLE_OPEN_RE, STYLE_CLOSE_RE, type StyleKind } from '../lib/toolbarStyles';
+import { MONEY_CAT } from '../lib/moneyTaxonomy';
 
 export const WEEKLY_PLANS_KEY = 'weeklyPlans';
 
@@ -376,7 +377,9 @@ function stripStyleMarkers(text: string): string {
   return text.replace(/\{[^}]*\}/g, '');
 }
 
-const MOOD_EMOJIS: Record<number, string> = { 1: '😴', 2: '😞', 3: '😐', 4: '🙂', 5: '🔥' };
+/** One face per energy score. Shared so the planner, the AI serializer and the
+ *  money cell cannot drift into showing three different faces for a 3. */
+export const MOOD_EMOJIS: Record<number, string> = { 1: '😴', 2: '😞', 3: '😐', 4: '🙂', 5: '🔥' };
 
 /**
  * Serialize up to `maxWeeks` most-recent non-empty weeks from this plan.
@@ -538,6 +541,13 @@ export interface MoneyEntryData {
   status: 'ok' | 'needs_amount';
   /** Snapshot of `text` when parsed; drives the dirty-check in useMoneySync. */
   parsedFrom: string | null;
+  /**
+   * Which wallet this line moved money through, or null for lines written
+   * before wallets existed (and for anyone who never made a second wallet).
+   * null belongs to the default wallet — see walletBalance — so adding wallets
+   * never had to rewrite a single existing entry.
+   */
+  walletId: string | null;
   /** Insertion order within a day — a flat map has no inherent order. */
   createdAt: number;
 }
@@ -562,6 +572,7 @@ function readMoneyEntry(entry: YMoneyEntry): MoneyEntryData {
     debtDelta:    (entry.get('debtDelta') as number | undefined) ?? 0,
     status:       (entry.get('status') as MoneyEntryData['status'] | undefined) ?? 'needs_amount',
     parsedFrom:   (entry.get('parsedFrom') as string | undefined) ?? null,
+    walletId:     (entry.get('walletId') as string | undefined) ?? null,
     createdAt:    (entry.get('createdAt') as number | undefined) ?? 0,
   };
 }
@@ -574,7 +585,12 @@ const byCreatedAt = (a: MoneyEntryData, b: MoneyEntryData) => a.createdAt - b.cr
  * never waits on the network.
  * Returns the new entry's id (also the Postgres primary key).
  */
-export function addMoneyEntry(ydoc: Y.Doc, date: string, text: string): string {
+export function addMoneyEntry(
+  ydoc: Y.Doc,
+  date: string,
+  text: string,
+  walletId: string | null = null,
+): string {
   const id = crypto.randomUUID();
   const entry: YMoneyEntry = new Y.Map();
   entry.set('id', id);
@@ -586,6 +602,7 @@ export function addMoneyEntry(ydoc: Y.Doc, date: string, text: string): string {
   entry.set('debtDelta', 0);
   entry.set('status', 'needs_amount');
   entry.set('parsedFrom', null);
+  entry.set('walletId', walletId);
   entry.set('createdAt', Date.now());
   // A uuid key, so two devices adding at once write different keys and both
   // survive. This is the whole reason the map is flat.
@@ -643,10 +660,218 @@ export function moneyTotal(entries: MoneyEntryData[]): number {
   return entries.reduce((sum, e) => sum + (e.amount ?? 0), 0);
 }
 
+/** Every money entry as one flat list — the input every function in moneyStats takes. */
+export function readMoneyAll(ydoc: Y.Doc): MoneyEntryData[] {
+  const out: MoneyEntryData[] = [];
+  moneyMap(ydoc).forEach((raw) => out.push(readMoneyEntry(raw)));
+  return out.sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+}
+
 /** '-85000' → '−85.000'. Uses the real minus sign so it lines up with '+'. */
 export function formatDong(amount: number): string {
   const sign = amount < 0 ? '−' : '+';
   return `${sign}${Math.abs(amount).toLocaleString('vi-VN')}`;
+}
+
+// ---------------------------------------------------------------------------
+// Wallets — a FLAT top-level map, keyed by wallet id
+//   ydoc.getMap('moneyWallets') → Y.Map<walletId, Y.Map{…WalletData}>
+//
+// Same shape as moneyLog, for the same reason: a nested container would have to
+// be created by whoever writes first, and two offline devices creating it is a
+// same-key conflict that throws one side's whole map away.
+//
+// A wallet has NO stored balance. The balance is the sum of the entries that
+// moved through it, recomputed every time — the one hard rule this feature has
+// followed since the debt ledger, because a counter two devices both increment
+// is wrong forever with no way to tell afterwards.
+//
+// Correcting a wallet therefore writes an *entry*, not a number: the difference
+// between what the app thinks you have and what you actually have becomes a
+// dated line like any other. You get the correction you asked for, the balance
+// stays a pure sum, and the history says when it drifted and by how much.
+// ---------------------------------------------------------------------------
+
+export interface WalletData {
+  id: string;
+  name: string;
+  /** One emoji, shown before the name. Purely decorative. */
+  icon: string;
+  /** Creation time doubles as sort order and picks the default wallet. */
+  createdAt: number;
+}
+
+export const WALLETS_KEY = 'moneyWallets';
+
+function walletMap(ydoc: Y.Doc): Y.Map<Y.Map<unknown>> {
+  return ydoc.getMap<Y.Map<unknown>>(WALLETS_KEY);
+}
+
+/** Wallets in creation order. The first one is the default — see walletBalance. */
+export function readWallets(ydoc: Y.Doc): WalletData[] {
+  const out: WalletData[] = [];
+  walletMap(ydoc).forEach((w) => {
+    out.push({
+      id:        w.get('id') as string,
+      name:      w.get('name') as string,
+      icon:      (w.get('icon') as string | undefined) ?? '👛',
+      createdAt: (w.get('createdAt') as number | undefined) ?? 0,
+    });
+  });
+  return out.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+}
+
+/**
+ * Write a correction line: an ordinary money entry that is born already parsed,
+ * so useMoneySync never sends it to the model. It has an amount and a category
+ * from the moment it exists; there is nothing for a parser to work out.
+ */
+function addAdjustmentEntry(
+  ydoc: Y.Doc,
+  walletId: string,
+  amount: number,
+  text: string,
+  date: string,
+): string {
+  const id = crypto.randomUUID();
+  const entry: YMoneyEntry = new Y.Map();
+  entry.set('id', id);
+  entry.set('date', date);
+  entry.set('text', text);
+  entry.set('amount', amount);
+  entry.set('category', MONEY_CAT.ADJUSTMENT);
+  entry.set('counterparty', null);
+  entry.set('debtDelta', 0);
+  entry.set('status', 'ok');
+  // parsedFrom === text is what makes the dirty-check skip this line forever.
+  entry.set('parsedFrom', text);
+  entry.set('walletId', walletId);
+  entry.set('createdAt', Date.now());
+  moneyMap(ydoc).set(id, entry);
+  return id;
+}
+
+function todayIso(): string {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${dd}`;
+}
+
+/**
+ * Create a wallet. A non-zero opening balance is written as a correction entry
+ * rather than stored on the wallet, so there is exactly one way a balance can
+ * come about and exactly one thing to fix when it is wrong.
+ */
+export function createWallet(
+  ydoc: Y.Doc,
+  name: string,
+  icon = '👛',
+  openingBalance = 0,
+  openingLabel = 'Opening balance',
+): string {
+  const id = crypto.randomUUID();
+  ydoc.transact(() => {
+    const w = new Y.Map<unknown>();
+    w.set('id', id);
+    w.set('name', name.trim() || 'Wallet');
+    w.set('icon', icon);
+    w.set('createdAt', Date.now());
+    walletMap(ydoc).set(id, w);
+    if (openingBalance !== 0) {
+      addAdjustmentEntry(ydoc, id, openingBalance, openingLabel, todayIso());
+    }
+  });
+  return id;
+}
+
+export function renameWallet(ydoc: Y.Doc, walletId: string, name: string, icon?: string): void {
+  const w = walletMap(ydoc).get(walletId);
+  if (!w) return;
+  const next = name.trim();
+  if (next) w.set('name', next);
+  if (icon) w.set('icon', icon);
+}
+
+/**
+ * Remove a wallet and hand its entries back to the default wallet.
+ *
+ * The lines are kept. They are real spending that really happened; only the
+ * label for where the money sat has gone away. Detaching them (walletId → null)
+ * rather than deleting them means the month totals do not silently drop.
+ */
+export function deleteWallet(ydoc: Y.Doc, walletId: string): void {
+  ydoc.transact(() => {
+    walletMap(ydoc).delete(walletId);
+    moneyMap(ydoc).forEach((entry) => {
+      if (entry.get('walletId') === walletId) entry.set('walletId', null);
+    });
+  });
+}
+
+export function moveEntryToWallet(ydoc: Y.Doc, entryId: string, walletId: string | null): void {
+  moneyMap(ydoc).get(entryId)?.set('walletId', walletId);
+}
+
+/**
+ * What this wallet holds: every amount that moved through it, added up.
+ *
+ * `isDefault` folds in the entries that name no wallet — everything logged
+ * before wallets existed, and everything logged by someone who never made a
+ * second one. Without it those lines would vanish from the wallet view the day
+ * the feature shipped, which is a worse first impression than any migration.
+ */
+export function walletBalance(
+  entries: MoneyEntryData[],
+  walletId: string,
+  isDefault: boolean,
+): number {
+  let sum = 0;
+  for (const e of entries) {
+    if (e.walletId === walletId || (isDefault && e.walletId === null)) sum += e.amount ?? 0;
+  }
+  return sum;
+}
+
+/**
+ * Reconcile a wallet against reality: you say what is actually in it, and the
+ * difference is written as a dated correction line.
+ *
+ * Returns the entry id, or null when nothing had drifted. `label` and `date`
+ * come from the caller so the wording stays in the UI's language.
+ */
+// ---------------------------------------------------------------------------
+// Money settings — one small top-level map of scalars
+//
+// Safe as a plain key/value map precisely because the values are scalars: two
+// devices setting `monthlyBudget` is last-write-wins on a number, which loses a
+// preference at worst. That is a different situation from the containers above,
+// where the same conflict discards a whole map of entries.
+// ---------------------------------------------------------------------------
+
+export const MONEY_SETTINGS_KEY = 'moneySettings';
+
+/** Monthly spending cap in đồng. 0 means "not set" — the UI then shows pace only. */
+export function readMonthlyBudget(ydoc: Y.Doc): number {
+  const v = ydoc.getMap<unknown>(MONEY_SETTINGS_KEY).get('monthlyBudget');
+  return typeof v === 'number' && v > 0 ? v : 0;
+}
+
+export function setMonthlyBudget(ydoc: Y.Doc, amount: number): void {
+  ydoc.getMap<unknown>(MONEY_SETTINGS_KEY).set('monthlyBudget', Math.max(0, Math.round(amount)));
+}
+
+export function correctWalletBalance(
+  ydoc: Y.Doc,
+  walletId: string,
+  actualBalance: number,
+  currentBalance: number,
+  label: string,
+  date = todayIso(),
+): string | null {
+  const delta = Math.round(actualBalance - currentBalance);
+  if (delta === 0) return null;
+  return addAdjustmentEntry(ydoc, walletId, delta, label, date);
 }
 
 // ---------------------------------------------------------------------------

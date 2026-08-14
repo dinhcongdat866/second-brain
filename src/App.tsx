@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type * as Y from 'yjs';
 import type { EditorView } from 'prosemirror-view';
 
-import { appendMarkdownCell, makeAppendAiCell, makeAppendWeeklyCell } from './commands';
+import { appendMarkdownCell, makeAppendAiCell, makeAppendWeeklyCell, makeAppendMoneyCell } from './commands';
 import { BackgroundPicker } from './components/BackgroundPicker';
 import { Button } from './components/Button';
 import { Icon } from './components/Icon';
@@ -114,9 +114,12 @@ function OverflowMenu({
 function CellAdder({
   view,
   ydoc,
+  isGuest,
 }: {
   view: EditorView | null;
   ydoc: Y.Doc | null;
+  /** Guests have no money tier at all, so the lens over it has nothing to show. */
+  isGuest: boolean;
 }) {
   const { t } = useTranslation();
   if (!view || !ydoc) return null;
@@ -140,6 +143,14 @@ function CellAdder({
       >
         {t('cellAdder.weekly')}
       </Button>
+      {!isGuest && (
+        <Button
+          variant="ghost"
+          onClick={() => { makeAppendMoneyCell(ydoc)(view.state, view.dispatch.bind(view)); view.focus(); }}
+        >
+          {t('cellAdder.money')}
+        </Button>
+      )}
     </div>
   );
 }
@@ -369,7 +380,7 @@ function App() {
                 {t('app.loading')}
               </div>
             )}
-            <CellAdder view={view} ydoc={ydoc} />
+            <CellAdder view={view} ydoc={ydoc} isGuest={isGuest} />
           </div>
           <SlashMenu view={view} />
           <FloatingToolbar view={view} />

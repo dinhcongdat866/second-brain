@@ -18,7 +18,8 @@
   "cellAdder": {
     "markdown": "+ Markdown",
     "ai": "+ AI Cell",
-    "weekly": "+ Weekly"
+    "weekly": "+ Weekly",
+    "money": "+ Money"
   },
   "sidebar": {
     "documents": "Documents",
@@ -106,7 +107,8 @@
     "ledger": "Debt ledger",
     "ledgerBorrowed": "borrowed",
     "ledgerRepaid": "repaid",
-    "ledgerOwed": "they owe"
+    "ledgerOwed": "they owe",
+    "wallet": "Logging to {{name}}"
   },
   "moneyCategory": {
     "food": "Food & Drink",
@@ -121,7 +123,8 @@
     "otherIncome": "Other Income",
     "borrowing": "Borrowing",
     "debtRepayment": "Debt Repayment",
-    "other": "Other"
+    "other": "Other",
+    "adjustment": "Balance Adjustment"
   },
   "markdown": {
     "copy": "Copy cell content"
@@ -160,5 +163,82 @@
     "title": "A UI error occurred",
     "body": "Your data is safe (stored in the browser and on the server). Try reloading the page.",
     "reload": "Reload"
+  },
+  "money": {
+    "kind": "Money",
+    "deleteCell": "Delete cell",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "thisMonth": "This month",
+    "guestNote": "Money tracking needs an account — the parser runs on your own API key.",
+    "noData": "Nothing logged yet. Money lines are typed in the Money section of the weekly planner.",
+    "in": "In",
+    "out": "Out",
+    "net": "Net",
+    "pendingLines": "{{count}} lines have no amount yet — the figures below are incomplete",
+    "noSpending": "Nothing spent this month",
+    "futureMonth": "This month hasn't started",
+    "sectionWallets": "Wallets",
+    "sectionCategories": "Categories",
+    "sectionPace": "Pace",
+    "sectionUnusual": "Unusual days",
+    "sectionRecurring": "Recurring",
+    "sectionLedger": "Debts",
+    "sectionRhythm": "Rhythm",
+    "sectionSearch": "Search",
+    "usually": "usually {{amount}}",
+    "spentSoFar": "Spent so far",
+    "ofDays": "{{done}} of {{total}} days",
+    "fixed": "Fixed",
+    "fixedHint": "housing, bills, education",
+    "variable": "Variable",
+    "perDay": "{{amount}}/day",
+    "projected": "Projected this month",
+    "projectedHint": "fixed counted once",
+    "nextMonthEstimate": "Next month",
+    "basedOn": "from {{count}} months",
+    "basedOnThisMonth": "from this month only",
+    "budget": "Monthly budget",
+    "budgetPlaceholder": "e.g. 10tr",
+    "allowance": "{{remaining}} left · {{days}} days · {{perDay}}/day",
+    "overBudget": "{{amount}} over",
+    "allowanceNote": "Fixed costs still due this month are already set aside, so this is money you can actually spend.",
+    "nothingUnusual": "No unusual days",
+    "timesNormal": "{{ratio}}× a normal day",
+    "noRecurring": "No recurring charges found",
+    "everyDays": "every ~{{days}} days · {{count}} times",
+    "overdue": "due",
+    "noDebts": "Nothing outstanding",
+    "sinceDays": "{{days}} days ago",
+    "youOwe": "you owe {{amount}}",
+    "theyOwe": "owes you {{amount}}",
+    "noRhythm": "Not enough data yet",
+    "byMood": "By mood",
+    "byWeekday": "By weekday",
+    "dayCount": "{{count}} days",
+    "rhythmNote": "Median per day, not mean — one big purchase doesn't skew it.",
+    "searchPlaceholder": "coffee, grab, mum…",
+    "searchNone": "Nothing found",
+    "searchSummary": "{{count}} lines · {{spent}} spent",
+    "searchTruncated": "{{count}} more not shown",
+    "searchNote": "Searches the words you actually typed, which no category can answer.",
+    "wallets": {
+      "none": "No wallets yet — every line sits in one pile.",
+      "add": "+ New wallet",
+      "untitled": "Wallet",
+      "namePlaceholder": "Wallet name",
+      "openingPlaceholder": "Opening balance",
+      "openingLabel": "Opening balance",
+      "create": "Create",
+      "fix": "Correct balance",
+      "fixPlaceholder": "Actual balance",
+      "correctionLabel": "Balance correction",
+      "correctionNote": "A balance is always the sum of its lines, never a stored number. Correcting one writes a dated difference, so the history still says when it drifted and by how much.",
+      "rename": "Rename",
+      "delete": "Delete wallet",
+      "confirmDelete": "Delete — the lines are kept",
+      "setActive": "Log new lines here",
+      "isActive": "New lines go here"
+    }
   }
 }

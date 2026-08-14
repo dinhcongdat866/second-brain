@@ -4,7 +4,7 @@ import type { EditorView, NodeView } from 'prosemirror-view';
 import type * as Y from 'yjs';
 import { getThread } from '../collab/aiThreads';
 import type { PlannerHandle } from '../collab/plannerHandle';
-import { extractDocContext, extractLocalContext, extractWeeklyContext } from '../lib/docContext';
+import { extractDocContext, extractLocalContext, extractMoneyContext, extractWeeklyContext } from '../lib/docContext';
 import { AiCell } from './AiCell';
 
 // ---------------------------------------------------------------------------
@@ -52,7 +52,8 @@ export class AiCellView implements NodeView {
       // been loading when this cell was created.
       const plannerYdoc = planner?.get() ?? null;
       const weekly = plannerYdoc ? extractWeeklyContext(plannerYdoc) : '';
-      return [md, weekly].filter(Boolean).join('\n\n');
+      const money = plannerYdoc ? extractMoneyContext(plannerYdoc) : '';
+      return [md, weekly, money].filter(Boolean).join('\n\n');
     };
 
     this.root = createRoot(this.dom);

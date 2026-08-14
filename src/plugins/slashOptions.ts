@@ -4,6 +4,7 @@ import {
   insertMarkdownCell,
   makeInsertAiCell,
   makeInsertWeeklyCell,
+  makeInsertMoneyCell,
   smartInsertTextblock,
   smartInsertBlockquote,
   smartInsertDivider,
@@ -184,6 +185,21 @@ export const SLASH_OPTIONS: SlashOption[] = [
         return;
       }
       dispatch(view, makeInsertWeeklyCell(_ydoc));
+    },
+  },
+  {
+    id: 'money-cell',
+    label: 'Money',
+    description: 'Monthly spending, wallets, pace and debts',
+    icon: '💰',
+    group: 'cell',
+    keywords: ['money', 'spend', 'spending', 'budget', 'wallet', 'tien', 'chi', 'tieu', 'vi', 'thu'],
+    run: (view) => {
+      if (!_ydoc) {
+        console.warn('[slashOptions] insertMoneyCell called before ydoc was bound');
+        return;
+      }
+      dispatch(view, makeInsertMoneyCell(_ydoc));
     },
   },
 ];

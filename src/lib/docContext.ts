@@ -1,6 +1,17 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import type * as Y from 'yjs';
-import { WEEKLY_PLANS_KEY, serializeWeeklyForAI } from '../collab/weeklyPlans';
+import { WEEKLY_PLANS_KEY, readMoneyAll, readWallets, serializeWeeklyForAI, walletBalance } from '../collab/weeklyPlans';
+import {
+  categoryBreakdown,
+  categoryNorms,
+  forecastMonth,
+  formatDongCompact,
+  ledgerFrom,
+  monthOf,
+  monthTotals,
+  todayIso,
+} from './moneyStats';
+import { MONEY_CAT } from './moneyTaxonomy';
 
 /**
  * Tier 1 — local context: text from the N markdown cells immediately before
@@ -53,4 +64,86 @@ export function extractWeeklyContext(plannerYdoc: Y.Doc, maxWeeks = 4): string {
     if (serialized) parts.push(serialized);
   });
   return parts.join('\n\n');
+}
+
+/**
+ * Money context: the figures the money cell shows, as text the model can read.
+ *
+ * A summary rather than the raw lines. A year of entries is thousands of them,
+ * and pasting the lot would spend the context window on the part the client has
+ * already worked out — the totals, the split, the pace. What goes in is what a
+ * person would say if asked how the month is going.
+ *
+ * Category names go through as the stored identifiers ('Food & Drink'), not the
+ * localised labels: they are identifiers everywhere else in the system, and a
+ * model reasoning about them should see the same strings the database stores.
+ * The raw lines that do go in keep their original Vietnamese, because that is
+ * user data and normalising it would throw away the detail worth asking about.
+ */
+export function extractMoneyContext(plannerYdoc: Y.Doc, maxLines = 30): string {
+  const all = readMoneyAll(plannerYdoc);
+  if (all.length === 0) return '';
+
+  const today = monthOf(todayIso());
+  const prev = (() => {
+    const [y, m] = today.split('-').map(Number);
+    const d = new Date(y, m - 2, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  })();
+
+  const lines: string[] = ['MONEY (đồng; amounts are exact, totals are computed locally):'];
+
+  for (const month of [today, prev]) {
+    const totals = monthTotals(all, month);
+    if (totals.entries === 0) continue;
+    lines.push(
+      `  ${month}: in ${totals.in}, out ${totals.out}, net ${totals.net}` +
+        (totals.unknown > 0 ? ` (${totals.unknown} lines still have no amount)` : ''),
+    );
+    const cats = categoryBreakdown(all, month, categoryNorms(all, todayIso()));
+    for (const c of cats.slice(0, 8)) {
+      const normal = c.normal !== null && c.normalMonths >= 2 ? `, usually ${c.normal}` : '';
+      lines.push(`    ${c.category}: ${c.total} (${c.count} lines${normal})`);
+    }
+  }
+
+  const forecast = forecastMonth(all, today, todayIso());
+  if (forecast) {
+    lines.push(
+      `  Pace: ${forecast.spentSoFar} spent over ${forecast.daysElapsed}/${forecast.daysInMonth} days` +
+        ` — fixed ${forecast.fixedSoFar}, variable ${forecast.variableSoFar}` +
+        ` (${Math.round(forecast.variablePerDay)}/day). Projected ${forecast.projected}.`,
+    );
+  }
+
+  const wallets = readWallets(plannerYdoc);
+  if (wallets.length > 0) {
+    const parts = wallets.map((w, i) => `${w.name} ${walletBalance(all, w.id, i === 0)}`);
+    lines.push(`  Wallets: ${parts.join(', ')}`);
+  }
+
+  const debts = ledgerFrom(all, todayIso());
+  if (debts.length > 0) {
+    const parts = debts.map((d) =>
+      d.balance > 0
+        ? `owes ${d.counterparty} ${d.balance} (${d.ageDays}d)`
+        : `${d.counterparty} owes ${-d.balance} (${d.ageDays}d)`,
+    );
+    lines.push(`  Debts: ${parts.join('; ')}`);
+  }
+
+  // A tail of the actual lines, because the summary cannot answer "what did I
+  // buy" and that is most of what anyone asks. Verbatim, corrections excluded.
+  const recent = all
+    .filter((e) => e.category !== MONEY_CAT.ADJUSTMENT)
+    .slice(-maxLines);
+  if (recent.length > 0) {
+    lines.push('  Recent lines:');
+    for (const e of recent) {
+      const amount = e.amount === null ? '?' : formatDongCompact(e.amount);
+      lines.push(`    ${e.date} ${e.text} → ${amount}`);
+    }
+  }
+
+  return lines.join('\n');
 }

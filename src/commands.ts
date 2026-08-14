@@ -15,7 +15,7 @@ import {
   toggleMark,
 } from 'prosemirror-commands';
 import type * as Y from 'yjs';
-import { notebookSchema, createMarkdownCell, createAiCell, createWeeklyPlannerCell } from './schema';
+import { notebookSchema, createMarkdownCell, createAiCell, createWeeklyPlannerCell, createMoneyCell } from './schema';
 import { getThread } from './collab/aiThreads';
 
 // ---------------------------------------------------------------------------
@@ -448,8 +448,34 @@ export function makeAppendWeeklyCell(ydoc: Y.Doc): Command {
   };
 }
 
+export function makeAppendMoneyCell(ydoc: Y.Doc): Command {
+  return (state, dispatch) => {
+    const cell = createMoneyCell();
+    const insertPos = state.doc.content.size;
+    ydoc.transact(() => {
+      if (dispatch) {
+        const tr = state.tr.insert(insertPos, cell);
+        tr.setSelection(Selection.near(tr.doc.resolve(insertPos), -1));
+        tr.scrollIntoView();
+        dispatch(tr);
+      }
+    });
+    return true;
+  };
+}
+
+export function makeInsertMoneyCell(ydoc: Y.Doc): Command {
+  return (state, dispatch) => {
+    const cell = createMoneyCell();
+    ydoc.transact(() => {
+      insertCellAfterCurrent(cell)(state, dispatch);
+    });
+    return true;
+  };
+}
+
 // ---------------------------------------------------------------------------
-// Guard: prevent Backspace from deleting ai_cell / weekly_cell
+// Guard: prevent Backspace from deleting ai_cell / weekly_cell / money_cell
 // ---------------------------------------------------------------------------
 // These cells must be removed via their × button only.
 // Two cases to block:
@@ -458,7 +484,7 @@ export function makeAppendWeeklyCell(ydoc: Y.Doc): Command {
 //      protected cell (joinBackward would consume it).
 // ---------------------------------------------------------------------------
 
-const PROTECTED_CELLS = new Set(['ai_cell', 'weekly_planner_cell']);
+const PROTECTED_CELLS = new Set(['ai_cell', 'weekly_planner_cell', 'money_cell']);
 
 export const guardProtectedCells: Command = (state) => {
   const { selection } = state;

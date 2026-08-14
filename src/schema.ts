@@ -5,7 +5,7 @@ import { schema as basicSchema } from 'prosemirror-schema-basic';
 // Notebook Schema
 // ---------------------------------------------------------------------------
 // Structure:
-//   doc → cell+ (markdown_cell | ai_cell)
+//   doc → cell+ (markdown_cell | ai_cell | weekly_planner_cell | money_cell)
 //   markdown_cell → block+ (paragraph, heading, blockquote, hr)
 //   ai_cell → atom (no PM content; conversation lives in Yjs — collab/aiThreads)
 // ---------------------------------------------------------------------------
@@ -78,6 +78,21 @@ export const notebookSchema = new Schema({
       parseDOM: [{ tag: 'div[data-type="weekly-planner-cell"]' }],
       toDOM(node) {
         return ['div', { 'data-type': 'weekly-planner-cell', 'data-id': node.attrs.id }];
+      },
+    },
+
+    // money_cell: atom — a *lens* over the money log, never a second place to
+    // store it. Entries are written in the weekly planner; this cell only reads
+    // them back as months, categories, wallets and pace. Nothing here owns data,
+    // which is why any number of these can sit in any number of documents and
+    // still agree with each other.
+    money_cell: {
+      group: 'cell',
+      atom: true,
+      attrs: baseCellAttrs,
+      parseDOM: [{ tag: 'div[data-type="money-cell"]' }],
+      toDOM(node) {
+        return ['div', { 'data-type': 'money-cell', 'data-id': node.attrs.id }];
       },
     },
 
@@ -173,6 +188,10 @@ export function createAiCell(): PMNode {
 
 export function createWeeklyPlannerCell(): PMNode {
   return notebookSchema.nodes.weekly_planner_cell.create(makeCellAttrs());
+}
+
+export function createMoneyCell(): PMNode {
+  return notebookSchema.nodes.money_cell.create(makeCellAttrs());
 }
 
 export function createInitialDoc(): PMNode {

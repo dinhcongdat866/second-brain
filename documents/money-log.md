@@ -281,9 +281,168 @@ through `WeeklyCellView`; todos are untouched, since they need no backend.
 
 ## 8. Explicitly out of slice 1
 
-- `money_cell` (the lens: monthly totals, runway)
+- `money_cell` (the lens: monthly totals, runway) — **shipped in slice 2, §9**
 - receipt photo → entry (the upload/vision/lightbox infra already exists, so this is a prompt)
-- recurring-charge detection in `analyticsRules.ts`
-- money × mood × category correlation in `/analytics/report-data`
+- recurring-charge detection in `analyticsRules.ts` — **shipped in slice 2**, though in
+  `moneyStats.ts` rather than `analyticsRules.ts`; see §12
+- money × mood correlation — **shipped in slice 2**, client-side rather than in
+  `/analytics/report-data`; see §12
+- money × todo-category correlation — still out. Todo categories live in
+  `todo_classifications`, keyed by week, so unlike mood this is not a join on a
+  date the client already holds.
 - feeding past corrections back as few-shot examples
-- `extractMoneyContext` for the AI cell (`src/lib/docContext.ts`)
+- `extractMoneyContext` for the AI cell (`src/lib/docContext.ts`) — **shipped in slice 2**
+
+---
+
+# Money Log — slice 2: the lens
+
+Slice 1 gave money a way in. Nothing gave it a way out: a day had a total, a
+month had nothing. `money_cell` is that way out — a **read-only lens** over the
+same log, exactly as the header of this document promised, never a second place
+to store.
+
+## 9. Everything is computed on the client
+
+The decision that shapes this slice: **no new endpoints**. Every figure in the
+money cell is derived from the Y.Doc, in `src/lib/moneyStats.ts`, with no request.
+
+That is not a shortcut, it falls out of the shape slice 1 chose. Each entry
+carries its own `date`, `amount`, `category` and `debtDelta`, and the whole log
+is one flat top-level map — so a month, a category, a search or a per-person
+balance is a filter over an array already in memory. The backend keeps the job
+only it can do: run the parser, which needs a model, and hold the SQL projection
+other devices read.
+
+Consequences worth stating: the numbers are there offline, and changing the
+month has no spinner between the click and the answer.
+
+`GET /money/ledger` stays as it is and the planner's `DebtLedger` still uses it.
+The money cell computes its own ledger from the Y.Doc because it needs something
+SQL was never asked for — how old the debt is.
+
+### Two rules hold throughout
+
+- **Balance corrections are excluded from every statistic.** A correction is
+  bookkeeping. Counting one as spending would mean fixing your wallet reads as a
+  shopping trip.
+- **Averages are medians.** One 20 triệu laptop drags a mean for months, and the
+  question these figures answer is "what is normal for me" — precisely what a
+  mean stops being able to say.
+
+## 10. Wallets
+
+Requested as "like Money Lover: if the balance is wrong I just fix it".
+
+A wallet has **no stored balance**. It is the sum of the entries that moved
+through it, recomputed every time — the same rule as the debt ledger and the day
+total, and for the same reason: a counter two devices both increment is wrong
+forever with no way to tell afterwards.
+
+So "correct my balance" is expressed as an *entry*, not an assignment. The
+difference between what the app thinks you have and what you say is really there
+becomes a dated line with `category = 'Balance Adjustment'`. You get the
+correction you asked for, the balance stays a pure sum, and the history still
+says when it drifted and by how much. Two devices correcting the same wallet
+keep both corrections rather than one overwriting the other.
+
+```
+planner Y.Doc
+├── weeklyPlans   ← unchanged
+├── moneyLog      ← unchanged, entries gain `walletId: string | null`
+├── moneyWallets  : Y.Map<walletId → Y.Map{id,name,icon,createdAt}>   ← new
+└── moneySettings : Y.Map<'monthlyBudget' → number>                   ← new
+```
+
+`moneySettings` is safe as a plain key/value map because its values are scalars:
+a same-key conflict is last-write-wins on a number, which loses a preference at
+worst — a different situation from the containers, where the same conflict
+discards a whole map of entries.
+
+`walletId: null` means "the default wallet". Everything logged before wallets
+existed carries null, and `walletBalance` folds those into the first wallet, so
+shipping wallets rewrote no entries and made none disappear.
+
+Wallets are **client-side only**. `money_entries` gains no column: the DB is the
+parse cache and the cross-device projection, and neither needs to know which
+pocket the money sat in.
+
+Which wallet new lines land in is a **device preference** (`localStorage`), not
+shared data — a phone and a laptop plausibly spend from different wallets. It is
+a small store with a `useSyncExternalStore` subscription rather than two
+`localStorage` calls, because the choice is made in the money cell and read by
+the planner's wallet chip, two React trees with nothing between them, and
+`storage` events do not fire in the tab that did the writing.
+
+The planner's money input stays at exactly one keystroke. Picking a wallet per
+line would be correct bookkeeping and nobody would do it twice.
+
+## 11. Pace — the honest version of a projection
+
+The naive projection is wrong in a way that destroys trust within two weeks:
+6 triệu over 14 days does not mean 12,9 triệu by month end, because rent was in
+those 14 days and rent does not happen twice.
+
+So spending splits into **fixed** (`Housing`, `Bills`, `Education` — obligations
+that land on a date someone else picked) and **variable**. Only the variable part
+is extrapolated. Fixed is counted once — and the opposite failure is handled too:
+on the 14th with rent due on the 28th, `expectedFixed = max(fixedSoFar, median
+fixed of past months)`, so a rent that has not landed is still expected.
+
+The output people act on is not a monthly total but **an allowance per remaining
+day**, with fixed costs still due already set aside — rent due on the 28th is not
+money you may spend on the 20th. That needs a budget, the one number the user has
+to supply; without it the cell shows pace only, plus an estimate for next month
+from the median of complete months (and says how many it rests on).
+
+## 12. What the lens shows
+
+| Section | Answers |
+|---|---|
+| Summary | in / out / net for the month, with a warning when lines are still unparsed |
+| Wallets | balance per wallet, correction, which one new lines go to |
+| Categories | plain lines, plus "usually X" from the median of complete months |
+| Pace | fixed/variable split, projection, next month, optional allowance |
+| Unusual days | days costing ≥2.5× a normal day — a budget you never have to set |
+| Recurring | same text, same amount, ~monthly. Deliberately strict: 3 sightings, amounts within 20%, gaps 20–40 days. A rule loose enough to also flag "cà phê" is a list nobody reads twice |
+| Debts | the ledger, plus how old it is |
+| Rhythm | spending against the mood logged the same day, and by weekday |
+| Search | free text over `raw_text` |
+
+Two of these exist only because this is a notebook and not a money app. **Rhythm**
+is a join on a date string, because `moodLog` and `moneyLog` are both keyed by
+day. **Search** works because slice 1 kept the user's line verbatim: `Food & Drink`
+is somebody else's bucket, but "cà phê" is the thing you wanted to know about,
+and no category set can ever answer it.
+
+## 13. `parseDongShorthand`
+
+A hand-written reader for `5tr`, `4tr5`, `300k`, `3.800.000`, used by the balance
+and budget fields. Vietnamese money shorthand is a small closed grammar — four
+multipliers and one compound form — so it fits in twenty lines and answers
+instantly. The model earns its keep on prose like "cà phê với anh Tuấn 85k",
+where the amount is one part of a sentence; it has no business being asked what
+"5tr" means. Returns null rather than guessing, and the field echoes back what it
+read before you commit.
+
+## 14. Adding a node type is a breaking change for old clients
+
+Found while verifying this in the running app, and worth writing down.
+
+Inserting a `money_cell` while another client on the **previous build** was
+connected to the same sync server did not merely fail to render there — that
+client **deleted the node from the shared document**, and the deletion came back
+over the websocket. y-prosemirror's `createNodeFromYElement` deletes any element
+it cannot build against the current schema.
+
+So a new cell type must be deployed before it is used anywhere, and any tab still
+running the old build has to be reloaded. Nothing in the schema-migration
+machinery helps: migrations run forward, and the damage is done by a client that
+has not been upgraded yet.
+
+## 15. Still out
+
+- money × todo-category correlation (needs the week-keyed classification join)
+- receipt photo → entry
+- feeding past corrections back as few-shot examples
+- a runway figure, which needs a reliable notion of total balance across wallets

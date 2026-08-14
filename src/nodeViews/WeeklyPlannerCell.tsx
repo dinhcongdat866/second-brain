@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback, type KeyboardEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, useSyncExternalStore, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type * as Y from 'yjs';
@@ -33,7 +33,12 @@ import {
   shiftWeek,
   dayToDate,
   setMoodForDate,
+  readWallets,
+  WALLETS_KEY,
+  MOOD_EMOJIS,
+  type WalletData,
 } from '../collab/weeklyPlans';
+import { readActiveWalletId, resolveActiveWalletId, subscribeActiveWallet } from '../lib/activeWallet';
 import {
   weeklyOpen,
   weeklyClose,
@@ -311,8 +316,6 @@ function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelecti
 // Mood picker
 // ---------------------------------------------------------------------------
 
-const MOOD_EMOJIS: Record<number, string> = { 1: '😴', 2: '😞', 3: '😐', 4: '🙂', 5: '🔥' };
-
 interface MoodPickerProps {
   date: string;
   entry: MoodEntry | null;
@@ -492,6 +495,8 @@ interface DayColumnProps {
   todos: AllDays[DayKey];
   /** null = money tier off for this session (guest — see WeeklyPlannerCell). */
   money: MoneyEntryData[] | null;
+  /** Which wallet a new line lands in; null before any wallet exists. */
+  walletId: string | null;
   /** Section visibility, set once for the whole week — see SectionToggles. */
   showTodos: boolean;
   showMoney: boolean;
@@ -503,7 +508,7 @@ interface DayColumnProps {
 }
 
 function DayColumn({
-  day, date, todos, money, showTodos, showMoney, isToday, ydoc, plan, weekStart, moodEntry,
+  day, date, todos, money, walletId, showTodos, showMoney, isToday, ydoc, plan, weekStart, moodEntry,
 }: DayColumnProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
@@ -567,7 +572,7 @@ function DayColumn({
     if (e.key === 'Enter' && moneyInput.trim()) {
       // The line lands in Yjs immediately and renders as pending; useMoneySync
       // notices and fills in the numbers. Typing never waits on the network.
-      addMoneyEntry(ydoc, date, moneyInput);
+      addMoneyEntry(ydoc, date, moneyInput, walletId);
       setMoneyInput('');
     }
   };
@@ -851,6 +856,7 @@ export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
   const [days, setDays] = useState<AllDays>(() => readAllDays(plan, plan.get('weekStart') as string));
   const [moodLog, setMoodLog] = useState<Record<string, MoodEntry>>(() => readMoodLog(plan));
   const [moneyLog, setMoneyLog] = useState<Record<string, MoneyEntryData[]>>(() => readMoneyLog(ydoc));
+  const [wallets, setWallets] = useState<WalletData[]>(() => readWallets(ydoc));
   const [sections, setSections] = useState<SectionState>(readSections);
   const [editingWeek, setEditingWeek] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -903,6 +909,27 @@ export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
     handler();
     return () => entries.unobserveDeep(handler);
   }, [ydoc]);
+
+  // Which wallet the money inputs write to. Read here rather than per column so
+  // all seven agree, and resolved against the wallets that actually exist so a
+  // deleted wallet quietly falls back instead of stranding new lines.
+  useEffect(() => {
+    const map = ydoc.getMap(WALLETS_KEY);
+    const handler = () => setWallets(readWallets(ydoc));
+    map.observeDeep(handler);
+    handler();
+    return () => map.unobserveDeep(handler);
+  }, [ydoc]);
+
+  // Subscribed rather than read once: the choice is changed in the money cell,
+  // which is a different React tree, and localStorage does not notify the tab
+  // that wrote to it.
+  const storedWallet = useSyncExternalStore(subscribeActiveWallet, readActiveWalletId);
+  const activeWalletId = useMemo(
+    () => resolveActiveWalletId(wallets.map((w) => w.id), storedWallet),
+    [wallets, storedWallet],
+  );
+  const activeWallet = wallets.find((w) => w.id === activeWalletId) ?? null;
 
   // Only debt-bearing lines can move a ledger balance, so the panel refetches
   // when one of those changes and stays quiet through ordinary edits.
@@ -977,6 +1004,14 @@ export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
           onToggle={toggleSection}
           showMoneyToggle={!isGuest}
         />
+        {/* Says where a money line will land before you type it. Changing it
+            happens in the money cell — putting a picker in every day column
+            would be seven copies of a choice that is the same for all of them. */}
+        {!isGuest && sections.money && activeWallet && (
+          <span className="weekly-cell__wallet" title={t('weekly.wallet', { name: activeWallet.name })}>
+            {activeWallet.icon} {activeWallet.name}
+          </span>
+        )}
         <button
           type="button"
           className="weekly-cell__delete"
@@ -996,6 +1031,7 @@ export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
               date={date}
               todos={days[day]}
               money={isGuest ? null : (moneyLog[date] ?? [])}
+              walletId={activeWalletId}
               showTodos={sections.todos}
               showMoney={sections.money}
               isToday={todayKey === day}

@@ -18,7 +18,8 @@
   "cellAdder": {
     "markdown": "+ Markdown",
     "ai": "+ AI Cell",
-    "weekly": "+ Lịch tuần"
+    "weekly": "+ Lịch tuần",
+    "money": "+ Tiền"
   },
   "sidebar": {
     "documents": "Tài liệu",
@@ -106,7 +107,8 @@
     "ledger": "Sổ nợ",
     "ledgerBorrowed": "vay",
     "ledgerRepaid": "trả",
-    "ledgerOwed": "nợ mình"
+    "ledgerOwed": "nợ mình",
+    "wallet": "Vào túi: {{name}}"
   },
   "moneyCategory": {
     "food": "Ăn uống",
@@ -121,7 +123,8 @@
     "otherIncome": "Thu khác",
     "borrowing": "Vay",
     "debtRepayment": "Trả nợ",
-    "other": "Khác"
+    "other": "Khác",
+    "adjustment": "Chỉnh số dư"
   },
   "markdown": {
     "copy": "Copy nội dung cell"
@@ -160,5 +163,82 @@
     "title": "Đã xảy ra lỗi giao diện",
     "body": "Dữ liệu của bạn vẫn an toàn (lưu trong trình duyệt và trên server). Thử tải lại trang.",
     "reload": "Tải lại"
+  },
+  "money": {
+    "kind": "Tiền",
+    "deleteCell": "Xóa cell",
+    "prevMonth": "Tháng trước",
+    "nextMonth": "Tháng sau",
+    "thisMonth": "Tháng này",
+    "guestNote": "Phần tiền cần đăng nhập — việc đọc số chạy bằng API key của bạn.",
+    "noData": "Chưa có dòng nào. Tiền được ghi ở mục Tiền trong weekly planner.",
+    "in": "Vào",
+    "out": "Ra",
+    "net": "Còn",
+    "pendingLines": "{{count}} dòng chưa có số — các con số dưới đây chưa đủ",
+    "noSpending": "Tháng này chưa chi gì",
+    "futureMonth": "Tháng chưa tới",
+    "sectionWallets": "Túi tiền",
+    "sectionCategories": "Phân loại",
+    "sectionPace": "Đà chi tiêu",
+    "sectionUnusual": "Ngày bất thường",
+    "sectionRecurring": "Khoản định kỳ",
+    "sectionLedger": "Sổ nợ",
+    "sectionRhythm": "Nhịp chi tiêu",
+    "sectionSearch": "Tìm trong ghi chú",
+    "usually": "bình thường {{amount}}",
+    "spentSoFar": "Đã tiêu",
+    "ofDays": "{{done}}/{{total}} ngày",
+    "fixed": "Cố định",
+    "fixedHint": "nhà, hoá đơn, học",
+    "variable": "Biến đổi",
+    "perDay": "{{amount}}/ngày",
+    "projected": "Dự báo cả tháng",
+    "projectedHint": "cố định chỉ tính một lần",
+    "nextMonthEstimate": "Ước tính tháng sau",
+    "basedOn": "dựa trên {{count}} tháng",
+    "basedOnThisMonth": "chỉ dựa trên tháng này",
+    "budget": "Ngân sách tháng",
+    "budgetPlaceholder": "vd 10tr",
+    "allowance": "còn {{remaining}} · {{days}} ngày · {{perDay}}/ngày",
+    "overBudget": "vượt {{amount}}",
+    "allowanceNote": "Đã trừ sẵn các khoản cố định chưa tới trong tháng, nên đây là tiền thật sự được tiêu.",
+    "nothingUnusual": "Không có ngày nào bất thường",
+    "timesNormal": "gấp {{ratio}} lần ngày thường",
+    "noRecurring": "Chưa thấy khoản nào lặp lại",
+    "everyDays": "~{{days}} ngày một lần · {{count}} lần",
+    "overdue": "sắp tới hạn",
+    "noDebts": "Không nợ ai, không ai nợ",
+    "sinceDays": "{{days}} ngày trước",
+    "youOwe": "nợ {{amount}}",
+    "theyOwe": "cho vay {{amount}}",
+    "noRhythm": "Chưa đủ dữ liệu",
+    "byMood": "Theo tâm trạng",
+    "byWeekday": "Theo thứ",
+    "dayCount": "{{count}} ngày",
+    "rhythmNote": "Số giữa mỗi ngày, không phải trung bình — một lần mua lớn không kéo lệch được.",
+    "searchPlaceholder": "cà phê, grab, mẹ…",
+    "searchNone": "Không tìm thấy",
+    "searchSummary": "{{count}} dòng · chi {{spent}}",
+    "searchTruncated": "còn {{count}} dòng nữa",
+    "searchNote": "Tìm trên đúng chữ bạn đã gõ — cái mà không nhóm nào trả lời được.",
+    "wallets": {
+      "none": "Chưa có túi nào — mọi dòng đang gộp chung.",
+      "add": "+ Túi mới",
+      "untitled": "Túi",
+      "namePlaceholder": "Tên túi",
+      "openingPlaceholder": "Số dư đầu",
+      "openingLabel": "Số dư đầu",
+      "create": "Tạo",
+      "fix": "Sửa số dư",
+      "fixPlaceholder": "Số dư thật",
+      "correctionLabel": "Chỉnh số dư",
+      "correctionNote": "Số dư luôn là tổng các dòng, không phải một con số lưu sẵn. Sửa số dư sẽ ghi một dòng chênh lệch có ngày tháng, nên lịch sử vẫn nói được nó lệch lúc nào và lệch bao nhiêu.",
+      "rename": "Đổi tên",
+      "delete": "Xóa túi",
+      "confirmDelete": "Xóa — các dòng vẫn giữ",
+      "setActive": "Ghi dòng mới vào túi này",
+      "isActive": "Dòng mới đang vào túi này"
+    }
   }
 }

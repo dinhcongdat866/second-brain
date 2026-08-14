@@ -650,3 +650,15 @@
   color: var(--nb-text-3);
 }
 
+
+/* Which wallet the money inputs write to. A quiet chip, not a control — the
+   choice is made once in the money cell, and this only reports it. */
+.weekly-cell__wallet {
+  font-size: var(--text-xs);
+  color: var(--nb-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14ch;
+  flex-shrink: 0;
+}
