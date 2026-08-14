@@ -572,8 +572,16 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
   // and mark the figure as partial while any line is still unaccounted for.
   const totalIsPartial = known < (money?.length ?? 0);
 
+  // Weekends read differently at a glance, so the shape of the week is visible
+  // without reading a single label.
+  const isWeekend = day === 'sat' || day === 'sun';
+
   return (
-    <div className={`weekly-day${isToday ? ' weekly-day--today' : ''}`}>
+    <div
+      className={
+        `weekly-day${isToday ? ' weekly-day--today' : ''}${isWeekend ? ' weekly-day--weekend' : ''}`
+      }
+    >
       <div className="weekly-day__header">
         <span>{DAY_LABELS[day]}</span>
         <MoodPicker date={date} entry={moodEntry} plan={plan} />

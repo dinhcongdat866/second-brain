@@ -58,6 +58,9 @@
   --nb-danger-hover:  #a02020;
   --nb-danger-light:  #f87171;
 
+  /* Weekend columns — a shade back from a weekday, never a colour of its own. */
+  --nb-weekly-weekend-bg: rgba(0, 0, 0, 0.028);
+
   /* ── Money log ── */
   --nb-money-out:     #b34747;   /* money leaving */
   --nb-money-in:      #2f7d4f;   /* money arriving */

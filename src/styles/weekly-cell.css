@@ -4,12 +4,34 @@
   margin: 4px 0;
 }
 
+/*
+ * Prose wants a narrow measure; a seven-column week does not. The editor column
+ * is capped at 960px (.notebook-wrap), which leaves ~121px per day — narrow
+ * enough that Vietnamese wraps every two or three words. On a wide screen this
+ * cell breaks out of that cap, buying each day roughly a third more width.
+ *
+ * Only above 1280px, so it can never push past the viewport on the laptop
+ * widths where 960px is already most of the screen.
+ */
+@media (min-width: 1280px) {
+  .weekly-cell-wrapper {
+    width: calc(100% + 200px);
+    margin-left: -100px;
+    margin-right: -100px;
+  }
+}
+
 .weekly-cell {
   background: var(--nb-weekly-bg);
   border: 1px solid var(--nb-weekly-border);
   border-radius: var(--nb-r-cell);
   padding: 12px 14px;
-  overflow-x: auto;
+  /*
+   * Queried by the grid below. A media query would be wrong here: the sidebar
+   * is resizable, so the width this cell actually gets is not a function of the
+   * viewport. The cell measures itself instead.
+   */
+  container-type: inline-size;
 }
 
 .weekly-cell:focus-within {
@@ -100,11 +122,26 @@
 
 /* ---- Grid ---- */
 
+/*
+ * `minmax(0, 1fr)`, not `minmax(110px, 1fr)`: a 110px floor does not keep the
+ * columns readable when there is no room — it just overflows the track and
+ * turns the week into a horizontal scroller, which is worse, because a week you
+ * have to scroll sideways is a week you cannot see. The columns wrap to fewer
+ * per row instead, and the day itself keeps a usable width at every size.
+ */
 .weekly-cell__grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
-  overflow-x: auto;
+}
+
+/* Below these widths seven columns would be too thin to read: 4 + 3, then 2s. */
+@container (max-width: 820px) {
+  .weekly-cell__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@container (max-width: 440px) {
+  .weekly-cell__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ---- Day column ---- */
@@ -117,6 +154,12 @@
   display: flex;
   flex-direction: column;
   min-height: 80px;
+}
+
+/* Recedes: a weekend is context, not content. Ordered before --today so that a
+   weekend which is also today still reads as today. */
+.weekly-day--weekend {
+  background: var(--nb-weekly-weekend-bg);
 }
 
 .weekly-day--today {
@@ -133,6 +176,10 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 6px;
+  padding-bottom: 5px;
+  /* A rule under the header separates label from content, so the eye lands on
+     the todos rather than on seven repeated day names. */
+  border-bottom: 1px solid var(--nb-border-faint);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -242,8 +289,21 @@
   margin-top: auto;
 }
 
+/*
+ * The placeholder fades, the input does not: seven "Add…" prompts at full
+ * strength make the grid read as a form to fill in rather than a week to look
+ * at. Hover or focus brings it back. Opacity only — the field stays in the
+ * layout and stays clickable, so nothing moves and nothing becomes unreachable.
+ */
 .weekly-day__input::placeholder {
   color: var(--nb-text-3);
+  opacity: 0.4;
+  transition: opacity var(--dur-base, 0.15s) var(--ease, ease);
+}
+
+.weekly-day:hover .weekly-day__input::placeholder,
+.weekly-day__input:focus::placeholder {
+  opacity: 1;
 }
 
 .weekly-day__input:focus {
