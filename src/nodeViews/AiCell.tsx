@@ -70,14 +70,23 @@ export function AiCell({
   const isStreamingShared =
     !!lastTurn && lastTurn.role === 'assistant' && !lastTurn.createdAt;
 
-  // During streaming, detect emotion from current content once >50 chars are
-  // available (avoids early false positives). Fall back to the last completed
-  // turn so subsequent streams inherit the conversation's established tone.
-  const lastAssistant = [...turns].reverse().find(t => t.role === 'assistant');
-  const lastDoneAssistant = lastAssistant?.createdAt ? lastAssistant
-    : [...turns].reverse().find(t => t.role === 'assistant' && t.createdAt);
-  const emotionSource = (lastAssistant && lastAssistant.content.length > 50)
-    ? lastAssistant.content
+  // Emotion comes from what YOU asked, not from what the model answered.
+  //
+  // Reading the reply had two problems. It lags — the colour only settled once
+  // 50 characters had streamed, so the aurora spent the first moments in the
+  // wrong palette. And the reply is the model's register, not yours: in a
+  // codebase every answer trips the `technical` pattern (backticks, "function",
+  // "deploy", "error"), which is first in priority order, so the cell was
+  // permanently cyan no matter what the conversation was about.
+  //
+  // The prompt is available the instant you hit send, and it is the thing you
+  // actually chose. The last completed reply is kept only as a fallback, for a
+  // cell restored from Yjs whose user turns are older than the window.
+  const lastUser = [...turns].reverse().find(t => t.role === 'user');
+  const lastDoneAssistant = [...turns].reverse()
+    .find(t => t.role === 'assistant' && t.createdAt);
+  const emotionSource = lastUser?.content?.trim()
+    ? lastUser.content
     : (lastDoneAssistant?.content ?? '');
   const emotion = detectEmotion(emotionSource);
 

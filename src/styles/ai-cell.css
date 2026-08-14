@@ -774,13 +774,8 @@
   border-color: var(--nb-ai-border-focus);
 }
 
-/* Streaming: the box keeps focus (readOnly, not disabled) but must still look
-   like it is not taking input. Read-only, not greyed-out-and-dead. */
-.ai-cell__input textarea:read-only {
-  background: rgba(200, 230, 215, 0.3);
-  color: var(--nb-text-3);
-  cursor: default;
-}
+/* No greyed-out state while streaming: the box stays a normal, editable,
+   blinking-caret text box, because that is what it now is. Only Enter waits. */
 
 /* Icon send button — square, aligned to bottom of flex */
 .ai-cell__send-btn {

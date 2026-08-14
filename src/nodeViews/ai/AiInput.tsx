@@ -84,14 +84,19 @@ export function AiInput({
           value={prompt}
           placeholder={editing ? t('ai.editPlaceholder') : t('ai.promptPlaceholder')}
           /*
-           * readOnly, not disabled. The browser blurs an element the moment it
-           * becomes disabled, so sending a message dropped the caret out of the
-           * box (measured: focus lands on <body>) and you had to click back in
-           * for every single message. Anything typed while the reply streamed
-           * went nowhere — or to a document-level shortcut handler.
-           * readOnly refuses input while keeping the caret exactly where it is.
+           * Deliberately neither `disabled` nor `readOnly` while streaming.
+           *
+           * `disabled` was the original bug: the browser blurs an element the
+           * moment it becomes disabled, so sending a message dropped the caret
+           * (measured: focus lands on <body>) and you had to click back in for
+           * every message.
+           *
+           * `readOnly` fixed the focus but kept a caret sitting in a box that
+           * silently swallows typing, which is its own kind of confusing. The
+           * box now behaves exactly as it looks — you can keep typing the next
+           * message while a reply streams. Only Enter is held back, in the
+           * keydown handler below.
            */
-          readOnly={streaming}
           aria-busy={streaming}
           onChange={(e) => {
             setPrompt(e.target.value);
@@ -107,9 +112,9 @@ export function AiInput({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              // `disabled` used to swallow this for free; readOnly does not, so
-              // the guard has to be explicit or Enter would queue a second
-              // request on top of the one still streaming.
+              // The only thing streaming holds back. `disabled` used to swallow
+              // this for free; now the guard is explicit, or Enter would queue a
+              // second request on top of the one still running.
               if (!streaming) onSubmit();
             }
             if (e.key === 'Escape' && editing) {
