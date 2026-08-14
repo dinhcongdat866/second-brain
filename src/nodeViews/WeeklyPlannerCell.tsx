@@ -491,6 +491,9 @@ interface DayColumnProps {
   todos: AllDays[DayKey];
   /** null = money tier off for this session (guest — see WeeklyPlannerCell). */
   money: MoneyEntryData[] | null;
+  /** Section visibility, set once for the whole week — see SectionToggles. */
+  showTodos: boolean;
+  showMoney: boolean;
   isToday: boolean;
   ydoc: Y.Doc;
   plan: Y.Map<unknown>;
@@ -498,7 +501,9 @@ interface DayColumnProps {
   moodEntry: MoodEntry | null;
 }
 
-function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, moodEntry }: DayColumnProps) {
+function DayColumn({
+  day, date, todos, money, showTodos, showMoney, isToday, ydoc, plan, weekStart, moodEntry,
+}: DayColumnProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
   const [moneyInput, setMoneyInput] = useState('');
@@ -598,6 +603,7 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
         <span>{DAY_LABELS[day]}</span>
         <MoodPicker date={date} entry={moodEntry} plan={plan} />
       </div>
+      {showTodos && (
       <div className="weekly-day__todos">
         {todos.map((todo) => (
           <div key={todo.id} className="weekly-todo">
@@ -655,31 +661,43 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
           </div>
         ))}
       </div>
-      <input
-        ref={inputRef}
-        className="weekly-day__input"
-        placeholder={t('weekly.add')}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onClick={(e) => e.stopPropagation()}
-      />
-      {money !== null && (
-      <div className="weekly-day__money">
-        {money.map((entry) => (
-          <MoneyRow key={entry.id} entry={entry} onDelete={() => handleMoneyDelete(entry.id)} />
-        ))}
-        {known > 0 && (
-          <div
-            className="weekly-money__total"
-            title={totalIsPartial ? t('weekly.partialTotal') : undefined}
-          >
-            <span>{t('weekly.dayTotal')}</span>
-            <span className={`weekly-money__amount--${total < 0 ? 'out' : 'in'}`}>
-              {formatDong(total)}{totalIsPartial ? '…' : ''}
-            </span>
-          </div>
-        )}
+      )}
+      {showTodos && (
+        <input
+          ref={inputRef}
+          className="weekly-day__input weekly-day__input--todo"
+          placeholder={t('weekly.add')}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
+      {/*
+        The money block and its input are siblings of the todo block, not nested
+        inside one another. Each of the five is placed on its own grid row (see
+        weekly-cell.css), which is what lets the "add" inputs line up across all
+        seven days no matter how many todos or money lines a day happens to have.
+      */}
+      {money !== null && showMoney && (
+        <div className="weekly-day__money">
+          {money.map((entry) => (
+            <MoneyRow key={entry.id} entry={entry} onDelete={() => handleMoneyDelete(entry.id)} />
+          ))}
+          {known > 0 && (
+            <div
+              className="weekly-money__total"
+              title={totalIsPartial ? t('weekly.partialTotal') : undefined}
+            >
+              <span>{t('weekly.dayTotal')}</span>
+              <span className={`weekly-money__amount--${total < 0 ? 'out' : 'in'}`}>
+                {formatDong(total)}{totalIsPartial ? '…' : ''}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+      {money !== null && showMoney && (
         <input
           className="weekly-day__input weekly-day__input--money"
           placeholder={t('weekly.addMoney')}
@@ -688,8 +706,65 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
           onKeyDown={handleMoneyKeyDown}
           onClick={(e) => e.stopPropagation()}
         />
-      </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section toggles
+// ---------------------------------------------------------------------------
+
+const SECTIONS_KEY = 'weeklySections';
+
+interface SectionState { todos: boolean; money: boolean }
+
+function readSections(): SectionState {
+  try {
+    const raw = localStorage.getItem(SECTIONS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<SectionState>;
+      return { todos: parsed.todos !== false, money: parsed.money !== false };
+    }
+  } catch { /* private mode or corrupt value — fall through to both shown */ }
+  return { todos: true, money: true };
+}
+
+interface SectionTogglesProps {
+  sections: SectionState;
+  onToggle: (key: keyof SectionState) => void;
+  showMoneyToggle: boolean;
+}
+
+/**
+ * One switch per section for the whole week, not per day.
+ *
+ * Per-day switches would let two columns disagree about which sections are
+ * open, and columns that disagree cannot keep their "add" rows on a shared
+ * line — which is the point of the grid rows below. A week is also the unit
+ * people think in here: you are either tracking money this week or you are not.
+ */
+function SectionToggles({ sections, onToggle, showMoneyToggle }: SectionTogglesProps) {
+  const { t } = useTranslation();
+  const btn = (key: keyof SectionState, label: string) => (
+    <button
+      type="button"
+      className={`weekly-section-toggle${sections[key] ? ' weekly-section-toggle--on' : ''}`}
+      onClick={() => onToggle(key)}
+      title={sections[key] ? t('weekly.collapseSection') : t('weekly.expandSection')}
+      aria-pressed={sections[key]}
+    >
+      <span className="weekly-section-toggle__chevron" aria-hidden="true">
+        {sections[key] ? '▾' : '▸'}
+      </span>
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="weekly-section-toggles">
+      {btn('todos', t('weekly.sectionTodos'))}
+      {showMoneyToggle && btn('money', t('weekly.sectionMoney'))}
     </div>
   );
 }
@@ -774,6 +849,7 @@ export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
   const [days, setDays] = useState<AllDays>(() => readAllDays(plan, plan.get('weekStart') as string));
   const [moodLog, setMoodLog] = useState<Record<string, MoodEntry>>(() => readMoodLog(plan));
   const [moneyLog, setMoneyLog] = useState<Record<string, MoneyEntryData[]>>(() => readMoneyLog(ydoc));
+  const [sections, setSections] = useState<SectionState>(readSections);
   const [editingWeek, setEditingWeek] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
@@ -807,6 +883,14 @@ export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
     handler();
     return () => plan.unobserveDeep(handler);
   }, [plan]);
+
+  const toggleSection = useCallback((key: keyof SectionState) => {
+    setSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem(SECTIONS_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+      return next;
+    });
+  }, []);
 
   // Money lives in its own top-level map, not under the plan, so it needs its
   // own subscription — and gets one that todo edits never wake.
@@ -885,6 +969,11 @@ export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
             ›
           </button>
         </div>
+        <SectionToggles
+          sections={sections}
+          onToggle={toggleSection}
+          showMoneyToggle={!isGuest}
+        />
         <button
           type="button"
           className="weekly-cell__delete"
@@ -904,6 +993,8 @@ export function WeeklyPlannerCell({ ydoc, onDelete, isGuest }: Props) {
               date={date}
               todos={days[day]}
               money={isGuest ? null : (moneyLog[date] ?? [])}
+              showTodos={sections.todos}
+              showMoney={sections.money}
               isToday={todayKey === day}
               ydoc={ydoc}
               plan={plan}

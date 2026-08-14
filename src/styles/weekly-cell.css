@@ -89,6 +89,48 @@
   padding: 1px 4px;
 }
 
+/* ---- Section toggles ---- */
+
+.weekly-section-toggles {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  margin-right: 6px;
+}
+
+.weekly-section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--nb-text-3);
+  background: none;
+  border: none;
+  border-radius: var(--nb-r-xs);
+  padding: 2px 6px;
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+}
+
+.weekly-section-toggle:hover {
+  background: var(--nb-weekly-today-bg, rgba(0, 0, 0, 0.05));
+  color: var(--nb-text-2);
+}
+
+/* Open reads as active; closed recedes to the muted default. */
+.weekly-section-toggle--on {
+  color: var(--nb-weekly-accent);
+}
+
+.weekly-section-toggle__chevron {
+  font-size: 9px;
+  line-height: 1;
+}
+
 .weekly-cell__delete {
   background: none;
   border: none;
@@ -122,7 +164,8 @@
 .weekly-cell__grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
+  column-gap: 6px;
+  row-gap: 6px;
 }
 
 /* Below these widths seven columns would be too thin to read: 4 + 3, then 2s. */
@@ -136,20 +179,43 @@
 
 /* ---- Day column ---- */
 
+/*
+ * A day is a subgrid, not a flex column.
+ *
+ * The five parts — header, todos, add-todo, money, add-money — sit on five rows
+ * that belong to the PARENT grid, so every day shares the same row heights. That
+ * is what keeps the "Thêm…" inputs on one horizontal line across all seven days
+ * even when one day has six todos and the next has none: the todo track is as
+ * tall as the tallest day's todos everywhere, and the input row starts after it.
+ * Done with flex, each column sized itself and the inputs landed wherever.
+ *
+ * Row gap is 0 here (spacing comes from the parts themselves) so that a section
+ * switched off collapses to nothing instead of leaving a 6px ghost behind.
+ */
 .weekly-day {
   background: var(--nb-bg-surface);
   border: 1px solid var(--nb-border-faint);
   border-radius: var(--nb-r-sm);
   padding: 8px;
-  display: flex;
-  flex-direction: column;
   min-height: 80px;
+  display: grid;
+  grid-row: span 5;
+  grid-template-rows: subgrid;
+  row-gap: 0;
+  align-content: start;
 }
+
+.weekly-day__header      { grid-row: 1; }
+.weekly-day__todos       { grid-row: 2; }
+.weekly-day__input--todo { grid-row: 3; }
+.weekly-day__money       { grid-row: 4; }
+.weekly-day__input--money{ grid-row: 5; }
 
 /* Recedes: a weekend is context, not content. Ordered before --today so that a
    weekend which is also today still reads as today. */
 .weekly-day--weekend {
   background: var(--nb-weekly-weekend-bg);
+  border-color: var(--nb-weekly-weekend-border);
 }
 
 .weekly-day--today {
@@ -183,11 +249,11 @@
 /* ---- Todos ---- */
 
 .weekly-day__todos {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
   margin-bottom: 6px;
+  align-self: start;
 }
 
 .weekly-todo {
@@ -293,8 +359,10 @@
   padding: 5px 0 0;
   width: 100%;
   outline: none;
-  flex-shrink: 0;
-  margin-top: auto;
+  /* `margin-top: auto` used to push this to the bottom of a flex column, which
+     is exactly what made the inputs sit at seven different heights. The grid row
+     places it now. */
+  align-self: end;
 }
 
 /*
@@ -324,10 +392,10 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: 6px;
+  margin-top: 8px;
   padding-top: 5px;
   border-top: 1px solid var(--nb-border-faint);
-  flex-shrink: 0;
+  align-self: start;
 }
 
 /*
