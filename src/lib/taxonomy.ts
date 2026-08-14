@@ -22,3 +22,36 @@ export const CAT = {
 } as const;
 
 export type CategoryName = (typeof CAT)[keyof typeof CAT];
+
+/** Identifier → i18n key suffix under `todoCategory.*`. */
+const I18N_KEY: Record<string, string> = {
+  [CAT.MENTAL_WORK]:       'mentalWork',
+  [CAT.JOB_SEARCH]:        'jobSearch',
+  [CAT.WORK]:              'work',
+  [CAT.PERSONAL_PROJECT]:  'personalProject',
+  [CAT.FINANCE]:           'finance',
+  [CAT.RELATIONSHIPS]:     'relationships',
+  [CAT.REST]:              'rest',
+  [CAT.LEISURE]:           'leisure',
+  [CAT.CHORES]:            'chores',
+  [CAT.BAD_MENTAL_HEALTH]: 'badMentalHealth',
+  [CAT.BAD_PHYSICAL]:      'badPhysical',
+};
+
+/**
+ * Display text for a stored category — the same identifier/label split
+ * moneyCategoryLabel uses, and for the same reason: these strings are what the
+ * classifier returns and what todo_classifications stores, so translating them
+ * at the point of storage would make the data language-dependent.
+ *
+ * Falls back to the identifier for anything unrecognised, so a category added
+ * to the backend before this table shows up as readable English rather than a
+ * missing-translation placeholder.
+ */
+export function categoryLabel(
+  t: (key: string) => string,
+  category: string,
+): string {
+  const key = I18N_KEY[category];
+  return key ? t(`todoCategory.${key}`) : category;
+}

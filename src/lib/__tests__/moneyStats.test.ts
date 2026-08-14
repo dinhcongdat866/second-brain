@@ -25,6 +25,7 @@ import {
   parseDongShorthand,
   searchEntries,
   spendByMood,
+  spendByTodoCategory,
   spendByWeekday,
 } from '../moneyStats';
 
@@ -443,5 +444,100 @@ describe('rhythm', () => {
     // 2026-08-15 is a Saturday.
     const rows = spendByWeekday([entry('2026-08-15', 'đi chơi', -400_000)]);
     expect(rows).toEqual([{ day: 5, days: 1, medianSpend: 400_000 }]);
+  });
+});
+
+describe('spendByTodoCategory', () => {
+  /** Nine logged days at 100k, so the baseline median day is a round 100k. */
+  const routine = Array.from({ length: 9 }, (_, i) =>
+    entry(`2026-08-${String(i + 1).padStart(2, '0')}`, 'ăn', -100_000, MONEY_CAT.FOOD));
+
+  it('reports what days holding a category cost, and how that compares', () => {
+    const all = [
+      ...routine,
+      entry('2026-08-10', 'nhậu', -600_000, MONEY_CAT.FOOD),
+      entry('2026-08-11', 'cà phê với bạn', -400_000, MONEY_CAT.FOOD),
+      entry('2026-08-12', 'ăn tiệc', -500_000, MONEY_CAT.FOOD),
+    ];
+    const cats = new Map<string, string[]>([
+      ['2026-08-10', ['Relationships']],
+      ['2026-08-11', ['Relationships']],
+      ['2026-08-12', ['Relationships']],
+      ['2026-08-01', ['Rest']],
+      ['2026-08-02', ['Rest']],
+      ['2026-08-03', ['Rest']],
+    ]);
+
+    const rows = spendByTodoCategory(all, cats);
+    expect(rows.map((r) => r.category)).toEqual(['Relationships', 'Rest']);
+
+    const social = rows[0];
+    expect(social.days).toBe(3);
+    expect(social.medianSpend).toBe(500_000);
+    expect(social.ratio).toBeCloseTo(5, 5);
+    expect(rows[1].medianSpend).toBe(100_000);
+  });
+
+  it('does not treat an unlogged day as a day you spent nothing', () => {
+    // The distinction the whole function rests on. Days with no money lines are
+    // unmeasured, not free; counting them as zero would pull every category
+    // toward zero in exact proportion to how patchy the logging was.
+    const all = [...routine];
+    const withUnlogged = new Map<string, string[]>([
+      ['2026-08-01', ['Rest']],
+      ['2026-08-02', ['Rest']],
+      ['2026-08-03', ['Rest']],
+      // Nothing was logged on these three.
+      ['2026-08-20', ['Rest']],
+      ['2026-08-21', ['Rest']],
+      ['2026-08-22', ['Rest']],
+    ]);
+    const rows = spendByTodoCategory(all, withUnlogged);
+    expect(rows[0].days).toBe(3);
+    expect(rows[0].medianSpend).toBe(100_000);
+  });
+
+  it('does count a logged day that came to nothing', () => {
+    // Income-only is a real observation about the day: money was tracked and
+    // none went out.
+    const all = [
+      ...routine,
+      entry('2026-08-10', 'lương', 20_000_000, MONEY_CAT.SALARY),
+      entry('2026-08-11', 'lương', 20_000_000, MONEY_CAT.SALARY),
+      entry('2026-08-12', 'lương', 20_000_000, MONEY_CAT.SALARY),
+    ];
+    const cats = new Map<string, string[]>([
+      ['2026-08-10', ['Rest']], ['2026-08-11', ['Rest']], ['2026-08-12', ['Rest']],
+    ]);
+    const rows = spendByTodoCategory(all, cats);
+    expect(rows[0]).toMatchObject({ category: 'Rest', days: 3, medianSpend: 0 });
+  });
+
+  it('drops a category seen on too few days', () => {
+    // Two days is a coincidence, and a number nobody should read is worse than
+    // no number.
+    const all = [...routine, entry('2026-08-10', 'mua sắm', -900_000, MONEY_CAT.SHOPPING)];
+    const cats = new Map<string, string[]>([['2026-08-10', ['Leisure']]]);
+    expect(spendByTodoCategory(all, cats)).toEqual([]);
+  });
+
+  it('counts a day toward every category its todos carry', () => {
+    // No attribution is happening: the day's whole spend goes to each category
+    // present, because nothing ties a đồng to a task.
+    const all = [...routine, entry('2026-08-10', 'đi chơi', -300_000, MONEY_CAT.ENTERTAINMENT)];
+    const cats = new Map<string, string[]>([
+      ['2026-08-01', ['Work', 'Rest']],
+      ['2026-08-02', ['Work', 'Rest']],
+      ['2026-08-10', ['Work', 'Rest']],
+    ]);
+    const rows = spendByTodoCategory(all, cats);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].days).toBe(3);
+    expect(rows[1].days).toBe(3);
+    expect(rows[0].medianSpend).toBe(rows[1].medianSpend);
+  });
+
+  it('has nothing to say with no money logged', () => {
+    expect(spendByTodoCategory([], new Map([['2026-08-01', ['Rest']]]))).toEqual([]);
   });
 });

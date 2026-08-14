@@ -16,6 +16,7 @@ import {
   readMonthlyBudget,
   readMoneyAll,
   readMoodLog,
+  readTodoCategoriesByDate,
   readWallets,
   renameWallet,
   setMonthlyBudget,
@@ -41,10 +42,12 @@ import {
   parseDongShorthand,
   searchEntries,
   spendByMood,
+  spendByTodoCategory,
   spendByWeekday,
   todayIso,
 } from '../lib/moneyStats';
 import { moneyCategoryLabel } from '../lib/moneyTaxonomy';
+import { categoryLabel } from '../lib/taxonomy';
 import {
   readActiveWalletId,
   resolveActiveWalletId,
@@ -338,6 +341,7 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
   const [wallets, setWallets] = useState<WalletData[]>(() => readWallets(ydoc));
   const [budget, setBudget] = useState<number>(() => readMonthlyBudget(ydoc));
   const [moodLog, setMoodLog] = useState<Record<string, MoodEntry>>({});
+  const [todoCats, setTodoCats] = useState<Map<string, string[]>>(() => new Map());
   const [month, setMonth] = useState(() => monthOf(today));
   const [sections, setSections] = useState(readSections);
   const [query, setQuery] = useState('');
@@ -377,7 +381,14 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
   useEffect(() => {
     const plans = ydoc.getMap<Y.Map<unknown>>(WEEKLY_PLANS_KEY);
     let plan = plans.get(SHARED_PLAN_ID);
-    const read = () => { if (plan) setMoodLog(readMoodLog(plan)); };
+    const read = () => {
+      if (!plan) return;
+      setMoodLog(readMoodLog(plan));
+      // Categories are cached onto the todos themselves by useClassificationSync,
+      // so they arrive through this same subscription — no fetch, and the panel
+      // fills in by itself the moment the classifier has caught up.
+      setTodoCats(readTodoCategoriesByDate(ydoc));
+    };
     const onPlans = () => {
       const current = plans.get(SHARED_PLAN_ID);
       if (current && current !== plan) {
@@ -430,6 +441,7 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
   const recurring = useMemo(() => detectRecurring(entries, today), [entries, today]);
   const ledger    = useMemo(() => ledgerFrom(entries, today), [entries, today]);
   const byMood    = useMemo(() => spendByMood(entries, moodLog), [entries, moodLog]);
+  const byTodoCat = useMemo(() => spendByTodoCategory(entries, todoCats), [entries, todoCats]);
   const byWeekday = useMemo(() => spendByWeekday(entries), [entries]);
   const found     = useMemo(() => searchEntries(entries, query), [entries, query]);
   const knownMonths = useMemo(() => monthsWithData(entries), [entries]);
@@ -744,7 +756,7 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
           </Section>
 
           <Section id="rhythm" title={t('money.sectionRhythm')} open={sections.rhythm} onToggle={toggleSection}>
-            {byMood.length === 0 && byWeekday.length === 0 ? (
+            {byMood.length === 0 && byWeekday.length === 0 && byTodoCat.length === 0 ? (
               <p className="money-empty">{t('money.noRhythm')}</p>
             ) : (
               <>
@@ -760,6 +772,27 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
                         </li>
                       ))}
                     </ul>
+                  </>
+                )}
+                {byTodoCat.length > 0 && (
+                  <>
+                    <p className="money-sub">{t('money.byTodo')}</p>
+                    <ul className="money-list">
+                      {byTodoCat.map((c) => (
+                        <li key={c.category} className="money-list__row">
+                          <span className="money-list__main">{categoryLabel(t, c.category)}</span>
+                          <span className="money-list__aside">
+                            {t('money.dayCount', { count: c.days })}
+                            {/* Only worth colouring when it is far enough from
+                                your ordinary day to mean anything. */}
+                            {(c.ratio >= 1.5 || c.ratio <= 0.67) &&
+                              ` · ${t('money.timesNormal', { ratio: c.ratio.toFixed(1).replace('.', ',') })}`}
+                          </span>
+                          <span className="money-list__amount">{formatDongCompact(c.medianSpend)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="money-note">{t('money.byTodoNote')}</p>
                   </>
                 )}
                 {byWeekday.length > 0 && (

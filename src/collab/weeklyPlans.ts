@@ -26,6 +26,17 @@ export interface TodoData {
   id: string;
   text: string;
   done: boolean;
+  /**
+   * Analytics categories for this todo, cached from the classifier.
+   *
+   * Empty until useClassificationSync has seen it. Stored here rather than
+   * fetched on demand for the same reason parse results are written back onto a
+   * money entry: the answer is already paid for, and keeping it local is what
+   * lets the money cell correlate spending with what you were doing without a
+   * request. Two devices writing it agree, because both derive it from the same
+   * row in todo_classifications.
+   */
+  categories: string[];
 }
 
 export type AllDays = Record<DayKey, TodoData[]>;
@@ -147,6 +158,12 @@ export function getDayList(plan: Y.Map<unknown>, weekStart: string, day: DayKey)
   return getWeekData(plan, weekStart).get(day) as YDayList;
 }
 
+/** Categories off a todo Y.Map, tolerating the shape from before they existed. */
+function readCategories(todo: YTodo): string[] {
+  const raw = todo.get('categories');
+  return Array.isArray(raw) ? (raw as string[]) : [];
+}
+
 export function readAllDays(plan: Y.Map<unknown>, weekStart: string): AllDays {
   const weekData = getWeekData(plan, weekStart);
   const result = {} as AllDays;
@@ -157,6 +174,7 @@ export function readAllDays(plan: Y.Map<unknown>, weekStart: string): AllDays {
           id:   t.get('id')   as string,
           text: t.get('text') as string,
           done: t.get('done') as boolean,
+          categories: readCategories(t),
         }))
       : [];
   }
@@ -223,6 +241,39 @@ export function deleteTodo(plan: Y.Map<unknown>, weekStart: string, day: DayKey,
       return;
     }
   }
+}
+
+/**
+ * Every date that has todos, mapped to the categories those todos carry.
+ *
+ * The union for the day, de-duplicated — a day with three "Relationships" todos
+ * is still one day spent on relationships. Days whose todos have not been
+ * classified yet simply do not appear, which is the honest state: unknown, not
+ * uncategorised.
+ */
+export function readTodoCategoriesByDate(ydoc: Y.Doc): Map<string, string[]> {
+  const out = new Map<string, Set<string>>();
+  const plans = ydoc.getMap<Y.Map<unknown>>(WEEKLY_PLANS_KEY);
+  plans.forEach((plan) => {
+    const weeks = plan.get('weeks');
+    if (!(weeks instanceof Y.Map)) return;
+    weeks.forEach((weekData, weekStart) => {
+      if (!(weekData instanceof Y.Map)) return;
+      for (const day of DAY_KEYS) {
+        const list = weekData.get(day);
+        if (!(list instanceof Y.Array)) continue;
+        const date = dayToDate(weekStart, day);
+        for (const todo of (list as YDayList).toArray()) {
+          const cats = readCategories(todo);
+          if (cats.length === 0) continue;
+          const bucket = out.get(date) ?? new Set<string>();
+          for (const c of cats) bucket.add(c);
+          out.set(date, bucket);
+        }
+      }
+    });
+  });
+  return new Map([...out].map(([date, set]) => [date, [...set]]));
 }
 
 // ---------------------------------------------------------------------------

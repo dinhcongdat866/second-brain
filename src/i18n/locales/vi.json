@@ -239,6 +239,21 @@
       "confirmDelete": "Xóa — các dòng vẫn giữ",
       "setActive": "Ghi dòng mới vào túi này",
       "isActive": "Dòng mới đang vào túi này"
-    }
+    },
+    "byTodo": "Theo việc bạn làm hôm đó",
+    "byTodoNote": "Là những ngày bạn có làm việc thuộc nhóm này, không phải tiền tiêu cho nhóm đó — một ngày có nhiều việc và chỉ một khoản tiền, nên ở đây không quy đồng nào cho việc nào cả."
+  },
+  "todoCategory": {
+    "mentalWork": "Việc nội tâm",
+    "jobSearch": "Tìm việc",
+    "work": "Công việc",
+    "personalProject": "Dự án riêng",
+    "finance": "Tài chính",
+    "relationships": "Quan hệ",
+    "rest": "Nghỉ ngơi",
+    "leisure": "Giải trí",
+    "chores": "Việc vặt",
+    "badMentalHealth": "Tinh thần xuống",
+    "badPhysical": "Sức khoẻ kém"
   }
 }

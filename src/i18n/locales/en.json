@@ -239,6 +239,21 @@
       "confirmDelete": "Delete — the lines are kept",
       "setActive": "Log new lines here",
       "isActive": "New lines go here"
-    }
+    },
+    "byTodo": "By what you were doing",
+    "byTodoNote": "Days on which you did this, not money spent on it — a day holds several tasks and one pile of money, so nothing here attributes a đồng to a task."
+  },
+  "todoCategory": {
+    "mentalWork": "Mental Work",
+    "jobSearch": "Job Search",
+    "work": "Work",
+    "personalProject": "Personal Project",
+    "finance": "Finance",
+    "relationships": "Relationships",
+    "rest": "Rest",
+    "leisure": "Leisure",
+    "chores": "Chores",
+    "badMentalHealth": "Bad mental health",
+    "badPhysical": "Bad physical health"
   }
 }

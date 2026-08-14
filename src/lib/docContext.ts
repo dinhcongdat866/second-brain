@@ -1,6 +1,13 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import type * as Y from 'yjs';
-import { WEEKLY_PLANS_KEY, readMoneyAll, readWallets, serializeWeeklyForAI, walletBalance } from '../collab/weeklyPlans';
+import {
+  WEEKLY_PLANS_KEY,
+  readMoneyAll,
+  readTodoCategoriesByDate,
+  readWallets,
+  serializeWeeklyForAI,
+  walletBalance,
+} from '../collab/weeklyPlans';
 import {
   categoryBreakdown,
   categoryNorms,
@@ -9,6 +16,7 @@ import {
   ledgerFrom,
   monthOf,
   monthTotals,
+  spendByTodoCategory,
   todayIso,
 } from './moneyStats';
 import { MONEY_CAT } from './moneyTaxonomy';
@@ -120,6 +128,17 @@ export function extractMoneyContext(plannerYdoc: Y.Doc, maxLines = 30): string {
   if (wallets.length > 0) {
     const parts = wallets.map((w, i) => `${w.name} ${walletBalance(all, w.id, i === 0)}`);
     lines.push(`  Wallets: ${parts.join(', ')}`);
+  }
+
+  // Days on which each kind of task appeared, and what those days cost. NOT
+  // money attributed to a task — a day holds several tasks and one pile of
+  // money — so the label says "days with", and the model should repeat that.
+  const byTask = spendByTodoCategory(all, readTodoCategoriesByDate(plannerYdoc));
+  if (byTask.length > 0) {
+    const parts = byTask
+      .slice(0, 6)
+      .map((c) => `${c.category} ${c.medianSpend} (${c.days}d)`);
+    lines.push(`  Median spend on days with each kind of task: ${parts.join(', ')}`);
   }
 
   const debts = ledgerFrom(all, todayIso());

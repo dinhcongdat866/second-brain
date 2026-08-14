@@ -10,9 +10,13 @@ import * as Y from 'yjs';
 import {
   SHARED_PLAN_ID,
   addTodo,
+  dayToDate,
+  getDayList,
   getWeeklyPlan,
   readAllDays,
+  readTodoCategoriesByDate,
   updateTodoText,
+  type DayKey,
 } from '../weeklyPlans';
 
 const WEEK = '2026-08-10';
@@ -101,5 +105,61 @@ describe('updateTodoText', () => {
 
     expect(monTexts(plan)).toEqual(['Sửa bug loading (xong)', 'Deploy backend (xong)']);
     expect(monTexts(peerPlan)).toEqual(monTexts(plan));
+  });
+});
+
+describe('readTodoCategoriesByDate', () => {
+  /** Stamp categories the way useClassificationSync does, straight onto the todo. */
+  function classify(plan: Y.Map<unknown>, week: string, day: DayKey, idx: number, cats: string[]) {
+    const list = getDayList(plan, week, day);
+    list.get(idx).set('categories', cats);
+  }
+
+  it('maps a todo to the date of its column, not the start of its week', () => {
+    // The join the money cell depends on. Classifications are stored per week
+    // in Postgres; spending happens on a day. Getting this wrong would smear a
+    // Friday's category across the Monday's spending.
+    const ydoc = new Y.Doc();
+    const plan = getWeeklyPlan(ydoc, SHARED_PLAN_ID);
+    addTodo(plan, WEEK, 'fri', 'Gặp Tuấn');
+    classify(plan, WEEK, 'fri', 0, ['Relationships']);
+
+    const byDate = readTodoCategoriesByDate(ydoc);
+    expect([...byDate.keys()]).toEqual([dayToDate(WEEK, 'fri')]);
+    expect(byDate.get(dayToDate(WEEK, 'fri'))).toEqual(['Relationships']);
+  });
+
+  it('takes the union of the day, without repeating a category', () => {
+    const ydoc = new Y.Doc();
+    const plan = getWeeklyPlan(ydoc, SHARED_PLAN_ID);
+    addTodo(plan, WEEK, 'mon', 'Gặp Tuấn');
+    addTodo(plan, WEEK, 'mon', 'Ăn cưới');
+    addTodo(plan, WEEK, 'mon', 'Sửa bug');
+    classify(plan, WEEK, 'mon', 0, ['Relationships']);
+    classify(plan, WEEK, 'mon', 1, ['Relationships', 'Leisure']);
+    classify(plan, WEEK, 'mon', 2, ['Work']);
+
+    const cats = readTodoCategoriesByDate(ydoc).get(dayToDate(WEEK, 'mon'))!;
+    expect([...cats].sort()).toEqual(['Leisure', 'Relationships', 'Work']);
+  });
+
+  it('leaves out a day whose todos have not been classified yet', () => {
+    // Absent means unknown, not uncategorised. A day that shows up with an
+    // empty list would be counted as observed and quietly skew the medians.
+    const ydoc = new Y.Doc();
+    const plan = getWeeklyPlan(ydoc, SHARED_PLAN_ID);
+    addTodo(plan, WEEK, 'tue', 'Chưa phân loại');
+    expect(readTodoCategoriesByDate(ydoc).size).toBe(0);
+  });
+
+  it('reads categories back through readAllDays', () => {
+    const ydoc = new Y.Doc();
+    const plan = getWeeklyPlan(ydoc, SHARED_PLAN_ID);
+    addTodo(plan, WEEK, 'wed', 'Nộp CV');
+    classify(plan, WEEK, 'wed', 0, ['Job Search']);
+    expect(readAllDays(plan, WEEK).wed[0].categories).toEqual(['Job Search']);
+    // A todo written before categories existed reads as empty, not undefined.
+    addTodo(plan, WEEK, 'wed', 'Chưa có');
+    expect(readAllDays(plan, WEEK).wed[1].categories).toEqual([]);
   });
 });

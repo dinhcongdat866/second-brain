@@ -728,6 +728,67 @@ export function spendByMood(
     .sort((a, b) => a.energy - b.energy);
 }
 
+export interface TodoCategorySpend {
+  category: string;
+  /** Observed days that had at least one todo in this category. */
+  days: number;
+  /** Median đồng spent on those days. */
+  medianSpend: number;
+  /** medianSpend ÷ the median across all observed days. */
+  ratio: number;
+}
+
+/**
+ * Spending against what you were doing that day.
+ *
+ * **This is not attribution, and the wording has to keep saying so.** A day
+ * holds several todos across several categories and one pile of money; nothing
+ * ties a particular đồng to a particular task. What it answers is narrower and
+ * still worth knowing: *days on which you did X cost this much*.
+ *
+ * Only days with at least one money line count. A day with no lines is not a
+ * day you spent nothing, it is a day you did not write anything down, and
+ * folding those in as zeroes would drag every category toward zero in exact
+ * proportion to how lazy the logging was. A day that was logged and came to
+ * nothing does count as zero, because that is a real observation.
+ *
+ * `minDays` exists because two days is a coincidence. Below it a category is
+ * left out rather than shown with a number nobody should read.
+ */
+export function spendByTodoCategory(
+  entries: MoneyEntryData[],
+  categoriesByDate: Map<string, string[]>,
+  minDays = 3,
+): TodoCategorySpend[] {
+  const observed = new Set<string>();
+  for (const e of entries) {
+    if (countable(e)) observed.add(e.date);
+  }
+  if (observed.size === 0) return [];
+
+  const byDay = dailySpend(entries);
+  const spendOn = (date: string) => byDay.get(date) ?? 0;
+  const baseline = median([...observed].map(spendOn));
+  if (baseline <= 0) return [];
+
+  const buckets = new Map<string, number[]>();
+  for (const date of observed) {
+    for (const category of categoriesByDate.get(date) ?? []) {
+      const bucket = buckets.get(category);
+      if (bucket) bucket.push(spendOn(date));
+      else buckets.set(category, [spendOn(date)]);
+    }
+  }
+
+  return [...buckets.entries()]
+    .filter(([, values]) => values.length >= minDays)
+    .map(([category, values]) => {
+      const med = median(values);
+      return { category, days: values.length, medianSpend: med, ratio: med / baseline };
+    })
+    .sort((a, b) => b.medianSpend - a.medianSpend);
+}
+
 export interface WeekdaySpend {
   /** 0 = Monday, matching DAY_KEYS. */
   day: number;
