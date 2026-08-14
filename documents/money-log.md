@@ -440,9 +440,51 @@ running the old build has to be reloaded. Nothing in the schema-migration
 machinery helps: migrations run forward, and the damage is done by a client that
 has not been upgraded yet.
 
-## 15. Still out
+## 15. Money x todo category
 
-- money × todo-category correlation (needs the week-keyed classification join)
+The one item slice 2 left out, and the reason it was awkward: todo categories
+live in `todo_classifications`, keyed by week, while spending happens on a day.
+Worse, `useClassificationSync` pushed results to Postgres and kept nothing — the
+client had no copy of the answer at all.
+
+Rather than add a range endpoint, the sync now **writes the categories back onto
+the todo in Yjs**, exactly as `useMoneySync` writes parse results back onto a
+money entry. That brings the join into the same place as everything else in this
+slice, and it fixes a second thing on the way: the dirty-check is now split the
+way the money sync's is, so a todo Postgres has already classified is copied
+across for free instead of being re-classified on the user's own key. Before this
+change every load re-derived nothing; after it, the first load would have
+re-classified a whole year of planner if the split had been got wrong.
+
+### It is not attribution, and the wording has to keep saying so
+
+A day holds several todos across several categories and one pile of money.
+Nothing ties a particular đồng to a particular task, and any UI that implies
+otherwise is inventing a number.
+
+So the figure is: *days on which you did X cost this much* — median spend across
+those days, next to the median across all observed days.
+
+Two rules keep it honest:
+
+- **Only days with at least one money line count.** A day with no lines is not a
+  day you spent nothing, it is a day you wrote nothing down; folding those in as
+  zeroes would drag every category toward zero in exact proportion to how patchy
+  the logging was. A day that *was* logged and came to nothing does count as
+  zero, because that is a real observation.
+- **Three days minimum.** Two is a coincidence, and a number nobody should read
+  is worse than no number.
+
+`TodoData` gains `categories: string[]`, `readTodoCategoriesByDate` takes the
+per-day union, and `categoryLabel` in `taxonomy.ts` gives the todo taxonomy the
+same identifier/label split the money taxonomy already had.
+
+Coverage is bounded by `WEEKS_TO_SCAN` in `useClassificationSync` — the
+correlation only sees as far back as classification has run. Since the answers
+are now cached in the doc, that coverage only grows.
+
+## 16. Still out
+
 - receipt photo → entry
 - feeding past corrections back as few-shot examples
 - a runway figure, which needs a reliable notion of total balance across wallets
