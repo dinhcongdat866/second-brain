@@ -83,7 +83,16 @@ export function AiInput({
           rows={1}
           value={prompt}
           placeholder={editing ? t('ai.editPlaceholder') : t('ai.promptPlaceholder')}
-          disabled={streaming}
+          /*
+           * readOnly, not disabled. The browser blurs an element the moment it
+           * becomes disabled, so sending a message dropped the caret out of the
+           * box (measured: focus lands on <body>) and you had to click back in
+           * for every single message. Anything typed while the reply streamed
+           * went nowhere — or to a document-level shortcut handler.
+           * readOnly refuses input while keeping the caret exactly where it is.
+           */
+          readOnly={streaming}
+          aria-busy={streaming}
           onChange={(e) => {
             setPrompt(e.target.value);
             growTextarea(e.target);
@@ -98,7 +107,10 @@ export function AiInput({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              onSubmit();
+              // `disabled` used to swallow this for free; readOnly does not, so
+              // the guard has to be explicit or Enter would queue a second
+              // request on top of the one still streaming.
+              if (!streaming) onSubmit();
             }
             if (e.key === 'Escape' && editing) {
               e.preventDefault();
