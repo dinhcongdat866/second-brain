@@ -85,7 +85,32 @@
     "nextWeek": "Tuần sau",
     "changeWeek": "Đổi tuần",
     "deleteCell": "Xoá cell",
-    "add": "Thêm…"
+    "add": "Thêm…",
+    "addMoney": "+ tiền…",
+    "dayTotal": "Cả ngày",
+    "partialTotal": "Chưa tính hết — còn dòng chưa có số tiền",
+    "needsAmount": "Không thấy số tiền",
+    "needsAmountHint": "giữ nguyên chữ, chờ bạn điền",
+    "parsing": "đang đọc…",
+    "ledger": "Sổ nợ",
+    "ledgerBorrowed": "vay",
+    "ledgerRepaid": "trả",
+    "ledgerOwed": "nợ mình"
+  },
+  "moneyCategory": {
+    "food": "Ăn uống",
+    "transport": "Đi lại",
+    "housing": "Nhà ở",
+    "bills": "Hoá đơn",
+    "health": "Sức khoẻ",
+    "entertainment": "Giải trí",
+    "shopping": "Mua sắm",
+    "education": "Học tập",
+    "salary": "Lương",
+    "otherIncome": "Thu khác",
+    "borrowing": "Vay",
+    "debtRepayment": "Trả nợ",
+    "other": "Khác"
   },
   "markdown": {
     "copy": "Copy nội dung cell"

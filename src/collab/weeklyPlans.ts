@@ -466,6 +466,161 @@ export function readMoodLog(plan: Y.Map<unknown>): Record<string, MoodEntry> {
 }
 
 // ---------------------------------------------------------------------------
+// Money log — a FLAT top-level map, keyed by entry id
+//   ydoc.getMap('moneyLog') → Y.Map<entryId, Y.Map{…MoneyEntryData}>
+// Each entry carries its own `date`; a day or a range is a filter, not a lookup.
+//
+// Two structural decisions, both about the same hazard.
+//
+// Top-level, not nested under the plan next to moodLog: a nested container has
+// to be *created* by whoever writes first, and two offline devices each doing
+// `plan.set('moneyLog', new Y.Map())` is a same-key conflict that discards one
+// side's map wholesale — every line in it, not just the colliding one.
+// Top-level types are resolved by name and never conflict, the same guarantee
+// WEEKLY_PLANS_KEY already relies on.
+//
+// Flat, not Y.Map<date, Y.Array<entry>>: a per-date array is the same trap one
+// level down. Keyed by entry id there is nothing to race — two devices never
+// generate the same uuid, so concurrent writes are always distinct keys.
+//
+// Keyed by day rather than by week/day slot (via the `date` field) because
+// money is a stream that happens to you, not something you place into Tuesday
+// in advance — the same reason moodLog is keyed by date. It also means a date
+// range is one filter instead of enumerating week keys the way WEEKS_TO_SCAN
+// has to.
+// ---------------------------------------------------------------------------
+
+export interface MoneyEntryData {
+  id: string;
+  /** 'YYYY-MM-DD' — which day this line belongs to. */
+  date: string;
+  /** Exactly what the user typed — the source of truth; everything else is derived. */
+  text: string;
+  /**
+   * Signed integer đồng: negative is money out, positive is money in.
+   * null means the parser found no amount — never 0, which would read as a
+   * real entry worth nothing.
+   */
+  amount: number | null;
+  category: string;
+  counterparty: string | null;
+  /** Signed change in what this person is owed. 0 for ordinary entries. */
+  debtDelta: number;
+  status: 'ok' | 'needs_amount';
+  /** Snapshot of `text` when parsed; drives the dirty-check in useMoneySync. */
+  parsedFrom: string | null;
+  /** Insertion order within a day — a flat map has no inherent order. */
+  createdAt: number;
+}
+
+export const MONEY_LOG_KEY = 'moneyLog';
+
+type YMoneyEntry = Y.Map<unknown>;
+
+function moneyMap(ydoc: Y.Doc): Y.Map<YMoneyEntry> {
+  return ydoc.getMap<YMoneyEntry>(MONEY_LOG_KEY);
+}
+
+function readMoneyEntry(entry: YMoneyEntry): MoneyEntryData {
+  const amount = entry.get('amount');
+  return {
+    id:           entry.get('id') as string,
+    date:         entry.get('date') as string,
+    text:         entry.get('text') as string,
+    amount:       typeof amount === 'number' ? amount : null,
+    category:     (entry.get('category') as string | undefined) ?? '',
+    counterparty: (entry.get('counterparty') as string | undefined) ?? null,
+    debtDelta:    (entry.get('debtDelta') as number | undefined) ?? 0,
+    status:       (entry.get('status') as MoneyEntryData['status'] | undefined) ?? 'needs_amount',
+    parsedFrom:   (entry.get('parsedFrom') as string | undefined) ?? null,
+    createdAt:    (entry.get('createdAt') as number | undefined) ?? 0,
+  };
+}
+
+const byCreatedAt = (a: MoneyEntryData, b: MoneyEntryData) => a.createdAt - b.createdAt;
+
+/**
+ * Append a raw line for a date. The entry starts unparsed — the UI shows the
+ * text immediately and useMoneySync fills in the numbers afterwards, so typing
+ * never waits on the network.
+ * Returns the new entry's id (also the Postgres primary key).
+ */
+export function addMoneyEntry(ydoc: Y.Doc, date: string, text: string): string {
+  const id = crypto.randomUUID();
+  const entry: YMoneyEntry = new Y.Map();
+  entry.set('id', id);
+  entry.set('date', date);
+  entry.set('text', text.trim());
+  entry.set('amount', null);
+  entry.set('category', '');
+  entry.set('counterparty', null);
+  entry.set('debtDelta', 0);
+  entry.set('status', 'needs_amount');
+  entry.set('parsedFrom', null);
+  entry.set('createdAt', Date.now());
+  // A uuid key, so two devices adding at once write different keys and both
+  // survive. This is the whole reason the map is flat.
+  moneyMap(ydoc).set(id, entry);
+  return id;
+}
+
+export function readMoneyForDate(ydoc: Y.Doc, date: string): MoneyEntryData[] {
+  const out: MoneyEntryData[] = [];
+  moneyMap(ydoc).forEach((entry) => {
+    if (entry.get('date') === date) out.push(readMoneyEntry(entry));
+  });
+  return out.sort(byCreatedAt);
+}
+
+/** Every money entry, grouped by date (for the day grid, sync and analytics). */
+export function readMoneyLog(ydoc: Y.Doc): Record<string, MoneyEntryData[]> {
+  const result: Record<string, MoneyEntryData[]> = {};
+  moneyMap(ydoc).forEach((raw) => {
+    const entry = readMoneyEntry(raw);
+    (result[entry.date] ??= []).push(entry);
+  });
+  for (const list of Object.values(result)) list.sort(byCreatedAt);
+  return result;
+}
+
+/**
+ * Write parse results back onto an entry, so the line renders correctly offline
+ * on the next load without calling the model again.
+ * Only the keys present in `patch` are touched — `amount: null` is a meaningful
+ * value (flagged), not an absent one.
+ */
+export function updateMoneyEntry(
+  ydoc: Y.Doc,
+  id: string,
+  patch: Partial<Omit<MoneyEntryData, 'id'>>,
+): void {
+  const entry = moneyMap(ydoc).get(id);
+  if (!entry) return;
+  for (const [key, value] of Object.entries(patch)) {
+    entry.set(key, value);
+  }
+}
+
+export function deleteMoneyEntry(ydoc: Y.Doc, id: string): void {
+  moneyMap(ydoc).delete(id);
+}
+
+/**
+ * Net movement for a set of entries. Always recomputed from the list — a stored
+ * total is the one thing that cannot be repaired once two devices have both
+ * added to it. Flagged entries contribute nothing rather than guessing a zero.
+ */
+export function moneyTotal(entries: MoneyEntryData[]): number {
+  return entries.reduce((sum, e) => sum + (e.amount ?? 0), 0);
+}
+
+/** '-85000' → '−85.000'. Uses the real minus sign so it lines up with '+'. */
+export function formatDong(amount: number): string {
+  const sign = amount < 0 ? '−' : '+';
+  return `${sign}${Math.abs(amount).toLocaleString('vi-VN')}`;
+}
+
+// ---------------------------------------------------------------------------
 // Orphan sweep (called at load time, mirrors sweepOrphanThreads)
 // ---------------------------------------------------------------------------
 

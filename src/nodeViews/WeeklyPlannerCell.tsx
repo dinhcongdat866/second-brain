@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type * as Y from 'yjs';
@@ -10,7 +10,14 @@ import {
   type DayKey,
   type AllDays,
   type MoodEntry,
+  type MoneyEntryData,
+  MONEY_LOG_KEY,
   addTodo,
+  addMoneyEntry,
+  deleteMoneyEntry,
+  readMoneyLog,
+  moneyTotal,
+  formatDong,
   getWeeklyPlan,
   toggleTodo,
   deleteTodo,
@@ -32,6 +39,7 @@ import {
   type StyleKind,
 } from '../lib/toolbarStyles';
 import { SelectionToolbarShell } from '../components/SelectionToolbarShell';
+import { moneyCategoryLabel } from '../lib/moneyTaxonomy';
 import { apiFetch } from '../lib/http';
 
 // ---------------------------------------------------------------------------
@@ -427,19 +435,70 @@ function MoodPicker({ date, entry, plan }: MoodPickerProps) {
 // Day column
 // ---------------------------------------------------------------------------
 
+interface MoneyRowProps {
+  entry: MoneyEntryData;
+  onDelete: () => void;
+}
+
+/**
+ * One money line. Three visual states, and the distinction matters:
+ *   - never parsed yet (parsedFrom === null) → the text, and "reading…"
+ *   - parsed, no amount found                → amber warning, NO number shown
+ *   - parsed with an amount                  → signed amount, red or green
+ *
+ * The middle state is the point. A parser that guesses gives you a figure you
+ * will believe, so when the model finds no amount the line keeps the raw text
+ * and says so, rather than falling back to zero.
+ */
+function MoneyRow({ entry, onDelete }: MoneyRowProps) {
+  const { t } = useTranslation();
+  const pending = entry.parsedFrom !== entry.text;
+  const flagged = !pending && entry.amount === null;
+  // `entry.category` is the stored identifier ('Food & Drink'); what the user
+  // reads comes from the locale file.
+  const category = entry.category ? moneyCategoryLabel(t, entry.category) : undefined;
+
+  return (
+    <div className={`weekly-money${flagged ? ' weekly-money--flagged' : ''}`}>
+      <span className="weekly-money__label" title={category}>
+        {entry.text}
+      </span>
+      {pending ? (
+        <span className="weekly-money__pending">{t('weekly.parsing')}</span>
+      ) : flagged ? (
+        <span className="weekly-money__warn" title={t('weekly.needsAmountHint')}>
+          ⚠ {t('weekly.needsAmount')}
+        </span>
+      ) : (
+        <span
+          className={`weekly-money__amount weekly-money__amount--${entry.amount! < 0 ? 'out' : 'in'}`}
+        >
+          {formatDong(entry.amount!)}
+        </span>
+      )}
+      <button type="button" className="weekly-money__del" onClick={onDelete} title="Delete">
+        ×
+      </button>
+    </div>
+  );
+}
+
 interface DayColumnProps {
   day: DayKey;
   date: string;
   todos: AllDays[DayKey];
+  money: MoneyEntryData[];
   isToday: boolean;
+  ydoc: Y.Doc;
   plan: Y.Map<unknown>;
   weekStart: string;
   moodEntry: MoodEntry | null;
 }
 
-function DayColumn({ day, date, todos, isToday, plan, weekStart, moodEntry }: DayColumnProps) {
+function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, moodEntry }: DayColumnProps) {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
+  const [moneyInput, setMoneyInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -449,6 +508,34 @@ function DayColumn({ day, date, todos, isToday, plan, weekStart, moodEntry }: Da
       setInput('');
     }
   };
+
+  const handleMoneyKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    if (e.key === 'Enter' && moneyInput.trim()) {
+      // The line lands in Yjs immediately and renders as pending; useMoneySync
+      // notices and fills in the numbers. Typing never waits on the network.
+      addMoneyEntry(ydoc, date, moneyInput);
+      setMoneyInput('');
+    }
+  };
+
+  const handleMoneyDelete = useCallback((id: string) => {
+    deleteMoneyEntry(ydoc, id);
+    // Drop the SQL projection too, or the entry keeps counting toward monthly
+    // totals and the debt ledger after it has left the document.
+    void apiFetch(`/money/entries/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      .catch(() => { /* offline — a later parse of the surviving lines is still correct */ });
+  }, [ydoc]);
+
+  // Recomputed every render, never stored: two devices each adding to a saved
+  // total would be permanently wrong with no way to tell afterwards.
+  const total = moneyTotal(money);
+  const known = money.filter((e) => e.amount !== null).length;
+  // A day whose lines are all still pending would otherwise total "+0", which
+  // reads as "spent nothing today" — a confident wrong number, the exact thing
+  // the flagged state exists to avoid. Show nothing until something is known,
+  // and mark the figure as partial while any line is still unaccounted for.
+  const totalIsPartial = known < money.length;
 
   return (
     <div className={`weekly-day${isToday ? ' weekly-day--today' : ''}`}>
@@ -492,6 +579,86 @@ function DayColumn({ day, date, todos, isToday, plan, weekStart, moodEntry }: Da
         onKeyDown={handleKeyDown}
         onClick={(e) => e.stopPropagation()}
       />
+      <div className="weekly-day__money">
+        {money.map((entry) => (
+          <MoneyRow key={entry.id} entry={entry} onDelete={() => handleMoneyDelete(entry.id)} />
+        ))}
+        {known > 0 && (
+          <div
+            className="weekly-money__total"
+            title={totalIsPartial ? t('weekly.partialTotal') : undefined}
+          >
+            <span>{t('weekly.dayTotal')}</span>
+            <span className={`weekly-money__amount--${total < 0 ? 'out' : 'in'}`}>
+              {formatDong(total)}{totalIsPartial ? '…' : ''}
+            </span>
+          </div>
+        )}
+        <input
+          className="weekly-day__input weekly-day__input--money"
+          placeholder={t('weekly.addMoney')}
+          value={moneyInput}
+          onChange={(e) => setMoneyInput(e.target.value)}
+          onKeyDown={handleMoneyKeyDown}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Debt ledger
+// ---------------------------------------------------------------------------
+
+interface LedgerRow {
+  counterparty: string;
+  borrowed: number;
+  repaid: number;
+  balance: number;
+}
+
+/**
+ * Per-person balance, always fetched — never accumulated client-side.
+ *
+ * `signature` changes only when a debt-bearing line changes, so editing todos
+ * (by far the more common planner activity) never triggers a refetch.
+ * Settled people are dropped by the backend, so an empty result renders nothing
+ * rather than a row of zeroes.
+ */
+function DebtLedger({ signature }: { signature: string }) {
+  const { t } = useTranslation();
+  const [rows, setRows] = useState<LedgerRow[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch('/money/ledger')
+      .then((res) => res.json())
+      .then((data: LedgerRow[]) => { if (!cancelled) setRows(data); })
+      .catch(() => { /* guest or offline — panel stays hidden */ });
+    return () => { cancelled = true; };
+  }, [signature]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="weekly-ledger">
+      <div className="weekly-ledger__title">{t('weekly.ledger')}</div>
+      {rows.map((row) => (
+        <div key={row.counterparty} className="weekly-ledger__row">
+          <span className="weekly-ledger__who">{row.counterparty}</span>
+          <span className="weekly-ledger__detail">
+            {`${row.borrowed.toLocaleString('vi-VN')} ${t('weekly.ledgerBorrowed')} · ${row.repaid.toLocaleString('vi-VN')} ${t('weekly.ledgerRepaid')}`}
+          </span>
+          <span
+            className={`weekly-ledger__balance weekly-ledger__balance--${row.balance > 0 ? 'owe' : 'owed'}`}
+          >
+            {row.balance > 0
+              ? row.balance.toLocaleString('vi-VN')
+              : `${t('weekly.ledgerOwed')} ${Math.abs(row.balance).toLocaleString('vi-VN')}`}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -512,6 +679,7 @@ export function WeeklyPlannerCell({ ydoc, onDelete }: Props) {
   const [weekStart, setWeekStartState] = useState<string>(() => plan.get('weekStart') as string);
   const [days, setDays] = useState<AllDays>(() => readAllDays(plan, plan.get('weekStart') as string));
   const [moodLog, setMoodLog] = useState<Record<string, MoodEntry>>(() => readMoodLog(plan));
+  const [moneyLog, setMoneyLog] = useState<Record<string, MoneyEntryData[]>>(() => readMoneyLog(ydoc));
   const [editingWeek, setEditingWeek] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
@@ -545,6 +713,27 @@ export function WeeklyPlannerCell({ ydoc, onDelete }: Props) {
     handler();
     return () => plan.unobserveDeep(handler);
   }, [plan]);
+
+  // Money lives in its own top-level map, not under the plan, so it needs its
+  // own subscription — and gets one that todo edits never wake.
+  useEffect(() => {
+    const entries = ydoc.getMap(MONEY_LOG_KEY);
+    const handler = () => setMoneyLog(readMoneyLog(ydoc));
+    entries.observeDeep(handler);
+    handler();
+    return () => entries.unobserveDeep(handler);
+  }, [ydoc]);
+
+  // Only debt-bearing lines can move a ledger balance, so the panel refetches
+  // when one of those changes and stays quiet through ordinary edits.
+  const ledgerSignature = useMemo(
+    () => Object.values(moneyLog)
+      .flat()
+      .filter((e) => e.debtDelta !== 0)
+      .map((e) => `${e.id}:${e.debtDelta}:${e.counterparty ?? ''}`)
+      .join('|'),
+    [moneyLog],
+  );
 
   // When the date field opens, focus it and try to pop the native picker
   // (visible input → showPicker is reliable; falls back to plain focus).
@@ -620,7 +809,9 @@ export function WeeklyPlannerCell({ ydoc, onDelete }: Props) {
               day={day}
               date={date}
               todos={days[day]}
+              money={moneyLog[date] ?? []}
               isToday={todayKey === day}
+              ydoc={ydoc}
               plan={plan}
               weekStart={weekStart}
               moodEntry={moodLog[date] ?? null}
@@ -628,6 +819,7 @@ export function WeeklyPlannerCell({ ydoc, onDelete }: Props) {
           );
         })}
       </div>
+      <DebtLedger signature={ledgerSignature} />
       <WeeklySelectionToolbar containerRef={containerRef} plan={plan} weekStart={weekStart} />
     </div>
   );

@@ -62,3 +62,10 @@ async def run_migrations() -> None:
             "CREATE INDEX IF NOT EXISTS ix_yjs_updates_owner "
             "ON yjs_updates (user_id, doc_id, id)"
         ))
+
+        # Phase 6: money entries. Every read is a date range for one user, so
+        # the index matches (user_id, date) — the same shape mood_logs uses.
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_money_entries_user_date "
+            "ON money_entries (user_id, date)"
+        ))

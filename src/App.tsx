@@ -22,6 +22,7 @@ import { useUIStore } from './stores/uiStore';
 import { AiReportPage } from './components/AiReportPage';
 import { useAnalyticsContext } from './hooks/useAnalyticsContext';
 import { useClassificationSync } from './hooks/useClassificationSync';
+import { useMoneySync } from './hooks/useMoneySync';
 import { usePlannerYdoc } from './hooks/usePlannerYdoc';
 import './styles/main.css';
 
@@ -73,6 +74,7 @@ function App() {
   const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory, getAnalyticsContext, plannerHandle);
   const peers = usePresence(providerRef);
   useClassificationSync(plannerYdoc, !isGuest, plannerReady);
+  useMoneySync(plannerYdoc, !isGuest, plannerReady);
   const [showHistory, setShowHistory] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);

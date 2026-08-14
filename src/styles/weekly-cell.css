@@ -234,6 +234,157 @@
   border-top-color: var(--nb-weekly-border);
 }
 
+/* ---- Money log — the tier below the todos ---- */
+
+.weekly-day__money {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--nb-border-faint);
+  flex-shrink: 0;
+}
+
+/*
+ * Two lines, not one: a day column is ~110px wide, and a row of
+ * [label | amount | ×] leaves the label so little room that Vietnamese text
+ * wraps one character per line. The label gets a full-width line of its own and
+ * the amount is pushed right underneath it, which holds at any column width.
+ */
+.weekly-money {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 5px;
+  position: relative;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.weekly-money__label {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--nb-text);
+  overflow-wrap: break-word;
+  user-select: text;
+}
+
+.weekly-money__amount {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-money__amount--out { color: var(--nb-money-out); }
+.weekly-money__amount--in  { color: var(--nb-money-in); }
+
+.weekly-money__pending {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--nb-text-3);
+  font-style: italic;
+}
+
+/* Flagged line: the raw text stays, and no number is shown at all. */
+.weekly-money__warn {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--nb-money-warn);
+  background: var(--nb-money-warn-bg);
+  border-radius: var(--nb-r-xs);
+  padding: 0 4px;
+  overflow-wrap: break-word;
+}
+
+.weekly-money--flagged .weekly-money__label {
+  color: var(--nb-text-2);
+}
+
+.weekly-money__del {
+  opacity: 0;
+  font-size: 13px;
+  color: var(--nb-text-3);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: opacity 0.1s, color 0.1s;
+}
+
+.weekly-money:hover .weekly-money__del { opacity: 1; }
+.weekly-money__del:hover { color: var(--nb-danger); }
+
+.weekly-money__total {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--nb-text-3);
+  padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The label must never wrap — "All day" splitting across two lines in a narrow
+   column reads as two separate rows. The number wraps instead if it has to. */
+.weekly-money__total > span:first-child {
+  white-space: nowrap;
+}
+
+.weekly-day__input--money {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 3px;
+}
+
+/* ---- Debt ledger ---- */
+
+.weekly-ledger {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--nb-border-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.weekly-ledger__title {
+  font-size: 11px;
+  color: var(--nb-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.weekly-ledger__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.weekly-ledger__who {
+  color: var(--nb-text);
+  flex-shrink: 0;
+}
+
+.weekly-ledger__detail {
+  flex: 1;
+  text-align: center;
+  color: var(--nb-text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-ledger__balance {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-ledger__balance--owe  { color: var(--nb-money-out); }
+.weekly-ledger__balance--owed { color: var(--nb-money-in); }
+
 /* ProseMirror selected state */
 .weekly-cell-wrapper.ProseMirror-selectednode .weekly-cell {
   outline: 2px solid var(--nb-weekly-accent);

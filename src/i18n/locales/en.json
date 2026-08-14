@@ -85,7 +85,32 @@
     "nextWeek": "Next week",
     "changeWeek": "Change week",
     "deleteCell": "Delete cell",
-    "add": "Add…"
+    "add": "Add…",
+    "addMoney": "+ money…",
+    "dayTotal": "All day",
+    "partialTotal": "Incomplete — some lines have no amount yet",
+    "needsAmount": "No amount found",
+    "needsAmountHint": "text kept, waiting for you to fill in",
+    "parsing": "reading…",
+    "ledger": "Debt ledger",
+    "ledgerBorrowed": "borrowed",
+    "ledgerRepaid": "repaid",
+    "ledgerOwed": "they owe"
+  },
+  "moneyCategory": {
+    "food": "Food & Drink",
+    "transport": "Transport",
+    "housing": "Housing",
+    "bills": "Bills",
+    "health": "Health",
+    "entertainment": "Entertainment",
+    "shopping": "Shopping",
+    "education": "Education",
+    "salary": "Salary",
+    "otherIncome": "Other Income",
+    "borrowing": "Borrowing",
+    "debtRepayment": "Debt Repayment",
+    "other": "Other"
   },
   "markdown": {
     "copy": "Copy cell content"

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, DateTime, Text, LargeBinary, Integer, Numeric, Index
+from sqlalchemy import String, DateTime, Text, LargeBinary, BigInteger, Integer, Numeric, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from pgvector.sqlalchemy import Vector
 from app.db.engine import Base
@@ -118,6 +118,46 @@ class TodoClassification(Base):
     )
 
     __table_args__ = (Index("ix_todo_classifications_user_week", "user_id", "week_start"),)
+
+
+class MoneyEntry(Base):
+    """
+    One money line, parsed out of free text by the LLM — the SQL projection of
+    `moneyLog` in the planner Y.Doc.
+
+    The Y.Doc keeps whatever is needed to render a day offline; this table
+    exists for the questions SQL is good at: totals over a month, breakdown by
+    category, and the per-counterparty debt balance.
+    """
+    __tablename__ = "money_entries"
+
+    entry_id: Mapped[str] = mapped_column(String, primary_key=True)  # id of the Y.Doc entry
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    date: Mapped[str] = mapped_column(String, nullable=False)        # 'YYYY-MM-DD'
+    raw_text: Mapped[str] = mapped_column(Text, nullable=False)      # snapshot at parse time (dirty-check)
+
+    # BigInteger, not Integer: 32 triệu fits in int32, 3 tỷ does not.
+    # Signed đồng — negative is money out, positive is money in. NULL only when
+    # the model found no amount; it is never defaulted to 0, because there is no
+    # honest default for "how much money" (see status below).
+    amount: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    counterparty: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Signed change to what this person is owed. Borrowing is positive (I owe
+    # more), repaying negative. The balance is always SUM(debt_delta) — a stored
+    # running balance would be unrecoverably wrong the first time two devices
+    # both added to it.
+    debt_delta: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+    status: Mapped[str] = mapped_column(String, nullable=False)      # 'ok' | 'needs_amount'
+    taxonomy_version: Mapped[int] = mapped_column(Integer, default=1)
+    parsed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (Index("ix_money_entries_user_date", "user_id", "date"),)
 
 
 class MoodLog(Base):
