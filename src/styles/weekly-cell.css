@@ -189,6 +189,22 @@
   text-decoration-color: rgba(59, 111, 204, 0.45);
 }
 
+/* Inline editor — sits exactly where the rendered text was, so opening it does
+   not shift the row. Shows raw source, markers included. */
+.weekly-todo__edit {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1.5;
+  color: var(--nb-text);
+  background: var(--nb-bg-surface);
+  border: 1px solid var(--nb-weekly-accent);
+  border-radius: var(--nb-r-xs);
+  padding: 0 3px;
+  outline: none;
+}
+
 .weekly-todo__del {
   opacity: 0;
   font-size: 13px;

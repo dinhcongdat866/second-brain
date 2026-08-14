@@ -9,10 +9,12 @@ import {
   WEEKLY_PLANS_KEY,
   type DayKey,
   type AllDays,
+  type TodoData,
   type MoodEntry,
   type MoneyEntryData,
   MONEY_LOG_KEY,
   addTodo,
+  updateTodoText,
   addMoneyEntry,
   deleteMoneyEntry,
   readMoneyLog,
@@ -500,7 +502,39 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
   const { t } = useTranslation();
   const [input, setInput] = useState('');
   const [moneyInput, setMoneyInput] = useState('');
+  // Which todo is open for editing, and the uncommitted draft of its raw text.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const editRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editingId) return;
+    const el = editRef.current;
+    el?.focus();
+    el?.select();
+  }, [editingId]);
+
+  const startEdit = (todo: TodoData) => {
+    // The raw source, not the rendered HTML: what you edit is what is stored,
+    // markers and all, which is the same string formatTodoText works on.
+    setDraft(todo.text);
+    setEditingId(todo.id);
+  };
+
+  const commitEdit = () => {
+    if (editingId) updateTodoText(plan, weekStart, day, editingId, draft);
+    setEditingId(null);
+  };
+
+  const handleEditKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { commitEdit(); return; }
+    // Escape drops the draft. Blur (below) saves, so this is the only way out
+    // that discards — worth having, since the input starts fully selected and
+    // one keystroke can wipe the line.
+    if (e.key === 'Escape') setEditingId(null);
+  };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     e.stopPropagation();
@@ -554,12 +588,29 @@ function DayColumn({ day, date, todos, money, isToday, ydoc, plan, weekStart, mo
               onChange={() => toggleTodo(plan, weekStart, day, todo.id)}
               onKeyDown={(e) => e.stopPropagation()}
             />
-            <span
-              data-todo-id={todo.id}
-              data-day={day}
-              className={`weekly-todo__text${todo.done ? ' weekly-todo__text--done' : ''}`}
-              dangerouslySetInnerHTML={{ __html: renderMd(todo.text) }}
-            />
+            {editingId === todo.id ? (
+              <input
+                ref={editRef}
+                className="weekly-todo__edit"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={handleEditKeyDown}
+                onBlur={commitEdit}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span
+                data-todo-id={todo.id}
+                data-day={day}
+                className={`weekly-todo__text${todo.done ? ' weekly-todo__text--done' : ''}`}
+                // Double-click, not click: selecting text inside this span is
+                // what drives the formatting toolbar, so a single click has to
+                // keep meaning "select". Same idiom as renaming a document.
+                onDoubleClick={() => startEdit(todo)}
+                title={t('weekly.editHint')}
+                dangerouslySetInnerHTML={{ __html: renderMd(todo.text) }}
+              />
+            )}
             <button
               type="button"
               className="weekly-todo__del"

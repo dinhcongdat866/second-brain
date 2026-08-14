@@ -184,6 +184,35 @@ export function toggleTodo(plan: Y.Map<unknown>, weekStart: string, day: DayKey,
   }
 }
 
+/**
+ * Replace a todo's text.
+ *
+ * The stored string is raw source — it may carry `**bold**` and `{c=…}` style
+ * markers — so an editor built on this shows and saves that source, which is
+ * also what formatTodoText operates on. An empty result is ignored rather than
+ * treated as a delete: losing a line to a stray Ctrl+A is not worth the
+ * shortcut, and there is already an explicit × button.
+ */
+export function updateTodoText(
+  plan: Y.Map<unknown>,
+  weekStart: string,
+  day: DayKey,
+  todoId: string,
+  text: string,
+): void {
+  const next = text.trim();
+  if (!next) return;
+  const list = getDayList(plan, weekStart, day);
+  if (!list) return;
+  for (let i = 0; i < list.length; i++) {
+    const todo = list.get(i);
+    if (todo.get('id') === todoId) {
+      if (todo.get('text') !== next) todo.set('text', next);
+      return;
+    }
+  }
+}
+
 export function deleteTodo(plan: Y.Map<unknown>, weekStart: string, day: DayKey, todoId: string): void {
   const list = getDayList(plan, weekStart, day);
   if (!list) return;

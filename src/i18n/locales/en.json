@@ -86,6 +86,7 @@
     "changeWeek": "Change week",
     "deleteCell": "Delete cell",
     "add": "Add…",
+    "editHint": "Double-click to edit",
     "addMoney": "+ money…",
     "dayTotal": "All day",
     "partialTotal": "Incomplete — some lines have no amount yet",
