@@ -11,6 +11,10 @@ import { FloatingToolbar } from './components/FloatingToolbar';
 import { Sidebar } from './components/Sidebar';
 import { SlashMenu } from './components/SlashMenu';
 import { SnapshotModal } from './components/SnapshotModal';
+import { ShareModal } from './components/ShareModal';
+import { DocNotFoundPage, SharedDocPage } from './components/SharedDocPage';
+import { useDocSession } from './hooks/useDocSession';
+import { navigateToDoc } from './lib/router';
 import { useDocRegistry, useGuestDocRegistry } from './hooks/useDocRegistry';
 import { useMemory } from './hooks/useMemory';
 import { useNotebookEditor } from './hooks/useNotebookEditor';
@@ -161,17 +165,34 @@ function App() {
   const { status: authStatus, user } = useAuthStore();
   const isGuest = authStatus === 'guest';
   const userId = user?.id;
-  const authRegistry = useDocRegistry(userId);
+  const authRegistry = useDocRegistry(userId, !isGuest);
   const guestRegistry = useGuestDocRegistry();
   const registry = isGuest ? guestRegistry : authRegistry;
+  const session = useDocSession(
+    registry.activeDocId,
+    registry.docs.map((d) => d.id),
+    isGuest,
+  );
   const { getMemoryContext, appendMemory } = useMemory(isGuest ? undefined : userId);
   const { getAnalyticsContext } = useAnalyticsContext(!isGuest);
   const { ydoc: plannerYdoc, isReady: plannerReady, handle: plannerHandle } = usePlannerYdoc(userId, isGuest);
-  const { view, ydoc, providerRef } = useNotebookEditor(editorRef, registry.activeDocId, isGuest, userId, getMemoryContext, appendMemory, getAnalyticsContext, plannerHandle);
+  const { view, ydoc, providerRef } = useNotebookEditor(
+    editorRef,
+    registry.activeDocId,
+    isGuest,
+    userId,
+    getMemoryContext,
+    appendMemory,
+    getAnalyticsContext,
+    plannerHandle,
+    undefined,
+    session.kind === 'own',
+  );
   const peers = usePresence(providerRef);
   useClassificationSync(plannerYdoc, !isGuest, plannerReady);
   useMoneySync(plannerYdoc, !isGuest, plannerReady);
   const [showHistory, setShowHistory] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(220);
@@ -262,6 +283,29 @@ function App() {
   const activeDocName = activeDoc?.name ?? '';
   const activeDocBg = activeDoc?.bgImage;
 
+  const goHome = () => {
+    const mine = registry.docs[0]?.id;
+    if (mine) navigateToDoc(mine);
+  };
+
+  // Someone else's document, reached by link. A separate page rather than a
+  // mode: the sidebar, history, background and export all act on documents you
+  // own, and none of them mean anything here.
+  if (session.kind === 'shared') {
+    return (
+      <SharedDocPage
+        docId={registry.activeDocId}
+        ownerId={session.ownerId}
+        canWrite={session.canWrite}
+        name={session.name}
+        onLeave={registry.docs.length > 0 ? goHome : undefined}
+      />
+    );
+  }
+  if (session.kind === 'missing') {
+    return <DocNotFoundPage onLeave={registry.docs.length > 0 ? goHome : undefined} />;
+  }
+
   return (
     <div className="app">
       {isGuest && <GuestBanner />}
@@ -293,6 +337,15 @@ function App() {
           >
             <Icon name="history" />
           </Button>
+          {!isGuest && (
+            <Button
+              variant="icon"
+              onClick={() => setShowShare(true)}
+              title={t('share.title')}
+            >
+              <Icon name="share" />
+            </Button>
+          )}
           {!isGuest && (
             <Button
               variant="icon"
@@ -387,6 +440,13 @@ function App() {
         </main>
       </div>
 
+      {showShare && !isGuest && (
+        <ShareModal
+          docId={registry.activeDocId}
+          docName={activeDocName}
+          onClose={() => setShowShare(false)}
+        />
+      )}
       {showHistory && ydoc && view && (
         <SnapshotModal
           ydoc={ydoc}

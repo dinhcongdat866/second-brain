@@ -12,6 +12,7 @@ import {
   initProseMirrorDoc,
 } from 'y-prosemirror';
 import type * as Y from 'yjs';
+import type { Node as PMNode } from 'prosemirror-model';
 import type { Awareness } from 'y-protocols/awareness';
 import { WebsocketProvider } from 'y-websocket';
 
@@ -42,6 +43,7 @@ import { AiCellView } from '../nodeViews/aiCellView';
 import { MarkdownCellView } from '../nodeViews/markdownCellView';
 import { WeeklyCellView } from '../nodeViews/weeklyCellView';
 import { MoneyCellView } from '../nodeViews/moneyCellView';
+import { PersonalCellView } from '../nodeViews/personalCellView';
 import { startAutoSnapshot } from '../collab/snapshots';
 import {
   createCollabSetup,
@@ -60,6 +62,21 @@ import { exposeYDoc } from '../lib/devYDocs';
 import { createDocSyncer, createYjsSyncer, applyServerState } from '../lib/backendSync';
 
 type ProseMirrorMapping = ReturnType<typeof initProseMirrorDoc>['mapping'];
+
+/**
+ * Where the document comes from and what may be done to it.
+ *
+ * `shared` is not just `!own`: it decides whose relay room to join and whose
+ * cache to write, and it withdraws the three cells that read personal data.
+ */
+export interface DocSource {
+  /** Whose room. Differs from the viewer only for a document reached by link. */
+  ownerId?: string;
+  shared: boolean;
+  readOnly: boolean;
+}
+
+const OWN_DOC: DocSource = { shared: false, readOnly: false };
 
 function createPlugins(
   yXmlFragment: Y.XmlFragment,
@@ -124,6 +141,7 @@ function bindEditor(
   appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void,
   getAnalyticsContext: () => string,
   planner: PlannerHandle,
+  source: DocSource = OWN_DOC,
 ): (() => void) | undefined {
   sweepOrphanThreads(doc, yXmlFragment);
   sweepOrphanWeeklyPlans(doc, yXmlFragment);
@@ -137,7 +155,9 @@ function bindEditor(
   let stopSyncer: (() => void) | undefined;
   let detachLifecycle: (() => void) | undefined;
 
-  if (!isGuest) {
+  // A reader persists nothing. Every write path below would be refused by the
+  // backend anyway, so running them would only produce a stream of 403s.
+  if (!isGuest && !source.readOnly) {
     unwireSave = wireSaveStatus(doc);
     stopSnapshot = startAutoSnapshot(doc);
     const syncer = createYjsSyncer(activeDocId, doc);
@@ -169,14 +189,25 @@ function bindEditor(
       doc: pmDoc,
       plugins: createPlugins(yXmlFragment, mapping, awareness, activeDocId),
     });
-    const syncDoc = isGuest ? () => {} : createDocSyncer(activeDocId);
+    const syncDoc = isGuest || source.readOnly ? () => {} : createDocSyncer(activeDocId);
+    // The AI, planner and money cells all read the VIEWER's own data — their
+    // API key, their week, their money — not the author's. Rendered as-is in
+    // someone else's document they would quietly show you your own life inside
+    // their page, so a shared document gets a plaque where they were.
+    const personalCell = source.shared
+      ? (node: PMNode) => new PersonalCellView(node)
+      : null;
     v = new EditorView(container, {
       state,
+      editable: () => !source.readOnly,
       nodeViews: {
         markdown_cell: (node, view, getPos) => new MarkdownCellView(node, view, getPos),
-        ai_cell: (node, view, getPos) => new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext, appendMemory, getAnalyticsContext, planner),
-        weekly_planner_cell: (node, view, getPos) => new WeeklyCellView(node, view, getPos, planner, isGuest),
-        money_cell: (node, view, getPos) => new MoneyCellView(node, view, getPos, planner, isGuest),
+        ai_cell: (node, view, getPos) => personalCell?.(node)
+          ?? new AiCellView(node, view, getPos, doc, activeDocId, getMemoryContext, appendMemory, getAnalyticsContext, planner),
+        weekly_planner_cell: (node, view, getPos) => personalCell?.(node)
+          ?? new WeeklyCellView(node, view, getPos, planner, isGuest),
+        money_cell: (node, view, getPos) => personalCell?.(node)
+          ?? new MoneyCellView(node, view, getPos, planner, isGuest),
       },
       handleDOMEvents: {
         click(_view, event) {
@@ -219,13 +250,23 @@ export function useNotebookEditor(
   appendMemory: (bullets: string[], meta: { sourceCellId: string; sourceDocId: string }) => void = () => {},
   getAnalyticsContext: () => string = () => '',
   planner: PlannerHandle = nullPlannerHandle,
+  source: DocSource = OWN_DOC,
+  /**
+   * False while the caller does not yet know whether this document is theirs.
+   *
+   * Binding early would be worse than a short wait: a document that turns out
+   * to belong to someone else would first have been opened in the viewer's own
+   * room, under the viewer's own cache, and — if the id happened to be free —
+   * seeded with fresh content there.
+   */
+  enabled = true,
 ) {
   const [view, setView] = useState<EditorView | null>(null);
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
 
   useEffect(() => {
-    if (!editorRef.current) return;
+    if (!editorRef.current || !enabled) return;
 
     // ── Guest path ── no IndexedDB, no WebSocket, no Neon sync
     if (isGuest) {
@@ -269,7 +310,12 @@ export function useNotebookEditor(
     }
 
     // ── Authenticated path ── full persistence + Neon sync
-    const { ydoc: doc, persistence, provider, yXmlFragment } = createCollabSetup(activeDocId, userId);
+    const { ydoc: doc, persistence, provider, yXmlFragment, releaseToken } =
+      createCollabSetup(activeDocId, {
+        userId,
+        ownerId: source.ownerId ?? userId,
+        shared: source.shared,
+      });
     providerRef.current = provider;
     let editorCleanup: (() => void) | undefined;
     let cancelled = false;
@@ -288,6 +334,7 @@ export function useNotebookEditor(
         appendMemory,
         getAnalyticsContext,
         planner,
+        source,
       );
     };
 
@@ -339,7 +386,7 @@ export function useNotebookEditor(
         });
         if (cancelled) return;
       }
-      seedIfEmpty(doc, yXmlFragment);
+      if (!source.readOnly) seedIfEmpty(doc, yXmlFragment);
       bind();
     }).catch((err) => {
       // Without this, any throw above (corrupt server state blob, sweep or
@@ -352,6 +399,7 @@ export function useNotebookEditor(
     return () => {
       cancelled = true;
       editorCleanup?.();
+      releaseToken();
       provider.destroy();
       persistence.destroy();
       doc.destroy();
@@ -363,7 +411,7 @@ export function useNotebookEditor(
   // is inert — the planner Y.Doc arriving no longer tears the editor down and
   // re-fetches the document. Weekly cells render a placeholder and swap
   // themselves in when the handle notifies them (see collab/plannerHandle).
-  }, [activeDocId, isGuest, userId, planner]); // editorRef is stable
+  }, [activeDocId, isGuest, userId, planner, source, enabled]); // editorRef is stable
 
   return { view, ydoc, providerRef };
 }

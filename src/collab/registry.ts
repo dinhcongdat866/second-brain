@@ -16,9 +16,8 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
-import { collabRoom, collabDbName } from './ydoc';
+import { collabRoom, collabDbName, createTokenedProvider } from './ydoc';
 import { applyServerState } from '../lib/backendSync';
-import { WS_URL } from '../lib/config';
 
 /** doc_id / room suffix for the registry's own Y.Doc. */
 export const REGISTRY_DOC_ID = '__registry__';
@@ -42,6 +41,7 @@ export interface RegistrySetup {
   ydoc: Y.Doc;
   persistence: IndexeddbPersistence;
   provider: WebsocketProvider;
+  releaseToken: () => void;
   docsMap: DocsMap;
   /** Resolves after local IndexedDB load + Neon server-state merge. */
   whenReady: Promise<void>;
@@ -50,14 +50,14 @@ export interface RegistrySetup {
 export function createRegistrySetup(userId?: string): RegistrySetup {
   const ydoc = new Y.Doc();
   const persistence = new IndexeddbPersistence(collabDbName(REGISTRY_DOC_ID, userId), ydoc);
-  const provider = new WebsocketProvider(WS_URL, collabRoom(REGISTRY_DOC_ID, userId), ydoc);
+  const provider = createTokenedProvider(collabRoom(REGISTRY_DOC_ID, userId), ydoc, REGISTRY_DOC_ID);
   const docsMap = ydoc.getMap<Y.Map<unknown>>(REGISTRY_DOCS_KEY);
 
   const whenReady = persistence.whenSynced.then(async () => {
     await applyServerState(REGISTRY_DOC_ID, ydoc);
   });
 
-  return { ydoc, persistence, provider, docsMap, whenReady };
+  return { ydoc, persistence, provider, docsMap, whenReady, releaseToken: provider.releaseToken };
 }
 
 // ---------------------------------------------------------------------------

@@ -69,3 +69,16 @@ async def run_migrations() -> None:
             "CREATE INDEX IF NOT EXISTS ix_money_entries_user_date "
             "ON money_entries (user_id, date)"
         ))
+
+        # Phase 7: link sharing. create_all makes the table; the index is stated
+        # explicitly so an existing table picks it up. Lookups go both ways —
+        # by doc_id (a visitor resolving a link) and by user_id (the owner
+        # listing what they have shared).
+        await conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_document_shares_user_id "
+            "ON document_shares (user_id)"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE document_shares ADD COLUMN IF NOT EXISTS "
+            "name VARCHAR NOT NULL DEFAULT ''"
+        ))

@@ -44,12 +44,26 @@ Note the URL: `https://<backend-app>.fly.dev`. Sanity check: `curl .../health` �
 
 ## 2. Sync server → Fly.io
 
+The relay is no longer the stock y-websocket binary: it verifies a room token
+minted by the backend before admitting a connection, and enforces read-only
+links at the protocol level. It **refuses to start** without `SYNC_JWT_SECRET`,
+because a relay that is quietly open looks exactly like one that is working.
+
 ```bash
 cd deploy/sync-server
 fly launch --no-deploy            # reuse fly.toml; unique app name
+fly secrets set SYNC_JWT_SECRET="<same long random string as the backend>"
 fly deploy
 ```
 URL: `https://<sync-app>.fly.dev` → clients use `wss://<sync-app>.fly.dev`.
+
+> The backend needs the **same** value: `fly secrets set SYNC_JWT_SECRET="…"`
+> in `backend/`. They are two halves of one signature — if they differ, every
+> socket is refused and the app falls back to HTTP-only sync (documents still
+> load and save; live collaboration stops).
+
+Run its tests before deploying — they spawn the relay and drive real peers at
+it: `cd deploy/sync-server && npm ci && npm test`. See `documents/sharing.md`.
 
 ## 3. Frontend → Vercel env
 

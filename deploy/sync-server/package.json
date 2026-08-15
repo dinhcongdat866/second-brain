@@ -1,12 +1,19 @@
 {
   "name": "second-brain-sync-server",
   "private": true,
-  "version": "1.0.0",
-  "description": "Standalone y-websocket relay for real-time collab. In-memory only — durability is handled by the FastAPI backend persisting Yjs state to Neon.",
+  "version": "2.0.0",
+  "description": "y-websocket relay with room-token authorisation. In-memory only — durability is handled by the FastAPI backend persisting Yjs state to Neon.",
+  "main": "server.js",
   "dependencies": {
+    "jsonwebtoken": "^9.0.2",
     "y-websocket": "1.5.4"
   },
+  "devDependencies": {
+    "y-protocols": "^1.0.5",
+    "yjs": "^13.6.0"
+  },
   "scripts": {
-    "start": "node ./node_modules/y-websocket/bin/server.js"
+    "start": "node server.js",
+    "test": "node server.test.js"
   }
 }

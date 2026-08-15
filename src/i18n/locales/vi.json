@@ -255,5 +255,41 @@
     "chores": "Việc vặt",
     "badMentalHealth": "Tinh thần xuống",
     "badPhysical": "Sức khoẻ kém"
+  },
+  "share": {
+    "title": "Chia sẻ",
+    "close": "Đóng",
+    "untitled": "Tài liệu chưa đặt tên",
+    "copy": "Chép link",
+    "copied": "Đã chép",
+    "backToMine": "Tài liệu của tôi",
+    "badgeRead": "Chỉ đọc",
+    "badgeWrite": "Bạn sửa được",
+    "personalNote": "Ô AI, kế hoạch tuần và tiền không hiện trong trang chia sẻ — chúng đọc dữ liệu của người đang xem, không phải của bạn.",
+    "errorSave": "Không lưu được. Thử lại.",
+    "errorCopy": "Không chép được. Bôi đen link rồi chép tay.",
+    "errorDuplicateId": "Tài liệu này mang id kiểu cũ mà người khác đã công khai trước. Nhân bản nó rồi chia sẻ bản sao.",
+    "missingTitle": "Không có gì ở đây",
+    "missingBody": "Tài liệu này không tồn tại, hoặc chưa được chia sẻ.",
+    "level": {
+      "none": {
+        "name": "Riêng tư",
+        "hint": "Chỉ mình bạn mở được."
+      },
+      "read": {
+        "name": "Ai có link đều đọc được",
+        "hint": "Họ xem được tài liệu, không sửa được."
+      },
+      "write": {
+        "name": "Ai có link đều sửa được",
+        "hint": "Họ sửa được, và bạn sẽ không biết ai đã sửa."
+      }
+    },
+    "personalCell": {
+      "generic": "Không hiện trong tài liệu chia sẻ",
+      "ai_cell": "Ô AI — không hiện trong tài liệu chia sẻ",
+      "weekly_planner_cell": "Kế hoạch tuần — không hiện trong tài liệu chia sẻ",
+      "money_cell": "Tiền — không hiện trong tài liệu chia sẻ"
+    }
   }
 }

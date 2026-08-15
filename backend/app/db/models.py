@@ -52,6 +52,33 @@ class YjsUpdate(Base):
     __table_args__ = (Index("ix_yjs_updates_owner", "user_id", "doc_id", "id"),)
 
 
+class DocumentShare(Base):
+    """
+    Who may reach a document through its link.
+
+    `doc_id` alone is the primary key, unlike yjs_documents — a share row is the
+    thing that makes an id resolvable to an owner without a session, which is
+    exactly what a public URL needs. The cost is that legacy ids ('default',
+    which every pre-registry account carries) can only be claimed once; the
+    second claim is refused rather than silently pointing at the wrong account.
+    """
+    __tablename__ = "document_shares"
+
+    doc_id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    # 'none' | 'read' | 'write' — what someone holding the link may do.
+    link_access: Mapped[str] = mapped_column(String, nullable=False, default="none")
+    # Copied from the owner's registry at publish time. The real name lives in a
+    # Y.Doc the visitor cannot read, and a shared page with no title is worse
+    # than a slightly stale one.
+    name: Mapped[str] = mapped_column(String, nullable=False, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
 class UsageLog(Base):
     """One row per AI response turn — queryable for cost analytics."""
     __tablename__ = "usage_log"

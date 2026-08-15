@@ -24,7 +24,10 @@ export type IconName =
   | 'import'
   | 'export'
   | 'eye'
-  | 'eyeOff';
+  | 'eyeOff'
+  | 'share'
+  | 'close'
+  | 'back';
 
 /** Path data only — every icon shares the 24×24 box and the stroke below. */
 const PATHS: Record<IconName, string> = {
@@ -37,6 +40,9 @@ const PATHS: Record<IconName, string> = {
   export:  'M12 14V3M8 6.5 12 3l4 3.5M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2',
   eye:     'M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
   eyeOff:  'M4 4l16 16M9.9 5.2A9.9 9.9 0 0 1 12 5c6.5 0 10 6 10 6a17 17 0 0 1-3.3 3.9M6.3 7.9A17 17 0 0 0 2 11s3.5 6 10 6a10 10 0 0 0 3.4-.6',
+  share:   'M15 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM6 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM15 22a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM8.6 13.5l3.8 2.2M12.4 8.3 8.6 10.5',
+  close:   'M6 6l12 12M18 6 6 18',
+  back:    'M15 5l-7 7 7 7',
 };
 
 export function Icon({ name, size = 17 }: IconProps) {

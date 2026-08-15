@@ -8,6 +8,7 @@ import { createInitialDoc, createGuestDemoDoc } from '../schema';
 import { useUIStore } from '../stores/uiStore';
 import { WS_URL } from '../lib/config';
 import { NEON_SYNC_ORIGIN } from '../lib/backendSync';
+import { attachRoomToken } from '../lib/sharing';
 
 /**
  * XML fragment key inside the Y.Doc that ProseMirror binds to.
@@ -21,6 +22,14 @@ export const XML_FRAGMENT_NAME = 'prosemirror';
  */
 export const collabDbName = (docId: string, userId?: string) =>
   userId ? `notebook:${userId}:${docId}` : `notebook:${docId}`;
+
+/**
+ * Cache name for someone else's document, opened through a share link. Kept in
+ * its own namespace so a visited document never lands among your own — and so
+ * clearing your storage on sign-out does not silently delete it either.
+ */
+export const sharedDbName = (docId: string, ownerId: string) =>
+  `shared:${ownerId}:${docId}`;
 
 /** Permanently remove the Yjs IndexedDB store for a document. */
 export function deleteDocStorage(docId: string, userId?: string): void {
@@ -75,11 +84,44 @@ function randomUser() {
   };
 }
 
+/** A provider plus the handle that stops its token refresh. */
+type TokenedProvider = WebsocketProvider & { releaseToken: () => void };
+
+/**
+ * A provider that waits for a ticket before opening a socket.
+ *
+ * `connect: false` matters: the relay refuses an upgrade without a valid room
+ * token, and a provider created the normal way would immediately start a
+ * reconnect loop against a 401 before the token request had even returned.
+ */
+export function createTokenedProvider(room: string, ydoc: Y.Doc, docId: string): TokenedProvider {
+  const provider = new WebsocketProvider(WS_URL, room, ydoc, {
+    connect: false,
+  }) as TokenedProvider;
+  provider.releaseToken = attachRoomToken(provider, docId);
+  return provider;
+}
+
 export interface CollabSetup {
   ydoc: Y.Doc;
   persistence: IndexeddbPersistence;
   provider: WebsocketProvider;
   yXmlFragment: Y.XmlFragment;
+  /** Stops the room-token refresh loop. Call before provider.destroy(). */
+  releaseToken: () => void;
+}
+
+export interface CollabOptions {
+  /** Whose cache this is. Scopes IndexedDB so two accounts never share one. */
+  userId?: string;
+  /**
+   * Whose room to join. Differs from userId only when viewing someone else's
+   * document through a share link — the content lives in the owner's room, and
+   * the relay will only admit a token minted for that exact room.
+   */
+  ownerId?: string;
+  /** Read someone else's document: cache under the shared namespace. */
+  shared?: boolean;
 }
 
 /**
@@ -101,14 +143,22 @@ export function createGuestDocSetup(): GuestDocSetup {
   return { ydoc, yXmlFragment, awareness };
 }
 
-export function createCollabSetup(docId: string, userId?: string): CollabSetup {
+export function createCollabSetup(docId: string, opts: CollabOptions = {}): CollabSetup {
+  const { userId, ownerId = userId, shared = false } = opts;
   // gc: false — keep all tombstoned operations so Y.snapshot / time-travel works.
   const ydoc = new Y.Doc({ gc: false });
-  const persistence = new IndexeddbPersistence(collabDbName(docId, userId), ydoc);
-  const provider = new WebsocketProvider(WS_URL, collabRoom(docId, userId), ydoc);
+  const dbName = shared && ownerId ? sharedDbName(docId, ownerId) : collabDbName(docId, userId);
+  const persistence = new IndexeddbPersistence(dbName, ydoc);
+  const provider = createTokenedProvider(collabRoom(docId, ownerId), ydoc, docId);
   provider.awareness.setLocalStateField('user', randomUser());
   const yXmlFragment = ydoc.getXmlFragment(XML_FRAGMENT_NAME);
-  return { ydoc, persistence, provider, yXmlFragment };
+  return {
+    ydoc,
+    persistence,
+    provider,
+    yXmlFragment,
+    releaseToken: provider.releaseToken,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -122,6 +172,7 @@ export interface PlannerSetup {
   ydoc: Y.Doc;
   persistence: IndexeddbPersistence;
   provider: WebsocketProvider;
+  releaseToken: () => void;
 }
 
 /**
@@ -132,8 +183,8 @@ export interface PlannerSetup {
 export function createPlannerSetup(userId?: string): PlannerSetup {
   const ydoc = new Y.Doc({ gc: false });
   const persistence = new IndexeddbPersistence(collabDbName(PLANNER_DOC_ID, userId), ydoc);
-  const provider = new WebsocketProvider(WS_URL, collabRoom(PLANNER_DOC_ID, userId), ydoc);
-  return { ydoc, persistence, provider };
+  const provider = createTokenedProvider(collabRoom(PLANNER_DOC_ID, userId), ydoc, PLANNER_DOC_ID);
+  return { ydoc, persistence, provider, releaseToken: provider.releaseToken };
 }
 
 /**

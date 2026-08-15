@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import * as Y from 'yjs';
 import {
   createRegistrySetup,
@@ -20,12 +20,15 @@ import { deleteDocState, deleteDocImages, createYjsSyncer, applyServerState } fr
 import { apiFetch } from '../lib/http';
 import { supabase } from '../lib/supabase';
 import { exposeYDoc } from '../lib/devYDocs';
+import { docIdFromPath, navigateHome, navigateToDoc, readRoutePath, subscribeRoute } from '../lib/router';
 
 const ACTIVE_KEY = 'active-doc-id';
 
-function readActive(): string {
-  return localStorage.getItem(ACTIVE_KEY) ?? optimisticDocs()[0].id;
-}
+/*
+ * localStorage keeps its job — remembering where you were — but no longer
+ * decides which document is open. The address bar does, because a link someone
+ * sent you has to win over the last thing this device happened to read.
+ */
 
 // ---------------------------------------------------------------------------
 // Guest registry — simple React state, no network, no Yjs
@@ -39,6 +42,12 @@ function makeGuestDoc(): DocMeta {
 export function useGuestDocRegistry() {
   const [docs, setDocs] = useState<DocMeta[]>(() => [makeGuestDoc()]);
   const [activeDocId, setActiveDocId] = useState('guest-default');
+
+  // A guest arriving on someone's share link and choosing "try it now" gets
+  // their own scratch notebook, so the id in the address bar now names a
+  // document that is not on screen. Guest ids are tab-local and would 404 on
+  // reload anyway, so the honest address here is the root.
+  useEffect(() => { navigateHome(); }, []);
 
   const selectDoc = useCallback((id: string) => setActiveDocId(id), []);
 
@@ -97,9 +106,18 @@ export function useGuestDocRegistry() {
  * First paint uses an optimistic list (legacy localStorage / default) so the
  * sidebar isn't empty; once the registry Y.Doc syncs, the real list takes over.
  */
-export function useDocRegistry(userId?: string) {
+export function useDocRegistry(userId?: string, enabled = true) {
   const [docs, setDocs] = useState<DocMeta[]>(() => optimisticDocs());
-  const [activeDocId, setActiveDocIdState] = useState<string>(() => readActive());
+  // The address bar is the selector, so which document is open is DERIVED from
+  // it rather than mirrored into state. Mirroring meant an effect writing state
+  // on every navigation, and two sources that could disagree for a frame.
+  const routePath = useSyncExternalStore(subscribeRoute, readRoutePath, () => '/');
+  const routedId = docIdFromPath(routePath);
+  // Only consulted when the path names nothing — landing on the root.
+  const [lastOpened, setLastOpened] = useState<string>(
+    () => localStorage.getItem(ACTIVE_KEY) ?? optimisticDocs()[0].id,
+  );
+  const activeDocId = routedId ?? lastOpened;
   const setupRef = useRef<RegistrySetup | null>(null);
   const syncerRef = useRef<ReturnType<typeof createYjsSyncer> | null>(null);
   const storageCleanupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -155,10 +173,11 @@ export function useDocRegistry(userId?: string) {
 
       const list = readDocs(setup.docsMap);
       setDocs(list);
-      // Active doc may have been deleted on another device — fall back to first.
-      setActiveDocIdState((prev) =>
-        list.some((d) => d.id === prev) ? prev : list[0]?.id ?? prev,
-      );
+      // The remembered document may have been deleted on another device.
+      // Deliberately NOT applied to an id that came from the address bar: that
+      // id may be a link to somebody else's document, and jumping to the first
+      // of your own would swallow the link before it was ever resolved.
+      setLastOpened((prev) => (list.some((d) => d.id === prev) ? prev : list[0]?.id ?? prev));
     });
 
     return () => {
@@ -176,11 +195,28 @@ export function useDocRegistry(userId?: string) {
   }, [userId]);
 
   const setActive = (id: string) => {
-    localStorage.setItem(ACTIVE_KEY, id);
-    setActiveDocIdState(id);
+    setLastOpened(id);
+    navigateToDoc(id);
   };
 
   const selectDoc = useCallback((id: string) => setActive(id), []);
+
+  // Both writes below update something outside React — the address bar and
+  // localStorage — from state that already exists. Neither sets React state,
+  // which is what keeps this out of the cascading-render trap.
+  useEffect(() => {
+    // Landed on the root: put the open document into the address bar, as a
+    // replace so Back does not bounce straight back here.
+    //
+    // `enabled` is false in guest mode, where this hook still runs but its
+    // document list is not the one on screen — without the guard it would put
+    // an id from the signed-out registry into the address bar.
+    if (enabled && routedId === null) navigateToDoc(activeDocId, { replace: true });
+  }, [enabled, routedId, activeDocId]);
+
+  useEffect(() => {
+    try { localStorage.setItem(ACTIVE_KEY, activeDocId); } catch { /* private mode */ }
+  }, [activeDocId]);
 
   const createNewDoc = useCallback(() => {
     const map = setupRef.current?.docsMap;

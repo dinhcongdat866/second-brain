@@ -1,9 +1,8 @@
 import * as Y from 'yjs';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { WebsocketProvider } from 'y-websocket';
-import { collabRoom, collabDbName } from './ydoc';
+import { collabRoom, collabDbName, createTokenedProvider } from './ydoc';
 import { applyServerState } from '../lib/backendSync';
-import { WS_URL } from '../lib/config';
 
 export const MEMORY_DOC_ID = '__memory__';
 const MEMORY_LOG_KEY = 'memoryLog';
@@ -13,6 +12,7 @@ export interface MemorySetup {
   persistence: IndexeddbPersistence;
   provider: WebsocketProvider;
   whenReady: Promise<void>;
+  releaseToken: () => void;
 }
 
 export interface MemoryLogEntry {
@@ -29,13 +29,13 @@ export interface MemoryLogEntry {
 export function createMemorySetup(userId?: string): MemorySetup {
   const ydoc = new Y.Doc({ gc: false });
   const persistence = new IndexeddbPersistence(collabDbName(MEMORY_DOC_ID, userId), ydoc);
-  const provider = new WebsocketProvider(WS_URL, collabRoom(MEMORY_DOC_ID, userId), ydoc);
+  const provider = createTokenedProvider(collabRoom(MEMORY_DOC_ID, userId), ydoc, MEMORY_DOC_ID);
 
   const whenReady = persistence.whenSynced.then(async () => {
     await applyServerState(MEMORY_DOC_ID, ydoc);
   });
 
-  return { ydoc, persistence, provider, whenReady };
+  return { ydoc, persistence, provider, whenReady, releaseToken: provider.releaseToken };
 }
 
 // ---------------------------------------------------------------------------

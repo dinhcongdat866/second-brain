@@ -255,5 +255,41 @@
     "chores": "Chores",
     "badMentalHealth": "Bad mental health",
     "badPhysical": "Bad physical health"
+  },
+  "share": {
+    "title": "Share",
+    "close": "Close",
+    "untitled": "Untitled document",
+    "copy": "Copy link",
+    "copied": "Copied",
+    "backToMine": "My documents",
+    "badgeRead": "Read only",
+    "badgeWrite": "You can edit",
+    "personalNote": "AI, planner and money cells are left out of a shared page — they read whoever is looking, not you.",
+    "errorSave": "Could not save that. Try again.",
+    "errorCopy": "Could not copy. Select the link and copy it manually.",
+    "errorDuplicateId": "This document has a legacy id that someone else already published. Duplicate it and share the copy.",
+    "missingTitle": "Nothing here",
+    "missingBody": "This document does not exist, or it is not shared.",
+    "level": {
+      "none": {
+        "name": "Private",
+        "hint": "Only you can open it."
+      },
+      "read": {
+        "name": "Anyone with the link can read",
+        "hint": "They see the document. They cannot change it."
+      },
+      "write": {
+        "name": "Anyone with the link can edit",
+        "hint": "They can change the document, and you will not know who did."
+      }
+    },
+    "personalCell": {
+      "generic": "Not shown in a shared document",
+      "ai_cell": "AI cell — not shown in a shared document",
+      "weekly_planner_cell": "Weekly planner — not shown in a shared document",
+      "money_cell": "Money — not shown in a shared document"
+    }
   }
 }

@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     # else's usage. A stale ANTHROPIC_API_KEY in .env is ignored (extra="ignore").
     supabase_url: str = ""            # e.g. https://xxxx.supabase.co
     supabase_jwt_secret: str = ""     # Settings → API → JWT Settings → secret
+    # Shared with the y-websocket relay. The backend mints short-lived room
+    # tokens with it and the relay verifies them; without it the relay would be
+    # open to anyone who can guess a room name, which is what it used to be.
+    sync_jwt_secret: str = ""
     embedding_model: str = "all-MiniLM-L6-v2"
     # Comma-separated list of exact allowed CORS origins (e.g. localhost).
     allowed_origins: str = "http://localhost:5173"
