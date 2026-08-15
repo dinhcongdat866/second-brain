@@ -92,11 +92,19 @@ not the document.
 Both Fly apps need the **same** secret, and the relay refuses to start without
 it — a relay that is quietly open looks exactly like one that is working.
 
+Run each from its own directory so flyctl reads the app name out of the local
+`fly.toml`. Naming the apps on the command line is how you discover that the
+backend is not called `second-brain-api` — Fly appended a suffix when that name
+turned out to be taken.
+
 ```bash
-# any long random string; the same value in both places
-fly secrets set SYNC_JWT_SECRET="…" -a second-brain-api
-fly secrets set SYNC_JWT_SECRET="…" -a second-brain-sync
+cd backend            && fly secrets set SYNC_JWT_SECRET="…"
+cd deploy/sync-server && fly secrets set SYNC_JWT_SECRET="…"
 ```
+
+Generate the value once and paste the same string into both. Two different
+values means the backend signs with one key and the relay verifies with another,
+so every socket is refused.
 
 `vercel.json` adds the SPA rewrite, without which `/{docId}` 404s on reload.
 
