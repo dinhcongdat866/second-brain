@@ -118,8 +118,18 @@ export function attachRoomToken(provider: WebsocketProvider, docId: string): () 
 
   const run = async () => {
     try {
-      const { token, expiresIn } = await fetchRoomToken(docId);
+      const { token, room, expiresIn } = await fetchRoomToken(docId);
       if (stopped) return;
+      // The room string is built twice from the same parts — collabRoom() here,
+      // _room_name() in the backend — and the relay compares them for equality.
+      // Drift between the two would refuse every socket with nothing in the
+      // console to say why, so say it here.
+      if (room !== provider.roomname) {
+        console.error(
+          `[sharing] room mismatch for ${docId}: the token authorises "${room}" ` +
+            `but this provider joined "${provider.roomname}". The relay will refuse it.`,
+        );
+      }
       provider.params.token = token;
       provider.connect();
       timer = setTimeout(run, refreshDelay(expiresIn));

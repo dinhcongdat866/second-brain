@@ -58,6 +58,27 @@ A delta from someone editing through a write link is stored with the **owner's**
 `user_id`. Filing it under the editor would put the work in an account the owner
 never reads, and it would simply disappear.
 
+### Appending and replacing are different powers
+
+`POST /documents/{id}/updates` appends a delta. Nothing is overwritten, so the
+worst a write link can do through it is add content.
+
+`POST /documents/{id}/state` replaces the stored document outright and deletes
+the delta rows up to a number the caller supplies. It is **owner only**, and it
+has to be: given a write link it was one request away from replacing a year of
+notes with an empty document. The `if not body` guard does not help, because an
+empty `Y.Doc` still encodes to a few non-zero bytes.
+
+There was a mitigation but not a defence — Yjs merges additively, so an owner
+whose IndexedDB cache still held the document would silently restore it on the
+next load. On a fresh device they would have seen the wiped version.
+
+Visitors lose nothing. The append path is what the client uses for every
+keystroke anyway; a shared session flushes through `flushAppend` on tab-hide
+instead of taking a snapshot. Auto-snapshots are skipped in a shared session
+for the same reason: they are stored inside the shared Y.Doc, so a visitor
+running them would file entries into the author's history.
+
 ### Legacy ids cannot always be published
 
 `document_shares.doc_id` is the primary key, because a share row is what makes

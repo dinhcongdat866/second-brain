@@ -12,7 +12,12 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.access import AccessDenied, decide_access, require_write  # noqa: E402
+from app.access import (  # noqa: E402
+    AccessDenied,
+    decide_access,
+    require_owner,
+    require_write,
+)
 
 OWNER = "owner-uuid"
 VISITOR = "visitor-uuid"
@@ -103,6 +108,36 @@ def test_require_write_rejects_a_reader():
         assert exc.status == 403
     else:
         raise AssertionError("a read-only link was allowed to write")
+
+
+def test_a_write_link_cannot_replace_the_stored_document():
+    # The whole point of the owner check on POST /state. Without it, one request
+    # carrying a valid-but-empty Y.Doc plus a large `up_to` replaces the stored
+    # snapshot and deletes every delta row behind it.
+    editor = decide_access(VISITOR, False, OWNER, "write")
+    assert editor.can_write is True, "a write link can still append"
+    try:
+        require_owner(editor, VISITOR)
+    except AccessDenied as exc:
+        assert exc.status == 403
+    else:
+        raise AssertionError("a write link was allowed to replace the snapshot")
+
+
+def test_an_anonymous_write_link_cannot_replace_it_either():
+    editor = decide_access(None, False, OWNER, "write")
+    try:
+        require_owner(editor, None)
+    except AccessDenied as exc:
+        assert exc.status == 403
+    else:
+        raise AssertionError("an anonymous editor was allowed to replace the snapshot")
+
+
+def test_the_owner_can_replace_the_stored_document():
+    for share in (None, "none", "read", "write"):
+        access = decide_access(OWNER, True, OWNER if share else None, share)
+        assert require_owner(access, OWNER) is access, share
 
 
 if __name__ == "__main__":

@@ -69,3 +69,25 @@ def require_write(access: DocAccess) -> DocAccess:
     if not access.can_write:
         raise AccessDenied(403, "Read-only link")
     return access
+
+
+def require_owner(access: DocAccess, viewer_id: str | None) -> DocAccess:
+    """
+    Stricter than write access, for the operations that can destroy rather than
+    add.
+
+    Appending a delta is safe by construction — nothing is overwritten, so the
+    worst a write link can do is add content. Replacing the snapshot is the
+    opposite: it swaps the stored document wholesale and deletes the delta rows
+    it claims to contain, on a row count the caller supplies. Given a write
+    link, that is one request away from replacing a year of notes with an empty
+    document, by accident or on purpose.
+
+    Editing through a link and administering the stored copy are different
+    powers, and only the second belongs to the owner. Visitors lose nothing:
+    their edits persist through the append path, which is what the client uses
+    for every keystroke anyway.
+    """
+    if viewer_id is None or viewer_id != access.owner_id:
+        raise AccessDenied(403, "Only the owner can replace the stored document")
+    return access

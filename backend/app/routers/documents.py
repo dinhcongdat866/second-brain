@@ -8,7 +8,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.access import AccessDenied, DocAccess, decide_access, require_write
+from app.access import AccessDenied, DocAccess, decide_access, require_owner, require_write
 from app.auth import get_current_user, get_optional_user
 from app.config import settings
 from app.db.engine import get_db
@@ -69,6 +69,13 @@ async def resolve_doc_access(
 def _writable(access: DocAccess) -> DocAccess:
     try:
         return require_write(access)
+    except AccessDenied as denied:
+        raise HTTPException(status_code=denied.status, detail=denied.detail)
+
+
+def _owned(access: DocAccess, viewer_id: str | None) -> DocAccess:
+    try:
+        return require_owner(access, viewer_id)
     except AccessDenied as denied:
         raise HTTPException(status_code=denied.status, detail=denied.detail)
 
@@ -176,8 +183,15 @@ async def save_state(
     `up_to` is the highest update id the client had merged when it built this
     body. Only rows at or below it are deleted; anything appended later by
     another device survives and is merged on the next read.
+
+    OWNER ONLY, unlike /updates. This is the one endpoint that destroys: the
+    body replaces the stored document outright, and `up_to` is a client-supplied
+    number of delta rows to delete. A write link is permission to add content,
+    not permission to swap the archive for an empty file — and `if not body`
+    does not stand in the way of that, because an empty Y.Doc still encodes to
+    a few non-zero bytes.
     """
-    access = _writable(await resolve_doc_access(doc_id, db, viewer_id))
+    access = _owned(await resolve_doc_access(doc_id, db, viewer_id), viewer_id)
     body = await request.body()
     if not body:
         raise HTTPException(status_code=400, detail="Empty body")

@@ -159,14 +159,22 @@ function bindEditor(
   // backend anyway, so running them would only produce a stream of 403s.
   if (!isGuest && !source.readOnly) {
     unwireSave = wireSaveStatus(doc);
-    stopSnapshot = startAutoSnapshot(doc);
+    // Time-travel snapshots live inside the shared Y.Doc, so a visitor running
+    // this would be filing entries into the author's history from a session the
+    // author knows nothing about. It belongs to whoever owns the document.
+    if (!source.shared) stopSnapshot = startAutoSnapshot(doc);
     const syncer = createYjsSyncer(activeDocId, doc);
     stopSyncer = syncer.stop;
     // On hide, the page is still alive (tab switch / app background) — do a full
     // authenticated merge-save. This is the reliable durable path on iOS, where
     // pagehide/beforeunload are flaky. The keepalive beacon below is only a
     // last-ditch redundancy for an abrupt desktop tab-close.
-    const onHide = () => { if (document.visibilityState === 'hidden') syncer.flush(); };
+    //
+    // Editing through a link appends instead. The snapshot endpoint is owner
+    // only — it replaces the stored document — and an append persists the same
+    // edits without being able to destroy anything.
+    const flushNow = source.shared ? syncer.flushAppend : syncer.flush;
+    const onHide = () => { if (document.visibilityState === 'hidden') flushNow(); };
     const onVisible = () => { if (document.visibilityState === 'visible') applyServerState(activeDocId, doc).catch(() => {}); };
     const onPageHide = () => syncer.flushBeacon();
     window.addEventListener('visibilitychange', onHide);

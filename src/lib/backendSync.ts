@@ -416,10 +416,23 @@ export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = YJS_SAV
      * Snapshot immediately (clears pending debounce timer). Used when the tab
      * is hidden and when a document is deleted — the rare, durable path that
      * also compacts the delta log.
+     *
+     * OWNER ONLY. The endpoint behind it replaces the stored document, so it
+     * refuses anyone editing through a share link; use flushAppend there.
      */
     flush: () => {
       if (timer) { clearTimeout(timer); timer = null; }
       saveDocState(docId, ydoc).then(markSent).catch(() => {});
+    },
+    /**
+     * Send what has not been sent, as an append. Same durability as the
+     * debounced path, just now instead of in four seconds, and without the
+     * power to overwrite anything — which is why it is what a visitor editing
+     * through a link uses when the tab goes away.
+     */
+    flushAppend: () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      persist().catch(() => {});
     },
     /**
      * Last-ditch flush on hard teardown (pagehide). Appends the unsent delta
