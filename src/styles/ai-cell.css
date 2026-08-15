@@ -938,8 +938,21 @@
   padding: 32px;
 }
 
+/*
+ * The same surface as .ai-cell__inner, at another size — so it is written the
+ * same way. It used to hard-code `background: var(--nb-ai-bg)`, which quietly
+ * dropped two things the inline cell has: the emotion tint (the palettes at the
+ * top of this file already set --aurora-bg on this element, so the value was
+ * sitting there unused) and the 2px accent rule. Maximising a rose-tinted
+ * conversation gave you a plain canvas panel with no AI accent on it.
+ */
 .ai-cell__modal {
-  background: var(--nb-ai-bg);
+  /* Named so the aurora rules below can put the elevation back. They replace
+     box-shadow wholesale, and a floating panel that loses its drop shadow the
+     moment a reply starts streaming reads as a rendering fault. */
+  --ai-modal-lift: 0 24px 64px rgba(0, 0, 0, 0.18);
+
+  background: var(--aurora-bg, var(--nb-ai-bg));
   border: 1px solid var(--nb-ai-border);
   border-radius: var(--nb-r-lg);
   width: 100%;
@@ -947,9 +960,16 @@
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: inset 2px 0 0 var(--nb-ai-accent), var(--ai-modal-lift);
   overflow: hidden;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.5s ease;
+}
+
+/* Streaming drops the accent rule here exactly as it does on the inline cell —
+   the aurora is the state now — but the panel still has to look lifted. */
+.ai-cell__modal.is-streaming,
+.ai-cell__modal.is-finishing {
+  box-shadow: var(--ai-modal-lift), 0 0 18px -6px var(--aurora-shadow);
 }
 
 
