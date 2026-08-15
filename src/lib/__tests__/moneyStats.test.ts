@@ -1,8 +1,6 @@
 /**
- * The money cell's figures, which are the part of this feature a person will
- * act on. A layout bug is visible; a projection that quietly double-counts rent
- * is not, so the cases below are mostly about the specific ways a plausible
- * implementation gets a number wrong.
+ * The money cell's figures. Mostly about the specific ways a plausible
+ * implementation gets a number wrong, since a wrong number is invisible.
  */
 import { describe, it, expect } from 'vitest';
 import type { MoneyEntryData } from '../../collab/weeklyPlans';
@@ -90,8 +88,7 @@ describe('parseDongShorthand', () => {
   });
 
   it('treats dots in a bare number as thousands separators, not decimals', () => {
-    // Nobody logs 3.8 đồng, so '3.800.000' is three million eight hundred
-    // thousand — reading it as a decimal would be off by a factor of a million.
+    // '3.800.000' is 3,8 triệu — reading the dots as decimals is off by 10^6.
     expect(parseDongShorthand('3.800.000')).toBe(3_800_000);
     expect(parseDongShorthand('3800000')).toBe(3_800_000);
   });
@@ -149,8 +146,7 @@ describe('monthTotals', () => {
   });
 
   it('counts the lines with no amount rather than silently dropping them', () => {
-    // The figure is understated while these are outstanding, and the UI says so
-    // — the same rule the planner's day total follows.
+    // The figure is understated while these are outstanding, and the UI says so.
     expect(monthTotals(all, '2026-08').unknown).toBe(1);
   });
 
@@ -182,8 +178,7 @@ describe('categoryBreakdown', () => {
   });
 
   it('compares against the median of complete months only', () => {
-    // August is in progress, so including it would drag its own baseline toward
-    // itself and no month could ever look unusual.
+    // August is in progress; including it would drag its own baseline.
     const rows = categoryBreakdown(all, '2026-08', categoryNorms(all, today));
     const food = rows.find((r) => r.category === MONEY_CAT.FOOD)!;
     expect(food.normal).toBe(2_800_000);
@@ -200,9 +195,7 @@ describe('forecastMonth', () => {
   const today = '2026-08-14';
 
   it('does not forecast a second rent', () => {
-    // The whole reason the fixed/variable split exists. 3tr rent + 2tr8 food in
-    // 14 days is 5tr8; multiplying that by 31/14 says 12tr8 — two rents. The
-    // right answer counts rent once and extrapolates only the food.
+    // 3tr rent + 2tr8 food in 14 days × 31/14 would say 12tr8 — two rents.
     const all = [
       entry('2026-08-05', 'trọ', -3_000_000, MONEY_CAT.HOUSING),
       entry('2026-08-10', 'ăn', -2_800_000, MONEY_CAT.FOOD),
@@ -215,8 +208,7 @@ describe('forecastMonth', () => {
   });
 
   it('still expects rent that has not landed yet', () => {
-    // The opposite failure: on the 14th with rent due on the 28th, counting
-    // only what has happened understates the month by a whole rent.
+    // The opposite failure: rent due on the 28th, not yet counted.
     const all = [
       entry('2026-06-28', 'trọ', -3_000_000, MONEY_CAT.HOUSING),
       entry('2026-07-28', 'trọ', -3_000_000, MONEY_CAT.HOUSING),
@@ -263,8 +255,7 @@ describe('allowance', () => {
   const today = '2026-08-14';
 
   it('sets aside fixed costs that have not landed yet', () => {
-    // Rent due on the 28th is not money you may spend on the 20th. An allowance
-    // that ignores it is confidently wrong in the direction that costs you.
+    // Rent due on the 28th is not money you may spend on the 20th.
     const all = [
       entry('2026-06-28', 'trọ', -3_000_000, MONEY_CAT.HOUSING),
       entry('2026-07-28', 'trọ', -3_000_000, MONEY_CAT.HOUSING),
@@ -308,8 +299,7 @@ describe('detectRecurring', () => {
   });
 
   it('ignores a habit whose amount jumps around', () => {
-    // "cà phê" every month is not a subscription, and a list that flags it is a
-    // list nobody reads twice.
+    // "cà phê" every month is not a subscription.
     const all = [
       entry('2026-05-02', 'cà phê', -35_000, MONEY_CAT.FOOD),
       entry('2026-06-02', 'cà phê', -85_000, MONEY_CAT.FOOD),
@@ -370,8 +360,7 @@ describe('searchEntries', () => {
   ];
 
   it('finds accented text from an unaccented query, and the reverse', () => {
-    // The point of the feature: "Food & Drink" is somebody else's bucket, but
-    // "cà phê" is the thing you wanted to know about.
+    // "Food & Drink" is somebody else's bucket; "cà phê" is the real question.
     expect(searchEntries(all, 'ca phe').matches).toHaveLength(2);
     expect(searchEntries(all, 'cà phê').matches).toHaveLength(2);
     expect(searchEntries(all, 'CA PHE').matches).toHaveLength(2);
@@ -414,8 +403,7 @@ describe('ledgerFrom', () => {
   });
 
   it('ages the debt from its first movement, not its last', () => {
-    // "mẹ is owed 3 triệu" and "mẹ has been owed 3 triệu since May" are
-    // different sentences, and only the second one makes anybody do something.
+    // The age is the half that makes anybody act.
     expect(ledgerFrom(all, '2026-08-14')[0].ageDays).toBe(105);
   });
 });
@@ -479,9 +467,7 @@ describe('spendByTodoCategory', () => {
   });
 
   it('does not treat an unlogged day as a day you spent nothing', () => {
-    // The distinction the whole function rests on. Days with no money lines are
-    // unmeasured, not free; counting them as zero would pull every category
-    // toward zero in exact proportion to how patchy the logging was.
+    // Days with no money lines are unmeasured, not free.
     const all = [...routine];
     const withUnlogged = new Map<string, string[]>([
       ['2026-08-01', ['Rest']],
@@ -514,16 +500,14 @@ describe('spendByTodoCategory', () => {
   });
 
   it('drops a category seen on too few days', () => {
-    // Two days is a coincidence, and a number nobody should read is worse than
-    // no number.
+    // Two days is a coincidence.
     const all = [...routine, entry('2026-08-10', 'mua sắm', -900_000, MONEY_CAT.SHOPPING)];
     const cats = new Map<string, string[]>([['2026-08-10', ['Leisure']]]);
     expect(spendByTodoCategory(all, cats)).toEqual([]);
   });
 
   it('counts a day toward every category its todos carry', () => {
-    // No attribution is happening: the day's whole spend goes to each category
-    // present, because nothing ties a đồng to a task.
+    // Not attribution: the day's whole spend goes to each category present.
     const all = [...routine, entry('2026-08-10', 'đi chơi', -300_000, MONEY_CAT.ENTERTAINMENT)];
     const cats = new Map<string, string[]>([
       ['2026-08-01', ['Work', 'Rest']],

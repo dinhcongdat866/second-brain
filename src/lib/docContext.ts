@@ -76,17 +76,8 @@ export function extractWeeklyContext(plannerYdoc: Y.Doc, maxWeeks = 4): string {
 
 /**
  * Money context: the figures the money cell shows, as text the model can read.
- *
- * A summary rather than the raw lines. A year of entries is thousands of them,
- * and pasting the lot would spend the context window on the part the client has
- * already worked out — the totals, the split, the pace. What goes in is what a
- * person would say if asked how the month is going.
- *
- * Category names go through as the stored identifiers ('Food & Drink'), not the
- * localised labels: they are identifiers everywhere else in the system, and a
- * model reasoning about them should see the same strings the database stores.
- * The raw lines that do go in keep their original Vietnamese, because that is
- * user data and normalising it would throw away the detail worth asking about.
+ * A summary rather than the raw lines, plus a short verbatim tail. Categories
+ * go through as the stored identifiers, not the localised labels.
  */
 export function extractMoneyContext(plannerYdoc: Y.Doc, maxLines = 30): string {
   const all = readMoneyAll(plannerYdoc);
@@ -130,9 +121,8 @@ export function extractMoneyContext(plannerYdoc: Y.Doc, maxLines = 30): string {
     lines.push(`  Wallets: ${parts.join(', ')}`);
   }
 
-  // Days on which each kind of task appeared, and what those days cost. NOT
-  // money attributed to a task — a day holds several tasks and one pile of
-  // money — so the label says "days with", and the model should repeat that.
+  // NOT money attributed to a task — hence "days with", which the model should
+  // repeat rather than paraphrase into attribution.
   const byTask = spendByTodoCategory(all, readTodoCategoriesByDate(plannerYdoc));
   if (byTask.length > 0) {
     const parts = byTask
@@ -151,8 +141,7 @@ export function extractMoneyContext(plannerYdoc: Y.Doc, maxLines = 30): string {
     lines.push(`  Debts: ${parts.join('; ')}`);
   }
 
-  // A tail of the actual lines, because the summary cannot answer "what did I
-  // buy" and that is most of what anyone asks. Verbatim, corrections excluded.
+  // The summary cannot answer "what did I buy", which is most of what is asked.
   const recent = all
     .filter((e) => e.category !== MONEY_CAT.ADJUSTMENT)
     .slice(-maxLines);

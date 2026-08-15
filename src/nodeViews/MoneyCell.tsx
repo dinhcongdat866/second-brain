@@ -55,23 +55,13 @@ import {
   writeActiveWalletId,
 } from '../lib/activeWallet';
 
-// ---------------------------------------------------------------------------
-// Section open/closed state
-// ---------------------------------------------------------------------------
-
 const SECTIONS_KEY = 'moneyCellSections';
 
 type SectionId =
   | 'wallets' | 'categories' | 'pace' | 'unusual'
   | 'recurring' | 'ledger' | 'rhythm' | 'search';
 
-/**
- * Everything except the two long tails starts open.
- *
- * A lens with nine collapsed headers is a filing cabinet, not an answer. The
- * ones left shut are the two you consult rather than read — the rhythm figures
- * and the search box.
- */
+/** The two you consult rather than read start shut; everything else is open. */
 const DEFAULT_SECTIONS: Record<SectionId, boolean> = {
   wallets: true, categories: true, pace: true, unusual: true,
   recurring: true, ledger: true, rhythm: false, search: false,
@@ -113,10 +103,6 @@ function Section({ id, title, badge, open, onToggle, children }: SectionProps) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Amount input — accepts the shorthand the log is written in
-// ---------------------------------------------------------------------------
-
 interface AmountInputProps {
   value: string;
   onChange: (v: string) => void;
@@ -126,12 +112,7 @@ interface AmountInputProps {
   autoFocus?: boolean;
 }
 
-/**
- * Takes '5tr', '4tr5', '300k' or '3.800.000' and shows what it read before you
- * commit. Typing a balance in full digits when every other field in this app
- * accepts shorthand would be a small, constant annoyance — and the shorthand
- * parser is local, so the echo appears as you type with nothing in between.
- */
+/** Takes '5tr', '4tr5', '300k' or '3.800.000' and echoes what it read. */
 function AmountInput({
   value, onChange, onCommit, onCancel, placeholder, autoFocus,
 }: AmountInputProps) {
@@ -160,10 +141,6 @@ function AmountInput({
     </span>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Wallets
-// ---------------------------------------------------------------------------
 
 interface WalletsProps {
   ydoc: Y.Doc;
@@ -323,10 +300,6 @@ function Wallets({ ydoc, wallets, entries, activeId, onActivate }: WalletsProps)
   );
 }
 
-// ---------------------------------------------------------------------------
-// Root
-// ---------------------------------------------------------------------------
-
 interface Props {
   ydoc: Y.Doc;
   onDelete: () => void;
@@ -348,9 +321,8 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
   const [budgetDraft, setBudgetDraft] = useState('');
   const [editingBudget, setEditingBudget] = useState(false);
 
-  // Three separate subscriptions, because these are three separate top-level
-  // maps. Watching only what changed keeps a todo edit in the planner from
-  // recomputing a month of statistics.
+  // Three top-level maps, three subscriptions: a todo edit in the planner must
+  // not recompute a month of statistics.
   useEffect(() => {
     const map = ydoc.getMap(MONEY_LOG_KEY);
     const handler = () => setEntries(readMoneyAll(ydoc));
@@ -375,18 +347,16 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
     return () => map.unobserve(handler);
   }, [ydoc]);
 
-  // Mood lives inside the shared plan, so it is reached the same way the weekly
-  // cell reaches it — and re-resolved on the top-level map for the same reason:
-  // a late server merge can replace the plan instance wholesale.
+  // Re-resolved on the top-level map each time: a late server merge can replace
+  // the plan instance wholesale.
   useEffect(() => {
     const plans = ydoc.getMap<Y.Map<unknown>>(WEEKLY_PLANS_KEY);
     let plan = plans.get(SHARED_PLAN_ID);
     const read = () => {
       if (!plan) return;
       setMoodLog(readMoodLog(plan));
-      // Categories are cached onto the todos themselves by useClassificationSync,
-      // so they arrive through this same subscription — no fetch, and the panel
-      // fills in by itself the moment the classifier has caught up.
+      // Categories are cached onto the todos by useClassificationSync, so they
+      // arrive through this same subscription.
       setTodoCats(readTodoCategoriesByDate(ydoc));
     };
     const onPlans = () => {
@@ -407,9 +377,6 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
     };
   }, [ydoc]);
 
-  // Derived, not stored: the choice is one string in a store both this cell and
-  // the planner's wallet chip subscribe to, and the fallback for a deleted
-  // wallet is recomputed rather than written back.
   const storedWallet = useSyncExternalStore(subscribeActiveWallet, readActiveWalletId);
   const activeWallet = useMemo(
     () => resolveActiveWalletId(wallets.map((w) => w.id), storedWallet),
@@ -426,8 +393,6 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
 
   const activate = useCallback((id: string) => writeActiveWalletId(id), []);
 
-  // Every figure on the page, from one array already in memory. No request, and
-  // therefore no spinner between clicking ‹ and reading the answer.
   const totals    = useMemo(() => monthTotals(entries, month), [entries, month]);
   const norms     = useMemo(() => categoryNorms(entries, today), [entries, today]);
   const cats      = useMemo(() => categoryBreakdown(entries, month, norms), [entries, month, norms]);
@@ -531,8 +496,7 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
             </div>
           </div>
           {totals.unknown > 0 && (
-            // Same rule as the day total in the planner: say the figure is
-            // incomplete rather than quietly reporting a smaller number.
+            // Say the figure is incomplete rather than quietly under-reporting.
             <p className="money-note money-note--warn">
               {t('money.pendingLines', { count: totals.unknown })}
             </p>

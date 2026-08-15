@@ -1,19 +1,9 @@
 /**
- * The classification sync, now that it keeps a local copy.
- *
- * It used to push to Postgres and remember nothing, which was fine while the
- * only consumer was a backend report. The money cell's "days on which you did
- * X" join needs the categories on the client, so the results are written back
- * onto the todo in Yjs — and that write-back brings the same two hazards the
- * money sync was fixed for:
- *
- *   1. A todo the database has already classified must NOT be sent to the model
- *      again just because the Y.Doc has no copy yet. That is the state after
- *      every first load following this change, for every todo ever written —
- *      getting it wrong would re-classify a whole year of planner on the user's
- *      own API key.
- *   2. The answer has to actually land in the Y.Doc, by both routes: copied from
- *      the database, and taken from a fresh classify response.
+ * The classification sync, now that it writes results back into the Y.Doc.
+ * Two hazards: a todo the database has already classified must not be sent to
+ * the model again just because the Y.Doc has no copy yet (that is the state on
+ * every first load after this change, for every todo ever written), and the
+ * answer has to land in the Y.Doc by both routes.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as Y from 'yjs';
@@ -78,9 +68,8 @@ describe('a classification the database already holds', () => {
   });
 
   it('is left alone when the Y.Doc already agrees, in any order', async () => {
-    // The classifier does not promise an order, so comparing arrays positionally
-    // would report every two-category todo as changed and rewrite it on every
-    // single load — noise in the document history forever.
+    // The classifier promises no order; comparing positionally would rewrite
+    // every two-category todo on every load.
     const { ydoc, plan, ids } = planWith('Ăn cưới');
     stampCategories(plan, 0, ['Leisure', 'Relationships']);
 
@@ -117,8 +106,7 @@ describe('a todo the database has not seen', () => {
   });
 
   it('sends only the wire fields, never the Y.Map handle', async () => {
-    // The todo is tracked with a reference to its Y.Map so the answer can be
-    // written straight back. That handle must not reach JSON.stringify.
+    // The Y.Map handle must not reach JSON.stringify.
     const { ydoc, ids } = planWith('Sửa bug loading');
 
     apiFetchMock.mockImplementation(async (path: string) => {

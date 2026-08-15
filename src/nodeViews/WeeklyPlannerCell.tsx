@@ -182,10 +182,8 @@ function WeeklySelectionToolbar({ containerRef, plan, weekStart }: WeeklySelecti
       const node = range.startContainer;
       const span = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node as Element)
         ?.closest('[data-todo-id]');
-      // While a todo is being edited its span holds the RAW source, not the
-      // rendered text. The offsets below are visible-text offsets mapped back
-      // through the stored string, so acting on them here would apply markers
-      // at the wrong places. The toolbar simply stays out of the way.
+      // A todo being edited holds raw source, not rendered text, so the
+      // visible-offset mapping below would place markers wrongly.
       if (!span || (span as HTMLElement).isContentEditable) {
         setToolbarPos(null);
         savedFormatRef.current = null;
@@ -522,9 +520,8 @@ function DayColumn({
   const { t } = useTranslation();
   const [input, setInput] = useState('');
   const [moneyInput, setMoneyInput] = useState('');
-  // Which todo is open for editing. There is no draft state: the text being
-  // edited lives in the DOM, in the same element that renders it the rest of
-  // the time — see the contentEditable span below.
+  // No draft state: the text being edited lives in the DOM, in the same element
+  // that renders it the rest of the time.
   const [editingId, setEditingId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const editRef = useRef<HTMLSpanElement>(null);
@@ -548,9 +545,7 @@ function DayColumn({
   const startEdit = (todo: TodoData) => setEditingId(todo.id);
 
   const commitEdit = () => {
-    // Read the text out of the element itself. `textContent` is exactly the raw
-    // source, because that is what was put in — markers and all, the same
-    // string formatTodoText operates on.
+    // `textContent` is exactly the raw source, because that is what was put in.
     const next = editRef.current?.textContent ?? '';
     if (editingId) updateTodoText(plan, weekStart, day, editingId, next);
     setEditingId(null);
@@ -558,10 +553,9 @@ function DayColumn({
 
   const handleEditKeyDown = (e: KeyboardEvent<HTMLSpanElement>) => {
     e.stopPropagation();
-    // Enter saves rather than inserting a line break: a todo is one line of
-    // text, and the renderer has no notion of a break inside one.
+    // Enter saves: a todo is one line, and the renderer has no notion of a break.
     if (e.key === 'Enter') { e.preventDefault(); commitEdit(); return; }
-    // Escape drops the edit; blur saves. This is the only way out that discards.
+    // Escape is the only way out that discards; blur saves.
     if (e.key === 'Escape') setEditingId(null);
   };
 
@@ -628,20 +622,12 @@ function DayColumn({
               onKeyDown={(e) => e.stopPropagation()}
             />
             {/*
-              One element, editable or not — never a swap.
-              Editing used to replace this span with a textarea, and a textarea
-              carries an intrinsic width from its `cols` default that a 92px day
-              column cannot absorb, so opening the editor pushed the column out
-              of shape. Nothing about a caret requires a different box: the same
-              span takes one, keeps its width, its wrapping and its place in the
-              row, and the layout has no opportunity to move.
+              One element, editable or not — never a swap. A textarea carries an
+              intrinsic width from its `cols` default that a 92px day column
+              cannot absorb, which is what used to break the layout.
 
-              What it shows while editing is the raw source rather than the
-              rendered result — `**bold**`, `{c=#1971c2}…{/c}` and all — because
-              that is the string being edited and the one formatTodoText works
-              on. React sets it once via the html prop below and then leaves it
-              alone (the prop does not change while editing, since nothing is
-              written until commit), so typing is never clobbered mid-word.
+              While editing it holds the raw source, set once via the html prop
+              and then left alone, so typing is never clobbered mid-word.
             */}
             <span
               ref={editingId === todo.id ? editRef : undefined}
@@ -701,12 +687,8 @@ function DayColumn({
           onClick={(e) => e.stopPropagation()}
         />
       )}
-      {/*
-        The money block and its input are siblings of the todo block, not nested
-        inside one another. Each of the five is placed on its own grid row (see
-        weekly-cell.css), which is what lets the "add" inputs line up across all
-        seven days no matter how many todos or money lines a day happens to have.
-      */}
+      {/* Siblings, not nested: each of the five sits on its own grid row so the
+          "add" inputs line up across all seven days. */}
       {money !== null && showMoney && (
         <div className="weekly-day__money">
           {money.map((entry) => (

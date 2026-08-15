@@ -5,13 +5,11 @@ import type * as Y from 'yjs';
 import type { PlannerHandle } from '../collab/plannerHandle';
 import { MoneyCell } from './MoneyCell';
 
-// ---------------------------------------------------------------------------
-// NodeView — bridges the money_cell PM node ↔ the React money lens.
-// money_cell is an atom: ProseMirror owns nothing inside. It also owns no data
-// of its own — every figure is read back out of the money log in the planner
-// Y.Doc, so two of these cells in two documents can never disagree.
-// ---------------------------------------------------------------------------
-
+/**
+ * Bridges the money_cell PM node ↔ the React money lens. An atom that holds no
+ * data of its own — every figure is read out of the money log in the planner
+ * Y.Doc, so two of these cells in two documents can never disagree.
+ */
 export class MoneyCellView implements NodeView {
   dom: HTMLElement;
   private root: Root;
@@ -46,10 +44,8 @@ export class MoneyCellView implements NodeView {
       return;
     }
 
-    // Same rule as the weekly cell: never touch a still-loading planner doc.
-    // Reading is harmless, but rendering totals from a doc whose entries have
-    // not been applied yet shows a confident zero for a moment, and a zero is
-    // the one wrong number this feature has spent the most effort avoiding.
+    // Same rule as the weekly cell: totals from a doc whose entries have not
+    // been applied yet would show a confident zero for a moment.
     this.root.render(<div className="money-cell-loading">Loading…</div>);
     this.unsubscribe = planner.subscribe((loaded) => {
       this.unsubscribe?.();

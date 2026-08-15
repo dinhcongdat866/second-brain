@@ -1,12 +1,6 @@
 /**
- * Wallets, and the one decision that shapes all of them: a wallet has no stored
- * balance. It is the sum of the entries that moved through it, every time.
- *
- * That is not fussiness. A stored counter that two devices both increment is
- * wrong forever with no way to tell afterwards, which is the same reason the
- * debt ledger is a SUM and the day total is recomputed. So "correct my balance"
- * — the whole point of wallets in a log you type by hand — has to be expressed
- * as an entry rather than as an assignment, and these tests pin that down.
+ * Wallets, and the decision that shapes all of them: a wallet has no stored
+ * balance, so "correct my balance" has to be an entry, not an assignment.
  */
 import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
@@ -39,8 +33,7 @@ describe('wallets', () => {
     const id = createWallet(ydoc, 'Tiền mặt', '💵', 2_000_000, 'Số dư đầu');
 
     expect(walletBalance(readMoneyAll(ydoc), id, true)).toBe(2_000_000);
-    // The opening balance is visible in the log as a dated line, which is what
-    // makes it auditable later.
+    // The opening balance is a dated line, so it stays auditable.
     const [opening] = readMoneyAll(ydoc);
     expect(opening.category).toBe(MONEY_CAT.ADJUSTMENT);
     expect(opening.amount).toBe(2_000_000);
@@ -54,8 +47,8 @@ describe('wallets', () => {
   });
 
   it('a correction line is born already parsed, so it never reaches the model', () => {
-    // parsedFrom === text is exactly what useMoneySync's dirty-check looks at.
-    // Getting this wrong would bill the user to be told what "Chỉnh số dư" means.
+    // parsedFrom === text is what useMoneySync's dirty-check looks at; getting
+    // it wrong would bill the user to parse "Chỉnh số dư".
     const ydoc = new Y.Doc();
     createWallet(ydoc, 'Tiền mặt', '💵', 500_000, 'Số dư đầu');
     const [opening] = readMoneyAll(ydoc);
@@ -79,9 +72,7 @@ describe('wallets', () => {
   });
 
   it('folds unassigned lines into the default wallet', () => {
-    // Everything logged before wallets existed carries walletId null. Without
-    // this, shipping wallets would have made a year of entries vanish from the
-    // only view that shows a balance.
+    // Everything logged before wallets existed carries walletId null.
     const ydoc = new Y.Doc();
     const old = addMoneyEntry(ydoc, DATE, 'cà phê 85k');
     parse(ydoc, old, -85_000, 'cà phê 85k');
@@ -124,8 +115,7 @@ describe('correctWalletBalance', () => {
     const fix = readMoneyAll(ydoc).find((e) => e.text === 'Chỉnh số dư')!;
     expect(fix.amount).toBe(-200_000);
     expect(fix.date).toBe(DATE);
-    // The original opening line is untouched — the history still says when it
-    // drifted and by how much, which an assignment would have thrown away.
+    // The original opening line is untouched, so the drift stays in the history.
     expect(readMoneyAll(ydoc).filter((e) => e.category === MONEY_CAT.ADJUSTMENT)).toHaveLength(2);
   });
 
@@ -139,8 +129,7 @@ describe('correctWalletBalance', () => {
 
 describe('editing wallets', () => {
   it('deleting a wallet keeps its lines and hands them to the default', () => {
-    // The spending really happened; only the label for where the money sat has
-    // gone. Deleting the lines with it would silently drop a month's totals.
+    // Deleting the lines with the wallet would silently drop a month's totals.
     const ydoc = new Y.Doc();
     const cash = createWallet(ydoc, 'Tiền mặt', '💵', 0);
     const momo = createWallet(ydoc, 'Momo', '📱', 0);
@@ -190,9 +179,8 @@ describe('editing wallets', () => {
 
 describe('convergence', () => {
   it('two devices each making a wallet offline end up with both', () => {
-    // The failure this rules out is the one that made moneyLog top-level in the
-    // first place: a nested container created by two peers is a same-key
-    // conflict, and one side's whole map is discarded on merge.
+    // A nested container created by two peers is a same-key conflict, and one
+    // side's whole map is discarded on merge.
     const a = new Y.Doc();
     const b = new Y.Doc();
 
@@ -212,10 +200,7 @@ describe('convergence', () => {
   });
 
   it('two devices correcting the same wallet keep both corrections', () => {
-    // Both people looked in the same pocket and both wrote down what they saw.
-    // Neither correction is lost — which is the behaviour a stored balance
-    // could not have given, since one assignment would simply overwrite the
-    // other and no one would ever know.
+    // Neither correction is lost; a stored balance would have kept only one.
     const a = new Y.Doc();
     const id = createWallet(a, 'Tiền mặt', '💵', 1_000_000, 'đầu');
     const b = new Y.Doc();

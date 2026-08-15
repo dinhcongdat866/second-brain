@@ -1,20 +1,9 @@
 /* ---------- Money cell ---------- */
 
 /*
- * A lens over the money log — read-only by design. Every number here is summed
- * from the entries typed in the weekly planner, so this cell has no input for
- * spending at all; the only things you can change are the wallets, the budget
- * and which month you are looking at.
- *
- * Identity follows the same rule as the other cells: a 2px accent rule down the
- * left edge and a small uppercase label, on the one shared canvas. The accent
- * is gold. It was the money-in green, borrowed on the theory that this cell is
- * about numbers the planner already colours — but the AI cell is green too, so
- * the two announced themselves identically and the accent stopped saying which
- * kind of block you were looking at, which is the only job it has.
- *
- * Green and red stay where they mean something: in and out. Those are the same
- * everywhere, including inside the planner, and are not this cell's identity.
+ * Identity is a 2px gold rule down the left edge plus a small uppercase label,
+ * same as the other cells. Green and red stay reserved for in and out, which
+ * mean the same thing here and in the planner.
  */
 .money-cell-wrapper {
   margin: 4px 0;
@@ -134,8 +123,6 @@
   color: var(--nb-text-3);
 }
 
-/* The one place in this cell where a number is allowed to be large — three
-   figures that answer the question before any section is opened. */
 .money-summary__value {
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
@@ -185,8 +172,7 @@
   letter-spacing: 0.06em;
 }
 
-/* Carries the section's headline figure into the closed state, so shutting a
-   section hides the detail without hiding the answer. */
+/* Headline figure, kept visible when the section is collapsed. */
 .money-section__badge {
   margin-left: auto;
   font-size: var(--text-sm);
@@ -296,8 +282,6 @@
   flex-shrink: 0;
 }
 
-/* Deliberately thin and low-contrast. The number is the message; the bar only
-   answers "which of these is the big one" without being read. */
 .money-cat__bar {
   flex: 1 1 auto;
   height: 4px;
@@ -329,8 +313,7 @@
   flex-shrink: 0;
 }
 
-/* Well above what this category usually costs — the one comparison worth
-   colouring, because it is the only one that asks for a second look. */
+/* Well above what this category usually costs. */
 .money-cat__normal--high {
   color: var(--nb-money-warn);
 }
@@ -449,8 +432,7 @@
   white-space: nowrap;
 }
 
-/* Which wallet new lines in the planner land in. A dot rather than a highlight:
-   this is a small persistent fact, not a selection you are making right now. */
+/* Which wallet new lines in the planner land in. */
 .money-wallet__dot {
   color: var(--nb-money-accent-lit);
   font-size: 8px;
@@ -562,8 +544,7 @@
   gap: var(--space-sm);
 }
 
-/* Echoes back what the shorthand parser read, so committing a balance is never
-   a guess about whether "4tr5" meant what you thought it meant. */
+/* Echoes back what the shorthand parser read from "4tr5". */
 .money-amount-input__echo {
   font-size: var(--text-xs);
   color: var(--nb-text-3);
@@ -609,9 +590,8 @@
 
 /* ---------- Narrow ---------- */
 
-/* Container query, not a media query, for the same reason the weekly grid uses
-   one: the sidebar and the editor are both resizable, so the width this cell
-   gets is not a function of the viewport. */
+/* A container query, not a media query: sidebar and editor are both resizable,
+   so this cell's width is not a function of the viewport. */
 @container (max-width: 560px) {
   .money-summary {
     gap: var(--space-lg);
@@ -621,8 +601,6 @@
     font-size: var(--text-lg);
   }
 
-  /* The asides are the first thing to go: they qualify a number that is still
-     readable without them. */
   .money-pace__aside,
   .money-cat__normal {
     display: none;

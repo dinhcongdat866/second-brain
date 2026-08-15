@@ -1,41 +1,17 @@
 /**
- * Everything the money cell shows, derived from the money log.
+ * Everything the money cell shows, derived on the client from the money log.
  *
- * All of it is computed on the client, from the Y.Doc, with no request. That is
- * not a shortcut — it falls out of the shape the log already has. Every entry
- * carries its own date, amount and category, and the whole log lives in one
- * top-level map, so a month, a category or a search is a filter over an array
- * that is already in memory. The backend's job stays what it was: run the
- * parser, which needs a model, and keep the SQL projection other devices read.
- *
- * The practical effect is that the numbers are there offline and there is no
- * spinner between changing the month and seeing it.
- *
- * Two rules hold throughout, and both exist because a wrong number you believe
- * is worse than no number:
- *
- *   - Balance corrections are excluded from every figure. A correction is
- *     bookkeeping; counting it as spending would mean fixing your wallet looks
- *     like a shopping trip.
- *   - Averages are medians. One 20 triệu laptop drags a mean for months, and
- *     the question these figures answer is "what is normal for me", which is
- *     exactly what a mean stops being able to say.
+ * Two rules hold throughout: balance corrections are excluded from every
+ * figure, and averages are medians (one 20 triệu laptop drags a mean for
+ * months, and these figures answer "what is normal for me").
  */
 import type { MoneyEntryData, MoodEntry } from '../collab/weeklyPlans';
 import { MONEY_CAT } from './moneyTaxonomy';
 
-// ---------------------------------------------------------------------------
-// Category roles
-// ---------------------------------------------------------------------------
-
 /**
- * Obligations rather than daily choices: they land on a date someone else
- * picked, at an amount you already know.
- *
- * The split is the whole reason a projection can be trusted. Spending 6 triệu
- * in 14 days does not mean 12,9 triệu by month end, because rent was in those
- * 14 days and rent does not happen twice — multiplying the lot by two forecasts
- * a second rent. Fixed is counted once; only the variable part is extrapolated.
+ * Obligations rather than daily choices. Kept apart so a projection can count
+ * them once instead of extrapolating them — rent in the first 14 days does not
+ * mean two rents by month end.
  */
 export const FIXED_CATEGORIES: ReadonlySet<string> = new Set<string>([
   MONEY_CAT.HOUSING,
@@ -43,10 +19,8 @@ export const FIXED_CATEGORIES: ReadonlySet<string> = new Set<string>([
   MONEY_CAT.EDUCATION,
 ]);
 
-/** Excluded from every statistic — see the file header. */
 const EXCLUDED = new Set<string>([MONEY_CAT.ADJUSTMENT]);
 
-/** A line with a known amount that says something about your money. */
 function countable(e: MoneyEntryData): boolean {
   return e.amount !== null && e.amount !== 0 && !EXCLUDED.has(e.category);
 }
@@ -56,10 +30,6 @@ const isIncome = (e: MoneyEntryData) => countable(e) && e.amount! > 0;
 
 /** Spending as a positive number of đồng. */
 const spent = (e: MoneyEntryData) => -e.amount!;
-
-// ---------------------------------------------------------------------------
-// Dates
-// ---------------------------------------------------------------------------
 
 /** '2026-08-14' → '2026-08'. */
 export function monthOf(date: string): string {
@@ -71,7 +41,7 @@ export function daysInMonth(month: string): number {
   return new Date(y, m, 0).getDate();
 }
 
-/** '2026-08' + 1 → '2026-09'. Handles the year boundary. */
+/** '2026-08' + 1 → '2026-09'. */
 export function addMonths(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number);
   const d = new Date(y, m - 1 + delta, 1);
@@ -85,11 +55,7 @@ export function todayIso(): string {
   return `${d.getFullYear()}-${m}-${dd}`;
 }
 
-/**
- * How many days of `month` have happened as of `today`.
- * 0 for a month that has not started — the caller uses that to refuse to
- * project, rather than dividing by zero and reporting Infinity.
- */
+/** How many days of `month` have happened as of `today`. 0 if it hasn't started. */
 export function daysElapsedIn(month: string, today: string): number {
   const cur = monthOf(today);
   if (month < cur) return daysInMonth(month);
@@ -102,10 +68,6 @@ function isComplete(month: string, today: string): boolean {
   return month < monthOf(today);
 }
 
-// ---------------------------------------------------------------------------
-// Numbers
-// ---------------------------------------------------------------------------
-
 /** Middle value; average of the middle two for an even count. 0 for empty. */
 export function median(values: number[]): number {
   if (values.length === 0) return 0;
@@ -114,11 +76,7 @@ export function median(values: number[]): number {
   return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
 }
 
-/**
- * Vietnamese short form, the way the amounts were typed in the first place:
- * 300k, 6tr, 3tr8, 1,2 tỷ. Long-hand '3.800.000' is precise and unreadable in a
- * list of twelve, which is what these figures are read in.
- */
+/** Vietnamese short form: 300k, 6tr, 3tr8, 1,2 tỷ. */
 export function formatDongCompact(amount: number): string {
   const sign = amount < 0 ? '−' : '';
   const abs = Math.abs(amount);
@@ -141,16 +99,9 @@ export function formatDongCompact(amount: number): string {
 }
 
 /**
- * The inverse of formatDongCompact: read '5tr', '4tr5', '300k', '3.800.000'.
- *
- * Hand-written, and no model involved. Vietnamese money shorthand is a small
- * closed grammar — four multipliers and one compound form — so a parser for it
- * fits in twenty lines and answers instantly. The model earns its keep on free
- * prose like "cà phê với anh Tuấn 85k", where the amount is one part of a
- * sentence; it has no business being asked what "5tr" means.
- *
+ * The inverse of formatDongCompact: reads '5tr', '4tr5', '300k', '3.800.000'.
  * Returns null for anything it cannot read, so a caller can refuse rather than
- * guess — the same rule the parser follows for amounts.
+ * guess.
  */
 export function parseDongShorthand(input: string): number | null {
   const raw = normalizeVi(input).trim().replace(/\s+/g, '');
@@ -170,8 +121,7 @@ export function parseDongShorthand(input: string): number | null {
   };
 
   if (!unit) {
-    // No unit: '.' and ',' are thousands separators here, not decimal points —
-    // '3.800.000' is how the number is written, and nobody logs 3.8 đồng.
+    // Without a unit, '.' and ',' are thousands separators, not decimal points.
     if (tailRaw) return null;
     const digits = headRaw.replace(/[.,]/g, '');
     const n = Number(digits);
@@ -187,10 +137,6 @@ export function parseDongShorthand(input: string): number | null {
   const value = Math.round((head + tail) * mult);
   return negative ? -value : value;
 }
-
-// ---------------------------------------------------------------------------
-// Month totals
-// ---------------------------------------------------------------------------
 
 export interface MonthTotals {
   month: string;
@@ -228,10 +174,6 @@ export function monthsWithData(all: MoneyEntryData[]): string[] {
   return [...new Set(all.map((e) => monthOf(e.date)))].sort();
 }
 
-// ---------------------------------------------------------------------------
-// Category breakdown — the plain lines, plus what normal looks like
-// ---------------------------------------------------------------------------
-
 export interface CategoryTotal {
   category: string;
   /** Positive đồng spent in the month. */
@@ -248,13 +190,9 @@ export interface CategoryTotal {
 export interface Norm { median: number; months: number }
 
 /**
- * What each category usually costs, per month, over complete months only.
- *
+ * What each category usually costs per month, over complete months only.
  * Months where a category does not appear are left out rather than counted as
- * zero. Tuition happens twice a year; folding in ten zeroes would report the
- * normal as 0 and then flag every real payment as extraordinary, which tells
- * you nothing you did not already know. The number this gives instead is "when
- * this does happen, it is usually about this much".
+ * zero, so the answer is "when this happens it is usually about this much".
  */
 export function categoryNorms(all: MoneyEntryData[], today: string): Map<string, Norm> {
   const perMonth = new Map<string, Map<string, number>>();
@@ -305,10 +243,6 @@ export function categoryBreakdown(
     .sort((a, b) => b.total - a.total);
 }
 
-// ---------------------------------------------------------------------------
-// Pace — the honest version of "how much will this month cost"
-// ---------------------------------------------------------------------------
-
 export interface MonthForecast {
   month: string;
   daysInMonth: number;
@@ -323,9 +257,8 @@ export interface MonthForecast {
   variablePerDay: number;
   /**
    * Fixed spending the whole month is expected to carry: what has already
-   * landed, or the usual amount if it has not landed yet, whichever is larger.
-   * Rent paid on the 5th must not be doubled; rent not yet paid on the 25th
-   * must not be ignored.
+   * landed, or the usual amount, whichever is larger. Rent paid on the 5th must
+   * not be doubled; rent not yet paid on the 25th must not be ignored.
    */
   expectedFixed: number;
   /** expectedFixed + variablePerDay × daysInMonth. */
@@ -367,7 +300,6 @@ export function forecastMonth(
   };
 }
 
-/** Fixed-category total for each complete month, for the medians above. */
 function monthlyFixedTotals(all: MoneyEntryData[], today: string): number[] {
   return monthlySplit(all, today).map((m) => m.fixed);
 }
@@ -399,11 +331,9 @@ export interface NextMonthEstimate {
 }
 
 /**
- * What next month is likely to cost.
- *
- * Prefers the median of complete months, and falls back to this month's pace
- * when there are none — which is the honest answer in the first weeks of use,
- * as long as the caller says so. `basedOnMonths` is there for exactly that.
+ * What next month is likely to cost. Prefers the median of complete months and
+ * falls back to this month's pace when there are none — `basedOnMonths` lets
+ * the caller say which.
  */
 export function estimateNextMonth(
   all: MoneyEntryData[],
@@ -441,11 +371,8 @@ export interface Allowance {
 }
 
 /**
- * The number you can act on standing at a counter.
- *
- * Fixed costs that have not landed yet are subtracted up front — rent due on
- * the 28th is not money you may spend on the 20th, and an allowance that
- * pretends otherwise is worse than none.
+ * What is left to spend freely. Fixed costs not yet landed are subtracted up
+ * front — rent due on the 28th is not money you may spend on the 20th.
  */
 export function allowance(forecast: MonthForecast, budget: number): Allowance | null {
   if (budget <= 0) return null;
@@ -460,14 +387,9 @@ export function allowance(forecast: MonthForecast, budget: number): Allowance | 
   };
 }
 
-// ---------------------------------------------------------------------------
-// Recurring charges
-// ---------------------------------------------------------------------------
-
 /**
- * Strip everything that varies between two instances of the same charge —
- * diacritics, digits, money units — so "netflix 260k" in June and July collapse
- * to the same key.
+ * Strips everything that varies between two instances of the same charge, so
+ * "netflix 260k" in June and July collapse to the same key.
  */
 function recurringKey(text: string): string {
   return normalizeVi(text)
@@ -495,12 +417,8 @@ function dayNumber(date: string): number {
 
 /**
  * Charges that keep coming back at roughly the same amount, roughly a month
- * apart. Forgotten subscriptions are real money, and they are invisible in a
- * category breakdown because they hide inside a bigger bucket.
- *
- * Deliberately strict — three sightings, amounts within a fifth of each other,
- * gaps between 20 and 40 days. A loose rule that also flags "cà phê" every
- * month is a list nobody reads twice.
+ * apart. Deliberately strict — three sightings, amounts within a fifth of each
+ * other, gaps of 20–40 days — so it does not also flag "cà phê".
  */
 export function detectRecurring(all: MoneyEntryData[], today: string): RecurringHit[] {
   const groups = new Map<string, MoneyEntryData[]>();
@@ -544,10 +462,6 @@ export function detectRecurring(all: MoneyEntryData[], today: string): Recurring
   return out.sort((a, b) => b.amount - a.amount);
 }
 
-// ---------------------------------------------------------------------------
-// Unusual days
-// ---------------------------------------------------------------------------
-
 export interface DayAnomaly {
   date: string;
   /** Positive đồng spent that day. */
@@ -568,14 +482,7 @@ export function dailySpend(all: MoneyEntryData[]): Map<string, number> {
   return byDay;
 }
 
-/**
- * Days that cost several times a normal day.
- *
- * This is the alternative to a budget, and it is better precisely because it
- * needs no setup. A budget asks for a number in advance that nobody sets
- * honestly; "this day cost three times your usual" is derived from what you
- * already did and is true whether or not you ever configure anything.
- */
+/** Days that cost several times a normal day. */
 export function anomalies(
   all: MoneyEntryData[],
   month: string,
@@ -598,10 +505,6 @@ export function anomalies(
   return out.sort((a, b) => b.total - a.total);
 }
 
-// ---------------------------------------------------------------------------
-// Search over the raw text
-// ---------------------------------------------------------------------------
-
 /** Lowercase and drop diacritics, so "ca phe" finds "cà phê" and "Đi" finds "di". */
 export function normalizeVi(s: string): string {
   return s
@@ -618,14 +521,7 @@ export interface SearchResult {
   received: number;
 }
 
-/**
- * Free-text search over what you actually typed.
- *
- * This is the one question a category can never answer. "Food & Drink" is a
- * bucket somebody else drew; "cà phê" is the thing you wanted to know about,
- * and it is recoverable only because the raw line is kept verbatim rather than
- * being thrown away once the parser has had its look.
- */
+/** Free-text search over the raw line, which is kept verbatim for exactly this. */
 export function searchEntries(all: MoneyEntryData[], query: string): SearchResult {
   const q = normalizeVi(query.trim());
   if (!q) return { matches: [], spent: 0, received: 0 };
@@ -641,10 +537,6 @@ export function searchEntries(all: MoneyEntryData[], query: string): SearchResul
   return { matches, spent: out, received: inc };
 }
 
-// ---------------------------------------------------------------------------
-// Debt ledger, with time
-// ---------------------------------------------------------------------------
-
 export interface LedgerLine {
   counterparty: string;
   borrowed: number;
@@ -657,14 +549,7 @@ export interface LedgerLine {
   ageDays: number;
 }
 
-/**
- * Per-person balance, summed from the entries.
- *
- * The same figures GET /money/ledger returns, plus the thing SQL was not asked
- * for and the panel needed most: how long it has been. "Tuấn owes 1 triệu" and
- * "Tuấn has owed 1 triệu since April" are different sentences, and only the
- * second one makes anybody do something.
- */
+/** Per-person balance, summed from the entries, with how long it has been owed. */
 export function ledgerFrom(all: MoneyEntryData[], today: string): LedgerLine[] {
   const byPerson = new Map<string, LedgerLine>();
   for (const e of all) {
@@ -686,15 +571,10 @@ export function ledgerFrom(all: MoneyEntryData[], today: string): LedgerLine[] {
     byPerson.set(e.counterparty, cur);
   }
   return [...byPerson.values()]
-    // Settled people disappear rather than sitting there as a row of zeroes.
     .filter((r) => r.balance !== 0)
     .map((r) => ({ ...r, ageDays: dayNumber(today) - dayNumber(r.firstDate) }))
     .sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
 }
-
-// ---------------------------------------------------------------------------
-// Rhythm — what your spending tracks, besides the calendar
-// ---------------------------------------------------------------------------
 
 export interface MoodSpend {
   energy: number;
@@ -703,13 +583,7 @@ export interface MoodSpend {
   medianSpend: number;
 }
 
-/**
- * Spending against the mood logged the same day.
- *
- * Nothing new is stored for this: moodLog is keyed by date and so is the money
- * log, so it is a join on a string. No dedicated money app can produce it,
- * because no dedicated money app is also the place you record how the day went.
- */
+/** Spending against the mood logged the same day — a join on the date string. */
 export function spendByMood(
   all: MoneyEntryData[],
   moodLog: Record<string, MoodEntry>,
@@ -741,19 +615,12 @@ export interface TodoCategorySpend {
 /**
  * Spending against what you were doing that day.
  *
- * **This is not attribution, and the wording has to keep saying so.** A day
- * holds several todos across several categories and one pile of money; nothing
- * ties a particular đồng to a particular task. What it answers is narrower and
- * still worth knowing: *days on which you did X cost this much*.
+ * Not attribution — a day holds several todos and one pile of money. It answers
+ * only "days on which you did X cost this much", and the UI wording must match.
  *
- * Only days with at least one money line count. A day with no lines is not a
- * day you spent nothing, it is a day you did not write anything down, and
- * folding those in as zeroes would drag every category toward zero in exact
- * proportion to how lazy the logging was. A day that was logged and came to
- * nothing does count as zero, because that is a real observation.
- *
- * `minDays` exists because two days is a coincidence. Below it a category is
- * left out rather than shown with a number nobody should read.
+ * Only days with at least one money line are observed: a day with no lines is a
+ * day you did not write anything down, and counting it as zero would drag every
+ * category down in proportion to how lazy the logging was.
  */
 export function spendByTodoCategory(
   entries: MoneyEntryData[],

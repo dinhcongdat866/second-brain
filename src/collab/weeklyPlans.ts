@@ -244,12 +244,8 @@ export function deleteTodo(plan: Y.Map<unknown>, weekStart: string, day: DayKey,
 }
 
 /**
- * Every date that has todos, mapped to the categories those todos carry.
- *
- * The union for the day, de-duplicated — a day with three "Relationships" todos
- * is still one day spent on relationships. Days whose todos have not been
- * classified yet simply do not appear, which is the honest state: unknown, not
- * uncategorised.
+ * Every date that has classified todos, mapped to the union of their
+ * categories. Unclassified days do not appear at all — unknown, not empty.
  */
 export function readTodoCategoriesByDate(ydoc: Y.Doc): Map<string, string[]> {
   const out = new Map<string, Set<string>>();
@@ -592,12 +588,7 @@ export interface MoneyEntryData {
   status: 'ok' | 'needs_amount';
   /** Snapshot of `text` when parsed; drives the dirty-check in useMoneySync. */
   parsedFrom: string | null;
-  /**
-   * Which wallet this line moved money through, or null for lines written
-   * before wallets existed (and for anyone who never made a second wallet).
-   * null belongs to the default wallet — see walletBalance — so adding wallets
-   * never had to rewrite a single existing entry.
-   */
+  /** Which wallet the money moved through; null means the default wallet. */
   walletId: string | null;
   /** Insertion order within a day — a flat map has no inherent order. */
   createdAt: number;
@@ -725,22 +716,13 @@ export function formatDong(amount: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Wallets — a FLAT top-level map, keyed by wallet id
+// Wallets — a FLAT top-level map keyed by wallet id, same shape as moneyLog:
 //   ydoc.getMap('moneyWallets') → Y.Map<walletId, Y.Map{…WalletData}>
 //
-// Same shape as moneyLog, for the same reason: a nested container would have to
-// be created by whoever writes first, and two offline devices creating it is a
-// same-key conflict that throws one side's whole map away.
-//
 // A wallet has NO stored balance. The balance is the sum of the entries that
-// moved through it, recomputed every time — the one hard rule this feature has
-// followed since the debt ledger, because a counter two devices both increment
-// is wrong forever with no way to tell afterwards.
-//
-// Correcting a wallet therefore writes an *entry*, not a number: the difference
-// between what the app thinks you have and what you actually have becomes a
-// dated line like any other. You get the correction you asked for, the balance
-// stays a pure sum, and the history says when it drifted and by how much.
+// moved through it, because a counter two devices both increment is wrong
+// forever with no way to tell afterwards. Correcting a wallet therefore writes
+// a dated entry, not a number.
 // ---------------------------------------------------------------------------
 
 export interface WalletData {
@@ -772,11 +754,7 @@ export function readWallets(ydoc: Y.Doc): WalletData[] {
   return out.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
 }
 
-/**
- * Write a correction line: an ordinary money entry that is born already parsed,
- * so useMoneySync never sends it to the model. It has an amount and a category
- * from the moment it exists; there is nothing for a parser to work out.
- */
+/** A correction line: an ordinary entry, born already parsed. */
 function addAdjustmentEntry(
   ydoc: Y.Doc,
   walletId: string,
@@ -809,11 +787,7 @@ function todayIso(): string {
   return `${d.getFullYear()}-${m}-${dd}`;
 }
 
-/**
- * Create a wallet. A non-zero opening balance is written as a correction entry
- * rather than stored on the wallet, so there is exactly one way a balance can
- * come about and exactly one thing to fix when it is wrong.
- */
+/** An opening balance is written as a correction entry, not stored. */
 export function createWallet(
   ydoc: Y.Doc,
   name: string,
@@ -845,11 +819,8 @@ export function renameWallet(ydoc: Y.Doc, walletId: string, name: string, icon?:
 }
 
 /**
- * Remove a wallet and hand its entries back to the default wallet.
- *
- * The lines are kept. They are real spending that really happened; only the
- * label for where the money sat has gone away. Detaching them (walletId → null)
- * rather than deleting them means the month totals do not silently drop.
+ * Remove a wallet and detach its entries (walletId → null) rather than deleting
+ * them, so the month totals do not silently drop.
  */
 export function deleteWallet(ydoc: Y.Doc, walletId: string): void {
   ydoc.transact(() => {
@@ -865,12 +836,8 @@ export function moveEntryToWallet(ydoc: Y.Doc, entryId: string, walletId: string
 }
 
 /**
- * What this wallet holds: every amount that moved through it, added up.
- *
- * `isDefault` folds in the entries that name no wallet — everything logged
- * before wallets existed, and everything logged by someone who never made a
- * second one. Without it those lines would vanish from the wallet view the day
- * the feature shipped, which is a worse first impression than any migration.
+ * Every amount that moved through this wallet, added up. `isDefault` folds in
+ * the entries that name no wallet.
  */
 export function walletBalance(
   entries: MoneyEntryData[],
@@ -885,19 +852,12 @@ export function walletBalance(
 }
 
 /**
- * Reconcile a wallet against reality: you say what is actually in it, and the
- * difference is written as a dated correction line.
- *
- * Returns the entry id, or null when nothing had drifted. `label` and `date`
- * come from the caller so the wording stays in the UI's language.
+ * You say what is actually in the wallet; the difference becomes a dated
+ * correction line. Returns its id, or null when nothing had drifted.
  */
 // ---------------------------------------------------------------------------
-// Money settings — one small top-level map of scalars
-//
-// Safe as a plain key/value map precisely because the values are scalars: two
-// devices setting `monthlyBudget` is last-write-wins on a number, which loses a
-// preference at worst. That is a different situation from the containers above,
-// where the same conflict discards a whole map of entries.
+// Money settings — scalars only, so a concurrent write is last-write-wins on a
+// number rather than a container conflict that discards a whole map.
 // ---------------------------------------------------------------------------
 
 export const MONEY_SETTINGS_KEY = 'moneySettings';

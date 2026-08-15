@@ -1,20 +1,10 @@
 /**
- * Which wallet new money lines land in.
+ * Which wallet new money lines land in. A device preference in localStorage,
+ * not shared data — two devices may be spending from different wallets.
  *
- * A device preference, not shared data — the phone in your pocket and the
- * laptop on the desk are plausibly spending from different wallets, and making
- * one of them silently change the other's is the kind of thing you only notice
- * a month later. So localStorage, not the Y.Doc.
- *
- * It also keeps the planner's money input at exactly one keystroke. Picking a
- * wallet per line would be correct bookkeeping and nobody would do it twice;
- * the wallet is chosen once in the money cell and every line follows until you
- * change it.
- *
- * Which is why this is a store rather than two localStorage calls: the choice
- * is made in the money cell and read in the planner cell, two React trees with
- * nothing between them, and `storage` events do not fire in the tab that did
- * the writing. Both subscribe here instead, via useSyncExternalStore.
+ * A store rather than bare localStorage calls because the choice is made in the
+ * money cell and read in the planner cell, two React trees with nothing between
+ * them, and `storage` does not fire in the tab that did the writing.
  */
 const KEY = 'moneyActiveWallet';
 
@@ -34,7 +24,6 @@ export function subscribeActiveWallet(onChange: () => void): () => void {
   };
 }
 
-/** Another tab changed the choice — same person, same wallet. */
 function onStorage(e: StorageEvent): void {
   if (e.key === KEY || e.key === null) notify();
 }
@@ -56,16 +45,9 @@ export function writeActiveWalletId(id: string | null): void {
 }
 
 /**
- * The wallet a new line belongs to, given the wallets that exist.
- *
- * Falls back to the default (first) wallet when the stored id names a wallet
- * that has since been deleted, so a line never ends up attached to nothing.
- * Returns null when there are no wallets at all — the pre-wallets state, which
- * walletBalance already treats as belonging to the default.
- *
- * Derived on every read rather than corrected in place: the fallback is not
- * worth persisting, and writing it back would mean deleting a wallet quietly
- * rewrites a preference the person never touched.
+ * The wallet a new line belongs to, given the wallets that exist. Falls back to
+ * the first when the stored id names a deleted wallet; null when there are no
+ * wallets at all, which walletBalance treats as the default.
  */
 export function resolveActiveWalletId(
   walletIds: string[],
