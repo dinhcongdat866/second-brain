@@ -63,7 +63,7 @@ URL: `https://<sync-app>.fly.dev` → clients use `wss://<sync-app>.fly.dev`.
 > load and save; live collaboration stops).
 
 Run its tests before deploying — they spawn the relay and drive real peers at
-it: `cd deploy/sync-server && npm ci && npm test`. See `documents/sharing.md`.
+it: `cd deploy/sync-server && pnpm install && pnpm test`. See `documents/sharing.md`.
 
 ## 3. Frontend → Vercel env
 

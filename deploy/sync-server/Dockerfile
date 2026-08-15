@@ -1,10 +1,13 @@
 FROM node:20-slim
 WORKDIR /app
-# `npm ci` against a committed lockfile, not `npm install`: this process is now
-# the thing standing between a room name and someone else's notebook, so what
-# gets installed should not depend on the day the image was built.
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+# corepack ships with node 20 and reads packageManager from package.json, so the
+# image builds with the same pnpm the repo uses rather than whatever is newest.
+RUN corepack enable
+# Frozen lockfile, not a fresh resolve: this process is now the thing standing
+# between a room name and someone else's notebook, so what gets installed should
+# not depend on the day the image was built.
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
 COPY server.js .
 ENV HOST=0.0.0.0 PORT=1234
 EXPOSE 1234
