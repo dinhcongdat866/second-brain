@@ -71,6 +71,26 @@ def require_write(access: DocAccess) -> DocAccess:
     return access
 
 
+def require_document_holder(has_content: bool) -> None:
+    """
+    Before letting someone publish an id, check they actually have a document
+    under it.
+
+    A share row is a claim of ownership that the whole system then trusts: it is
+    what resolves an id to an account for a caller with no session. Writing it
+    from nothing but "the caller says so" let any signed-in account claim any id
+    it could name.
+
+    Nothing could be read that way — a squatter's rows are empty, and an id the
+    real owner already holds still resolves to them by the first rule in
+    decide_access. What it did allow was squatting: claim the id first and the
+    person who actually has that document can never publish it, because the row
+    is taken and the second claim is refused.
+    """
+    if not has_content:
+        raise AccessDenied(404, "No document with that id in your account")
+
+
 def require_owner(access: DocAccess, viewer_id: str | None) -> DocAccess:
     """
     Stricter than write access, for the operations that can destroy rather than

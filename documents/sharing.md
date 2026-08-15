@@ -129,10 +129,41 @@ so every socket is refused.
 
 `vercel.json` adds the SPA rewrite, without which `/{docId}` 404s on reload.
 
+### Publishing an id requires holding it
+
+`PUT /share` writes a row saying "this id belongs to me", and the rest of the
+system trusts that row — it is what resolves an id to an account for a caller
+with no session. It used to take the caller's word, writing `user_id` straight
+from the token without asking whether they had anything under that id.
+
+Nothing could be read that way: a squatter's rows are empty, and an id the real
+owner already holds still resolves to them by the first rule in `decide_access`.
+What it allowed was squatting. Claim the id first and the person who actually
+has that document can never publish it, because the second claim is refused as
+a duplicate. Publishing now requires a row in `yjs_documents` **or**
+`yjs_updates` under (caller, doc_id) — both count, because a document typed into
+for a few seconds has deltas but may not have a snapshot yet.
+
+## Revocation
+
+A token is verified once, at the upgrade. On its own that meant a socket opened
+a minute before a share was revoked kept its rights for as long as the tab
+stayed open — indefinitely, not for the token's lifetime.
+
+The relay now closes a connection when its token expires, which is what makes
+the lifetime an actual bound. It is one hour: the client refreshes at 80% of
+that, so a fresh token is already in hand and the reconnect is silent, and a
+revoked share stops working within the hour. Reloading the page revokes
+immediately, because the next token request is simply refused.
+
 ## Known gaps
 
 - A write link is anonymous. Nothing records who made an edit, and the modal
   says as much next to the option.
-- Revoking a share does not disconnect a session already holding a valid token;
-  it takes effect within the token's 12-hour lifetime, or immediately on the
-  visitor's next page load.
+- A failed token request is silent. Live sync stops and the document falls back
+  to HTTP save, which is correct behaviour, but nothing on screen says so.
+- Two implementations build the relay room string — `collabRoom()` on the
+  client, `_room_name()` on the server — and the relay compares them for
+  equality. Drift would refuse every socket; `attachRoomToken` logs an explicit
+  error if the token names a different room than the provider joined, but the
+  duplication is still there.

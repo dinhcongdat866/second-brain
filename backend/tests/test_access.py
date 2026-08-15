@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.access import (  # noqa: E402
     AccessDenied,
     decide_access,
+    require_document_holder,
     require_owner,
     require_write,
 )
@@ -138,6 +139,22 @@ def test_the_owner_can_replace_the_stored_document():
     for share in (None, "none", "read", "write"):
         access = decide_access(OWNER, True, OWNER if share else None, share)
         assert require_owner(access, OWNER) is access, share
+
+
+def test_publishing_an_id_you_hold_nothing_under_is_refused():
+    # Otherwise any signed-in account could claim any id it could name. Nothing
+    # leaks — a squatter's rows are empty — but the person who actually has that
+    # document could never publish it, because the row would already be taken.
+    try:
+        require_document_holder(has_content=False)
+    except AccessDenied as exc:
+        assert exc.status == 404
+    else:
+        raise AssertionError("an id the caller holds nothing under was publishable")
+
+
+def test_publishing_an_id_you_do_hold_is_allowed():
+    assert require_document_holder(has_content=True) is None
 
 
 if __name__ == "__main__":

@@ -11,7 +11,8 @@ const syncProtocol = require('y-protocols/dist/sync.cjs')
 const SECRET = 'test-secret-do-not-ship'
 const PORT = 3999
 const ROOM = 'notebook-user1-doc1'
-const sign = (room, w) => jwt.sign({ room, w }, SECRET, { algorithm: 'HS256', expiresIn: '5m' })
+const sign = (room, w, expiresIn = '5m') =>
+  jwt.sign({ room, w }, SECRET, { algorithm: 'HS256', expiresIn })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const results = []
@@ -105,6 +106,17 @@ async function main() {
   check('a second write-token peer does reach the first',
     writer.doc.getText('t').toString() === 'peer: from owner',
     JSON.stringify(writer.doc.getText('t').toString()))
+
+  // A token is only verified at the upgrade, so a socket left open would keep
+  // the rights it was granted forever — revoking a share would not reach anyone
+  // who simply never closed their tab. The relay closes it at expiry instead.
+  const shortLived = connect(ROOM, sign(ROOM, true, '2s'))
+  await sleep(600)
+  const openedFine = shortLived.ws.readyState === WebSocket.OPEN
+  await sleep(2600)
+  check('a socket is closed when its token expires',
+    openedFine && shortLived.ws.readyState === WebSocket.CLOSED,
+    `opened=${openedFine} readyState=${shortLived.ws.readyState}`)
 
   for (const c of [writer, reader, writer2]) c.ws.close()
   server.kill()

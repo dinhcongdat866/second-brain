@@ -108,13 +108,31 @@ server.on('upgrade', (request, socket, head) => {
   if (claims.room !== path) return refuse(socket, 403, 'Forbidden')
 
   wss.handleUpgrade(request, socket, head, (conn) => {
-    wss.emit('connection', conn, request, { room: path, canWrite: claims.w === true })
+    wss.emit('connection', conn, request, {
+      room: path,
+      canWrite: claims.w === true,
+      expMs: typeof claims.exp === 'number' ? claims.exp * 1000 : 0,
+    })
   })
 })
 
 wss.on('connection', (conn, request, ctx) => {
   if (!ctx.canWrite) makeReadOnly(conn)
   setupWSConnection(conn, request, { docName: ctx.room })
+
+  // A token is verified once, at the upgrade — so without this, a socket opened
+  // a minute before a share was revoked would keep the rights it was granted
+  // for as long as the tab stayed open, which is to say indefinitely. Closing
+  // it at expiry is what turns the token's lifetime into an actual bound on how
+  // stale a permission can get. The client reconnects with a fresh token, and
+  // is refused if the answer has changed.
+  if (ctx.expMs > 0) {
+    const expiry = setTimeout(
+      () => conn.close(4001, 'token expired'),
+      Math.max(0, ctx.expMs - Date.now()),
+    )
+    conn.on('close', () => clearTimeout(expiry))
+  }
 })
 
 server.listen(PORT, HOST, () => {

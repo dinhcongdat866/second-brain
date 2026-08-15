@@ -8,7 +8,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.access import AccessDenied, DocAccess, decide_access, require_owner, require_write
+from app.access import (
+    AccessDenied,
+    DocAccess,
+    decide_access,
+    require_document_holder,
+    require_owner,
+    require_write,
+)
 from app.auth import get_current_user, get_optional_user
 from app.config import settings
 from app.db.engine import get_db
@@ -25,9 +32,13 @@ RESERVED_DOC_IDS = {REGISTRY_DOC_ID, "__weekly-planner__", "__memory__"}
 
 LINK_ACCESS_VALUES = {"none", "read", "write"}
 
-# How long a room token stays valid. Long enough that a normal working session
-# never notices, short enough that revoking a share takes effect the same day.
-ROOM_TOKEN_TTL = timedelta(hours=12)
+# How long a room token stays valid — and, since the relay closes a socket when
+# its token expires, also the longest a revoked share can keep working. Twelve
+# hours was chosen when the token was only checked at connect time and the
+# number therefore meant very little. An hour costs one silent reconnect per
+# hour (the client refreshes at 80% of this, so a fresh token is already in
+# hand) and buys a revocation that actually takes effect.
+ROOM_TOKEN_TTL = timedelta(hours=1)
 
 # A Yjs update is opaque to this server and two updates cannot simply be
 # concatenated, so /sync frames each blob as [4-byte big-endian length][bytes].
@@ -78,6 +89,31 @@ def _owned(access: DocAccess, viewer_id: str | None) -> DocAccess:
         return require_owner(access, viewer_id)
     except AccessDenied as denied:
         raise HTTPException(status_code=denied.status, detail=denied.detail)
+
+
+async def _holds_document(db: AsyncSession, user_id: str, doc_id: str) -> bool:
+    """
+    Does this account actually have content under this id?
+
+    Both tables count. A document typed into for a few seconds has delta rows
+    but may not have a snapshot yet, and refusing to share it until the first
+    snapshot lands would be a confusing wait with no explanation.
+    """
+    snapshot = (await db.execute(
+        select(YjsDocument.doc_id).where(
+            YjsDocument.doc_id == doc_id,
+            YjsDocument.user_id == user_id,
+        )
+    )).scalar_one_or_none()
+    if snapshot is not None:
+        return True
+    delta = (await db.execute(
+        select(YjsUpdate.id).where(
+            YjsUpdate.doc_id == doc_id,
+            YjsUpdate.user_id == user_id,
+        ).limit(1)
+    )).scalar_one_or_none()
+    return delta is not None
 
 
 @router.get("/{doc_id}/state")
@@ -325,11 +361,21 @@ async def set_share(
     Publish or unpublish. Owner only, and deliberately not routed through
     resolve_doc_access: someone editing through a write link must not be able to
     widen the access they were given.
+
+    "Owner" has to be checked, not assumed. This used to write user_id straight
+    from the caller's token without asking whether they had anything under that
+    id, which made a share row claimable by any signed-in account that could
+    name one — see require_document_holder.
     """
     if body.link_access not in LINK_ACCESS_VALUES:
         raise HTTPException(status_code=400, detail="Unknown link_access")
     if doc_id in RESERVED_DOC_IDS:
         raise HTTPException(status_code=400, detail="This document cannot be shared")
+
+    try:
+        require_document_holder(await _holds_document(db, user_id, doc_id))
+    except AccessDenied as denied:
+        raise HTTPException(status_code=denied.status, detail=denied.detail)
 
     existing = (await db.execute(
         select(DocumentShare).where(DocumentShare.doc_id == doc_id)
