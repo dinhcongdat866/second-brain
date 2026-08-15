@@ -89,11 +89,28 @@
   --nb-weekly-weekend-bg:     #effbf5;
   --nb-weekly-weekend-border: #cdeddd;
 
-  /* ── Money log ── */
+  /* ── Money log ──
+     in/out are semantics, not identity: they mean the same thing wherever a
+     figure appears, including inside the weekly planner. */
   --nb-money-out:     #b34747;   /* money leaving */
   --nb-money-in:      #2f7d4f;   /* money arriving */
   --nb-money-warn:    #9a6b00;   /* parsed, but no amount found */
   --nb-money-warn-bg: rgba(240, 180, 40, 0.14);
+
+  /* ── Money cell identity — gold ──
+     The cell used to take its accent from --nb-money-in, which put it in the
+     same green family as the AI cell; two different kinds of block announcing
+     themselves in one colour is the same failure as no accent at all. Gold is
+     the obvious hue for money and the one warm family the page had not spent.
+
+     Two steps because the accent does two jobs. `accent` is ink — an 11px
+     uppercase label has to clear 4.5:1 on the canvas, which forces it deep.
+     `accent-lit` is for marks (the 2px edge rule, the active-wallet dot, a chip
+     border) where contrast is not the constraint and the colour is free to
+     actually read as gold. */
+  --nb-money-accent:      #8a6100;
+  --nb-money-accent-lit:  #a97c00;
+  --nb-money-accent-ring: rgba(169, 124, 0, 0.12);
 
   /* ── Links ── */
   --nb-link:          #3b6fcc;
