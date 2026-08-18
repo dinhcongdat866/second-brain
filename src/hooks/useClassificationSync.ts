@@ -21,7 +21,7 @@ import { getApiKey } from '../lib/apiKey';
 import { LLM_TIMEOUT_MS } from '../lib/config';
 import { apiFetch } from '../lib/http';
 
-const WEEKS_TO_SCAN = 4;   // current + 3 previous weeks
+const WEEKS_TO_SCAN = 4; // current + 3 previous weeks
 const BATCH_SIZE    = 50;  // backend max per request
 
 /**

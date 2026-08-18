@@ -373,6 +373,7 @@ export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = YJS_SAV
   let timer: ReturnType<typeof setTimeout> | null = null;
   let sentSV: Uint8Array | undefined;
   let dirty = false;
+  let appendsSinceSnapshot = 0;
 
   /** Bytes the server has not seen yet, or null when there is nothing to send. */
   const pendingDelta = (): Uint8Array | null => {
@@ -383,6 +384,7 @@ export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = YJS_SAV
   const markSent = () => {
     sentSV = Y.encodeStateVector(ydoc);
     dirty = false;
+    appendsSinceSnapshot = 0;
   };
 
   const persist = async () => {
@@ -393,6 +395,7 @@ export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = YJS_SAV
     await appendDocUpdate(docId, delta);
     sentSV = sv;
     dirty = false;
+    appendsSinceSnapshot++;
   };
 
   const schedule = (_update: Uint8Array, origin: unknown) => {
@@ -419,9 +422,17 @@ export function createYjsSyncer(docId: string, ydoc: Y.Doc, debounceMs = YJS_SAV
      *
      * OWNER ONLY. The endpoint behind it replaces the stored document, so it
      * refuses anyone editing through a share link; use flushAppend there.
+     *
+     * Does nothing when nothing has happened since the last snapshot. `dirty`
+     * alone is not that test: the debounce clears it after every append, so an
+     * hour of typing can end with `dirty === false` and a delta log that badly
+     * wants collapsing. Counting appends covers both — and it is what stops a
+     * tab switch from re-uploading a megabytes-long document that did not
+     * change, on every hide, forever.
      */
     flush: () => {
       if (timer) { clearTimeout(timer); timer = null; }
+      if (!dirty && appendsSinceSnapshot === 0) return;
       saveDocState(docId, ydoc).then(markSent).catch(() => {});
     },
     /**

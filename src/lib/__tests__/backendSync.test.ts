@@ -26,8 +26,9 @@ vi.mock('../http', () => {
 });
 vi.mock('../authToken', () => ({ getCachedToken: () => null }));
 
+import * as Y from 'yjs';
 import { apiFetch, HttpError } from '../http';
-import { fetchDocSync, parseSyncFrames } from '../backendSync';
+import { createYjsSyncer, fetchDocSync, parseSyncFrames } from '../backendSync';
 
 const apiFetchMock = vi.mocked(apiFetch);
 
@@ -120,5 +121,73 @@ describe('fetchDocSync retry semantics', () => {
     await vi.runAllTimersAsync();
     expect(await pending).toBeNull();
     expect(apiFetchMock).toHaveBeenCalledTimes(4); // initial + one per backoff delay
+  });
+});
+
+/**
+ * flush() runs on every visibilitychange to hidden — every tab switch, window
+ * blur and phone screen lock. It uploads the whole document, which on a mature
+ * notebook is megabytes, so firing it when nothing changed is pure waste on a
+ * loop.
+ */
+describe('createYjsSyncer flush', () => {
+  const DEBOUNCE = 4000;
+
+  /** 404 on the read (nothing stored yet), success on every write. */
+  function stubBackend() {
+    apiFetchMock.mockImplementation(async (path: string) => {
+      if (path.includes('/sync')) throw new HttpError(404, path);
+      return {} as Response;
+    });
+  }
+
+  const posted = (suffix: string) =>
+    apiFetchMock.mock.calls.filter((c) => String(c[0]).includes(suffix)).length;
+
+  function setup() {
+    stubBackend();
+    const ydoc = new Y.Doc();
+    return { ydoc, syncer: createYjsSyncer('doc-a', ydoc, DEBOUNCE) };
+  }
+
+  const edit = (ydoc: Y.Doc, value: string) => ydoc.getMap('m').set('k', value);
+
+  it('makes no request at all when the document has not changed', async () => {
+    const { syncer } = setup();
+    syncer.flush();
+    await vi.runAllTimersAsync();
+    expect(apiFetchMock).not.toHaveBeenCalled();
+  });
+
+  it('snapshots when there are unsaved edits', async () => {
+    const { ydoc, syncer } = setup();
+    edit(ydoc, 'one');
+    syncer.flush();
+    await vi.runAllTimersAsync();
+    expect(posted('/state')).toBe(1);
+  });
+
+  it('still snapshots after the debounce already appended, to collapse the log', async () => {
+    const { ydoc, syncer } = setup();
+    edit(ydoc, 'one');
+    await vi.advanceTimersByTimeAsync(DEBOUNCE);
+    expect(posted('/updates')).toBe(1); // dirty is false again from here on
+
+    syncer.flush();
+    await vi.runAllTimersAsync();
+    expect(posted('/state')).toBe(1);
+  });
+
+  it('goes quiet again once a snapshot has caught everything up', async () => {
+    const { ydoc, syncer } = setup();
+    edit(ydoc, 'one');
+    syncer.flush();
+    await vi.runAllTimersAsync();
+    const before = apiFetchMock.mock.calls.length;
+
+    syncer.flush(); // second tab switch, no edit in between
+    syncer.flush(); // third
+    await vi.runAllTimersAsync();
+    expect(apiFetchMock.mock.calls.length).toBe(before);
   });
 });
