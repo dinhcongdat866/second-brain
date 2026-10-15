@@ -167,6 +167,8 @@
   "money": {
     "kind": "Money",
     "deleteCell": "Delete cell",
+    "collapse": "Collapse",
+    "expand": "Expand",
     "prevMonth": "Previous month",
     "nextMonth": "Next month",
     "thisMonth": "This month",

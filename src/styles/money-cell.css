@@ -40,6 +40,29 @@
   margin-bottom: var(--space-lg);
 }
 
+.money-cell--minimized .money-cell__header {
+  margin-bottom: 0;
+}
+
+.money-cell__preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--nb-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.money-cell__collapse {
+  margin-left: auto;
+  font-size: var(--text-xs);
+}
+
+.money-cell__nav + .money-cell__collapse {
+  margin-left: 0;
+}
+
 .money-cell__kind {
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);

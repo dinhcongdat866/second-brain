@@ -167,6 +167,8 @@
   "money": {
     "kind": "Tiền",
     "deleteCell": "Xóa cell",
+    "collapse": "Thu gọn",
+    "expand": "Mở rộng",
     "prevMonth": "Tháng trước",
     "nextMonth": "Tháng sau",
     "thisMonth": "Tháng này",

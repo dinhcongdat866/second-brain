@@ -100,10 +100,13 @@ function createPlugins(
       'Enter': insertHardBreak,
       'Shift-Enter': insertHardBreak,
       'Mod-Enter': exitToParagraph,
+      // deleteEmptyCell runs before the guard: an empty markdown cell is
+      // removable whenever another cell of any kind remains, even when the
+      // cell before it is a protected one.
       'Backspace': chainCommands(
-        guardProtectedCells,
         convertEmptyHeadingToParagraph,
         deleteEmptyCell,
+        guardProtectedCells,
         exitBlockquoteOnBackspace,
         preventJoinIntoBlockquote,
       ),

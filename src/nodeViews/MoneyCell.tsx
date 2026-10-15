@@ -59,6 +59,7 @@ import {
 const SECTIONS_KEY = 'moneyCellSections';
 /** Masking the headline figure is a per-device choice, like which wallet is active. */
 const WORTH_HIDDEN_KEY = 'moneyNetWorthHidden';
+const MINIMIZED_KEY = 'moneyCellMinimized';
 
 type SectionId =
   | 'wallets' | 'categories' | 'pace' | 'unusual'
@@ -428,6 +429,13 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
     try { localStorage.setItem(WORTH_HIDDEN_KEY, h ? '0' : '1'); } catch { /* private mode */ }
     return !h;
   }), []);
+  const [minimized, setMinimized] = useState(() => {
+    try { return localStorage.getItem(MINIMIZED_KEY) === '1'; } catch { return false; }
+  });
+  const toggleMinimized = useCallback(() => setMinimized((m) => {
+    try { localStorage.setItem(MINIMIZED_KEY, m ? '0' : '1'); } catch { /* private mode */ }
+    return !m;
+  }), []);
 
   // Three top-level maps, three subscriptions: a todo edit in the planner must
   // not recompute a month of statistics.
@@ -544,10 +552,15 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
   const hasAnything = entries.length > 0;
 
   return (
-    <div className="money-cell">
+    <div className={`money-cell${minimized ? ' money-cell--minimized' : ''}`}>
       <div className="money-cell__header">
         <span className="money-cell__kind">{t('money.kind')}</span>
-        <div className="money-cell__nav">
+        {minimized && hasAnything && (
+          <span className="money-cell__preview">
+            {monthLabel} · {t('money.out')} {formatDongCompact(totals.out)} · {t('money.net')} {formatDongCompact(totals.net)}
+          </span>
+        )}
+        {!minimized && <div className="money-cell__nav">
           <button
             type="button"
             className="money-cell__navbtn"
@@ -574,11 +587,19 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
               {t('money.thisMonth')}
             </button>
           )}
-        </div>
+        </div>}
+        <button
+          type="button"
+          className="money-cell__navbtn money-cell__collapse"
+          onClick={toggleMinimized}
+          title={minimized ? t('money.expand') : t('money.collapse')}
+        >
+          {minimized ? '▶' : '▼'}
+        </button>
         <button type="button" className="money-cell__delete" onClick={onDelete} title={t('money.deleteCell')}>×</button>
       </div>
 
-      {!hasAnything ? (
+      {minimized ? null : !hasAnything ? (
         <p className="money-empty">{t('money.noData')}</p>
       ) : (
         <>
