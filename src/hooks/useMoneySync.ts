@@ -22,6 +22,7 @@ import {
   type MoneyEntryData,
 } from '../collab/weeklyPlans';
 import { getApiKey } from '../lib/apiKey';
+import { MONEY_CAT } from '../lib/moneyTaxonomy';
 import { deleteMoneyEntryRow } from '../lib/backendSync';
 import { LLM_TIMEOUT_MS } from '../lib/config';
 import { apiFetch } from '../lib/http';
@@ -122,6 +123,10 @@ async function syncMoney(ydoc: Y.Doc): Promise<void> {
   for (const [date, entries] of Object.entries(readMoneyLog(ydoc))) {
     if (date < fromDate || date > toDate) continue;
     for (const entry of entries) {
+      // A balance correction is born parsed and never had a DB row, so the
+      // "not in DB" branch below would hand it to the model, which finds no
+      // amount in "Chỉnh số dư" and wipes the one it already had.
+      if (entry.category === MONEY_CAT.ADJUSTMENT) continue;
       if (entry.text.trim()) pending.push(entry);
     }
   }

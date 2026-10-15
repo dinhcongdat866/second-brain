@@ -48,6 +48,7 @@ import {
 } from '../lib/moneyStats';
 import { moneyCategoryLabel } from '../lib/moneyTaxonomy';
 import { categoryLabel } from '../lib/taxonomy';
+import { Icon } from '../components/Icon';
 import {
   readActiveWalletId,
   resolveActiveWalletId,
@@ -56,6 +57,8 @@ import {
 } from '../lib/activeWallet';
 
 const SECTIONS_KEY = 'moneyCellSections';
+/** Masking the headline figure is a per-device choice, like which wallet is active. */
+const WORTH_HIDDEN_KEY = 'moneyNetWorthHidden';
 
 type SectionId =
   | 'wallets' | 'categories' | 'pace' | 'unusual'
@@ -158,9 +161,26 @@ function Wallets({ ydoc, wallets, entries, activeId, onActivate }: WalletsProps)
   const [newBalance, setNewBalance] = useState('');
   const [fixing, setFixing] = useState<string | null>(null);
   const [fixValue, setFixValue] = useState('');
+  const [menuFor, setMenuFor] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const defaultId = wallets[0]?.id ?? null;
+
+  const closeMenu = useCallback(() => { setMenuFor(null); setConfirmDelete(null); }, []);
+
+  useEffect(() => {
+    if (!menuFor) return;
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target instanceof Element) || !e.target.closest('.money-wallet__menu, .money-wallet__more')) closeMenu();
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') closeMenu(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuFor, closeMenu]);
 
   const submitNew = () => {
     const opening = parseDongShorthand(newBalance) ?? 0;
@@ -180,6 +200,7 @@ function Wallets({ ydoc, wallets, entries, activeId, onActivate }: WalletsProps)
       {wallets.map((w) => {
         const balance = walletBalance(entries, w.id, w.id === defaultId);
         const isActive = w.id === activeId;
+        const menuOpen = menuFor === w.id;
         return (
           <div key={w.id} className={`money-wallet${isActive ? ' money-wallet--active' : ''}`}>
             <button
@@ -194,18 +215,23 @@ function Wallets({ ydoc, wallets, entries, activeId, onActivate }: WalletsProps)
             </button>
 
             {fixing === w.id ? (
-              <AmountInput
-                value={fixValue}
-                onChange={setFixValue}
-                autoFocus
-                placeholder={t('money.wallets.fixPlaceholder')}
-                onCancel={() => setFixing(null)}
-                onCommit={(actual) => {
-                  correctWalletBalance(ydoc, w.id, actual, balance, t('money.wallets.correctionLabel'));
-                  setFixing(null);
-                  setFixValue('');
-                }}
-              />
+              <span className="money-wallet__fix">
+                <AmountInput
+                  value={fixValue}
+                  onChange={setFixValue}
+                  autoFocus
+                  placeholder={t('money.wallets.fixPlaceholder')}
+                  onCancel={() => setFixing(null)}
+                  onCommit={(actual) => {
+                    correctWalletBalance(ydoc, w.id, actual, balance, t('money.wallets.correctionLabel'));
+                    setFixing(null);
+                    setFixValue('');
+                  }}
+                />
+                <button type="button" className="money-btn money-btn--ghost" onClick={() => setFixing(null)}>
+                  {t('money.wallets.cancel')}
+                </button>
+              </span>
             ) : (
               <span
                 className={`money-wallet__balance money-wallet__balance--${balance < 0 ? 'out' : 'in'}`}
@@ -215,49 +241,57 @@ function Wallets({ ydoc, wallets, entries, activeId, onActivate }: WalletsProps)
               </span>
             )}
 
-            <div className="money-wallet__acts">
-              <button
-                type="button"
-                className="money-icon-btn"
-                title={t('money.wallets.fix')}
-                onClick={() => { setFixing(w.id); setFixValue(''); }}
-              >
-                ⇄
-              </button>
-              <button
-                type="button"
-                className="money-icon-btn"
-                title={t('money.wallets.rename')}
-                onClick={() => {
-                  const next = window.prompt(t('money.wallets.rename'), w.name);
-                  if (next) renameWallet(ydoc, w.id, next);
-                }}
-              >
-                ✎
-              </button>
-              {confirmDelete === w.id ? (
-                <>
-                  <button
-                    type="button"
-                    className="money-icon-btn money-icon-btn--danger"
-                    title={t('money.wallets.confirmDelete')}
-                    onClick={() => { deleteWallet(ydoc, w.id); setConfirmDelete(null); }}
-                  >
-                    ✓
-                  </button>
-                  <button type="button" className="money-icon-btn" onClick={() => setConfirmDelete(null)}>✗</button>
-                </>
-              ) : (
+            <button
+              type="button"
+              className={`money-wallet__more${menuOpen ? ' money-wallet__more--open' : ''}`}
+              title={t('money.wallets.menu')}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => {
+                if (menuOpen) { closeMenu(); return; }
+                setMenuFor(w.id);
+                setConfirmDelete(null);
+              }}
+            >
+              ⋯
+            </button>
+
+            {menuOpen && (
+              <div className="money-wallet__menu" role="menu">
                 <button
                   type="button"
-                  className="money-icon-btn"
-                  title={t('money.wallets.delete')}
-                  onClick={() => setConfirmDelete(w.id)}
+                  role="menuitem"
+                  onClick={() => { setFixing(w.id); setFixValue(''); closeMenu(); }}
                 >
-                  ×
+                  {t('money.wallets.fix')}
                 </button>
-              )}
-            </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    const next = window.prompt(t('money.wallets.rename'), w.name);
+                    if (next) renameWallet(ydoc, w.id, next);
+                    closeMenu();
+                  }}
+                >
+                  {t('money.wallets.rename')}
+                </button>
+                {confirmDelete === w.id ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="money-wallet__menu-danger"
+                    onClick={() => { deleteWallet(ydoc, w.id); closeMenu(); }}
+                  >
+                    {t('money.wallets.confirmDelete')}
+                  </button>
+                ) : (
+                  <button type="button" role="menuitem" onClick={() => setConfirmDelete(w.id)}>
+                    {t('money.wallets.delete')}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
@@ -268,6 +302,7 @@ function Wallets({ ydoc, wallets, entries, activeId, onActivate }: WalletsProps)
             className="money-input money-input--icon"
             value={newIcon}
             maxLength={2}
+            title={t('money.wallets.iconHint')}
             onChange={(e) => setNewIcon(e.target.value)}
             onKeyDown={(e) => e.stopPropagation()}
           />
@@ -287,7 +322,9 @@ function Wallets({ ydoc, wallets, entries, activeId, onActivate }: WalletsProps)
             onCancel={() => setAdding(false)}
           />
           <button type="button" className="money-btn" onClick={submitNew}>{t('money.wallets.create')}</button>
-          <button type="button" className="money-icon-btn" onClick={() => setAdding(false)}>×</button>
+          <button type="button" className="money-btn money-btn--ghost" onClick={() => setAdding(false)}>
+            {t('money.wallets.cancel')}
+          </button>
         </div>
       ) : (
         <button type="button" className="money-btn money-btn--ghost" onClick={() => setAdding(true)}>
@@ -295,8 +332,71 @@ function Wallets({ ydoc, wallets, entries, activeId, onActivate }: WalletsProps)
         </button>
       )}
 
-      <p className="money-note">{t('money.wallets.correctionNote')}</p>
+      <Hint text={t('money.wallets.correctionNote')} />
     </div>
+  );
+}
+
+/** A long explanation folded behind one small link, so the cell reads as numbers first. */
+function Hint({ text }: { text: string }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="money-hint">
+      <button type="button" className="money-hint__btn" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        {open ? '▾' : 'ⓘ'} {t('money.hint')}
+      </button>
+      {open && <p className="money-note">{text}</p>}
+    </div>
+  );
+}
+
+interface BarItem {
+  key: string;
+  label: string;
+  value: number;
+  sub?: string;
+}
+
+/** Vertical columns for a handful of short labels: weekdays, mood levels. */
+function Columns({ items }: { items: BarItem[] }) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <div className="money-cols">
+      {items.map((i) => (
+        <div
+          key={i.key}
+          className="money-cols__col"
+          title={`${i.label} · ${i.value.toLocaleString('vi-VN')}${i.sub ? ` · ${i.sub}` : ''}`}
+        >
+          <span className="money-cols__val">{formatDongCompact(i.value)}</span>
+          <span className="money-cols__track">
+            <span className="money-cols__bar" style={{ height: `${Math.max(3, Math.round((i.value / max) * 100))}%` }} />
+          </span>
+          <span className="money-cols__label">{i.label}</span>
+          {i.sub && <span className="money-cols__sub">{i.sub}</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Horizontal bars for labels too long to stand under a column. */
+function HBars({ items }: { items: BarItem[] }) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  return (
+    <ul className="money-cats">
+      {items.map((i) => (
+        <li key={i.key} className="money-cat" title={i.value.toLocaleString('vi-VN')}>
+          <span className="money-cat__name">{i.label}</span>
+          <span className="money-cat__bar" aria-hidden="true">
+            <span className="money-cat__fill" style={{ width: `${Math.round((i.value / max) * 100)}%` }} />
+          </span>
+          <span className="money-cat__amount">{formatDongCompact(i.value)}</span>
+          {i.sub && <span className="money-cat__normal">{i.sub}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -320,6 +420,14 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
   const [query, setQuery] = useState('');
   const [budgetDraft, setBudgetDraft] = useState('');
   const [editingBudget, setEditingBudget] = useState(false);
+  // Hidden until this device says otherwise: the figure is for you, not whoever is beside you.
+  const [worthHidden, setWorthHidden] = useState(() => {
+    try { return localStorage.getItem(WORTH_HIDDEN_KEY) !== '0'; } catch { return true; }
+  });
+  const toggleWorth = useCallback(() => setWorthHidden((h) => {
+    try { localStorage.setItem(WORTH_HIDDEN_KEY, h ? '0' : '1'); } catch { /* private mode */ }
+    return !h;
+  }), []);
 
   // Three top-level maps, three subscriptions: a todo edit in the planner must
   // not recompute a month of statistics.
@@ -393,6 +501,9 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
 
   const activate = useCallback((id: string) => writeActiveWalletId(id), []);
 
+  // Every đồng ever logged, in and out, across every wallet: what the wallets
+  // would add up to, with no wallet needed for the number to exist.
+  const netWorth  = useMemo(() => entries.reduce((s, e) => s + (e.amount ?? 0), 0), [entries]);
   const totals    = useMemo(() => monthTotals(entries, month), [entries, month]);
   const norms     = useMemo(() => categoryNorms(entries, today), [entries, today]);
   const cats      = useMemo(() => categoryBreakdown(entries, month, norms), [entries, month, norms]);
@@ -471,8 +582,29 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
         <p className="money-empty">{t('money.noData')}</p>
       ) : (
         <>
-          {/* Summary — three numbers, the whole month in one glance. */}
+          {/* Summary — what you have, then the month in three numbers. */}
           <div className="money-summary">
+            <div className="money-summary__item money-summary__item--worth">
+              <span className="money-summary__label">
+                {t('money.netWorth')}
+                <button
+                  type="button"
+                  className="money-summary__eye"
+                  onClick={toggleWorth}
+                  aria-pressed={worthHidden}
+                  title={worthHidden ? t('money.netWorthShow') : t('money.netWorthHide')}
+                >
+                  <Icon name={worthHidden ? 'eyeOff' : 'eye'} size={14} />
+                </button>
+              </span>
+              <span
+                className={`money-summary__value money-summary__value--worth${netWorth < 0 ? ' money-summary__value--out' : ''}`}
+                title={worthHidden ? undefined : `${netWorth.toLocaleString('vi-VN')} · ${t('money.netWorthNote')}`}
+              >
+                {worthHidden ? '***' : formatDongCompact(netWorth)}
+              </span>
+            </div>
+            <span className="money-summary__sep" aria-hidden="true" />
             <div className="money-summary__item">
               <span className="money-summary__label">{t('money.in')}</span>
               <span className="money-summary__value money-summary__value--in" title={totals.in.toLocaleString('vi-VN')}>
@@ -504,9 +636,11 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
 
           <Section
             id="wallets" title={t('money.sectionWallets')} open={sections.wallets} onToggle={toggleSection}
-            badge={wallets.length > 0
-              ? formatDongCompact(wallets.reduce((s, w, i) => s + walletBalance(entries, w.id, i === 0), 0))
-              : undefined}
+            badge={wallets.length === 0
+              ? undefined
+              : worthHidden
+                ? '***'
+                : formatDongCompact(wallets.reduce((s, w, i) => s + walletBalance(entries, w.id, i === 0), 0))}
           >
             <Wallets
               ydoc={ydoc}
@@ -636,9 +770,7 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
                     </>
                   )}
                 </div>
-                {budget > 0 && budgetLeft && (
-                  <p className="money-note">{t('money.allowanceNote')}</p>
-                )}
+                {budget > 0 && budgetLeft && <Hint text={t('money.allowanceNote')} />}
               </div>
             )}
           </Section>
@@ -724,56 +856,52 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
               <p className="money-empty">{t('money.noRhythm')}</p>
             ) : (
               <>
+                {byWeekday.length > 0 && (
+                  <>
+                    <p className="money-sub">{t('money.byWeekday')}</p>
+                    <Columns
+                      items={byWeekday.map((w) => ({
+                        key: String(w.day),
+                        label: DAY_LABELS[DAY_KEYS[w.day]],
+                        value: w.medianSpend,
+                        sub: t('money.dayCount', { count: w.days }),
+                      }))}
+                    />
+                  </>
+                )}
                 {byMood.length > 0 && (
                   <>
                     <p className="money-sub">{t('money.byMood')}</p>
-                    <ul className="money-list">
-                      {byMood.map((m) => (
-                        <li key={m.energy} className="money-list__row">
-                          <span className="money-list__main">{MOOD_EMOJIS[m.energy]} {m.energy}/5</span>
-                          <span className="money-list__aside">{t('money.dayCount', { count: m.days })}</span>
-                          <span className="money-list__amount">{formatDongCompact(m.medianSpend)}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <Columns
+                      items={byMood.map((m) => ({
+                        key: String(m.energy),
+                        label: `${MOOD_EMOJIS[m.energy]} ${m.energy}/5`,
+                        value: m.medianSpend,
+                        sub: t('money.dayCount', { count: m.days }),
+                      }))}
+                    />
                   </>
                 )}
                 {byTodoCat.length > 0 && (
                   <>
                     <p className="money-sub">{t('money.byTodo')}</p>
-                    <ul className="money-list">
-                      {byTodoCat.map((c) => (
-                        <li key={c.category} className="money-list__row">
-                          <span className="money-list__main">{categoryLabel(t, c.category)}</span>
-                          <span className="money-list__aside">
-                            {t('money.dayCount', { count: c.days })}
-                            {/* Only worth colouring when it is far enough from
-                                your ordinary day to mean anything. */}
-                            {(c.ratio >= 1.5 || c.ratio <= 0.67) &&
-                              ` · ${t('money.timesNormal', { ratio: c.ratio.toFixed(1).replace('.', ',') })}`}
-                          </span>
-                          <span className="money-list__amount">{formatDongCompact(c.medianSpend)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="money-note">{t('money.byTodoNote')}</p>
+                    <HBars
+                      items={byTodoCat.map((c) => ({
+                        key: c.category,
+                        label: categoryLabel(t, c.category),
+                        value: c.medianSpend,
+                        // Only worth annotating when it is far enough from your
+                        // ordinary day to mean anything.
+                        sub: t('money.dayCount', { count: c.days }) +
+                          ((c.ratio >= 1.5 || c.ratio <= 0.67)
+                            ? ` · ${t('money.timesNormal', { ratio: c.ratio.toFixed(1).replace('.', ',') })}`
+                            : ''),
+                      }))}
+                    />
+                    <Hint text={t('money.byTodoNote')} />
                   </>
                 )}
-                {byWeekday.length > 0 && (
-                  <>
-                    <p className="money-sub">{t('money.byWeekday')}</p>
-                    <ul className="money-list">
-                      {byWeekday.map((w) => (
-                        <li key={w.day} className="money-list__row">
-                          <span className="money-list__main">{DAY_LABELS[DAY_KEYS[w.day]]}</span>
-                          <span className="money-list__aside">{t('money.dayCount', { count: w.days })}</span>
-                          <span className="money-list__amount">{formatDongCompact(w.medianSpend)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-                <p className="money-note">{t('money.rhythmNote')}</p>
+                <Hint text={t('money.rhythmNote')} />
               </>
             )}
           </Section>
@@ -815,7 +943,7 @@ export function MoneyCell({ ydoc, onDelete, isGuest }: Props) {
                 </>
               )
             )}
-            <p className="money-note">{t('money.searchNote')}</p>
+            <Hint text={t('money.searchNote')} />
           </Section>
 
           {knownMonths.length > 1 && (

@@ -175,6 +175,11 @@
     "in": "In",
     "out": "Out",
     "net": "Net",
+    "netWorth": "Net worth",
+    "netWorthHide": "Hide",
+    "netWorthShow": "Show",
+    "netWorthNote": "Every line ever logged, across all wallets. Debts not included.",
+    "hint": "Explain",
     "pendingLines": "{{count}} lines have no amount yet — the figures below are incomplete",
     "noSpending": "Nothing spent this month",
     "futureMonth": "This month hasn't started",
@@ -238,7 +243,10 @@
       "delete": "Delete wallet",
       "confirmDelete": "Delete — the lines are kept",
       "setActive": "Log new lines here",
-      "isActive": "New lines go here"
+      "isActive": "New lines go here",
+      "menu": "Wallet actions",
+      "cancel": "Cancel",
+      "iconHint": "Wallet icon (emoji)"
     },
     "byTodo": "By what you were doing",
     "byTodoNote": "Days on which you did this, not money spent on it — a day holds several tasks and one pile of money, so nothing here attributes a đồng to a task."

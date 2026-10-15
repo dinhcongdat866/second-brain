@@ -22,7 +22,13 @@ vi.mock('../../lib/backendSync', () => ({ deleteMoneyEntryRow: vi.fn() }));
 
 import { apiFetch } from '../../lib/http';
 import { deleteMoneyEntryRow } from '../../lib/backendSync';
-import { addMoneyEntry, deleteMoneyEntry, readMoneyForDate } from '../../collab/weeklyPlans';
+import {
+  addMoneyEntry,
+  correctWalletBalance,
+  createWallet,
+  deleteMoneyEntry,
+  readMoneyForDate,
+} from '../../collab/weeklyPlans';
 import { syncMoneyForTest } from '../useMoneySync';
 
 const apiFetchMock = vi.mocked(apiFetch);
@@ -167,5 +173,20 @@ describe('a line deleted while its batch is in flight', () => {
     const survivors = readMoneyForDate(ydoc, TODAY);
     expect(survivors.map((e) => e.text)).toEqual(['grab 42k']);
     expect(survivors[0].amount).toBe(-42_000);
+  });
+});
+
+describe('a balance correction', () => {
+  it('is never sent to the model, even though the DB has no row for it', async () => {
+    const ydoc = new Y.Doc();
+    const cash = createWallet(ydoc, 'Cash', '💵', 2_000_000, 'Số dư đầu');
+    correctWalletBalance(ydoc, cash, 1_500_000, 2_000_000, 'Chỉnh số dư');
+    apiFetchMock.mockResolvedValueOnce(jsonResponse([]));
+
+    await syncMoneyForTest(ydoc);
+
+    expect(calledPaths()).not.toContain('/money/parse');
+    const amounts = readMoneyForDate(ydoc, TODAY).map((e) => e.amount);
+    expect(amounts).toEqual([2_000_000, -500_000]);
   });
 });
